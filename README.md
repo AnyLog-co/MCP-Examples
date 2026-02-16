@@ -293,6 +293,33 @@ Example:
 curl "http://localhost:8080/api/data/location?dbms=litsanleandro&table=ping_sensor"
 ```
 
+
+### UNS Policies (Blockchain Root Policies)
+
+#### Get UNS Root Policies
+```bash
+GET /api/uns
+```
+
+This endpoint proxies the native AnyLog command:
+
+- `blockchain get uns`
+
+Example:
+```bash
+curl http://localhost:8080/api/uns
+```
+
+Response:
+```json
+{
+  "command": "blockchain get uns",
+  "policies": [],
+  "raw": "..."
+}
+```
+
+
 ### Execute Arbitrary Command
 
 ```bash
@@ -489,6 +516,7 @@ The proxy:
 | `POST /api/query` | `sql {dbms} {sql}` |
 | `POST /api/query/increment` | `sql {dbms} SELECT increment(...) ...` |
 | `GET /api/data/location` | `get data nodes` |
+| `GET /api/uns` | `blockchain get uns` |
 
 ## Configuration
 

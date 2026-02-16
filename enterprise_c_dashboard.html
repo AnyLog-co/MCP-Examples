@@ -1,0 +1,1862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise C — Biopharmaceutical Process Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: #333;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .dashboard-container { max-width: 1900px; margin: 0 auto; }
+
+        /* ── Header ── */
+        .header {
+            background: white;
+            padding: 18px 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { color: #2c3e50; font-size: 22px; display: flex; align-items: center; gap: 10px; }
+        .header-info { text-align: right; font-size: 12px; color: #666; line-height: 1.6; }
+
+        .dot {
+            display: inline-block; width: 11px; height: 11px;
+            border-radius: 50%; flex-shrink: 0;
+        }
+        .dot-ok   { background: #4CAF50; animation: pulse 2s infinite; }
+        .dot-warn { background: #FF9800; animation: pulse 2s infinite; }
+        .dot-err  { background: #f44336; animation: pulse 1s infinite; }
+        .dot-off  { background: #9e9e9e; }
+
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+        @keyframes spin  { to{transform:rotate(360deg)} }
+
+        /* ── Proxy config bar ── */
+        .proxy-bar {
+            background: #1a252f;
+            padding: 10px 18px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .proxy-bar label { color: #aaa; font-size: 12px; white-space: nowrap; }
+        .proxy-bar input {
+            padding: 5px 9px; border-radius: 5px; border: 1px solid #555;
+            background: #2c3e50; color: #eee; font-size: 12px;
+        }
+        .proxy-bar input.w-host { width: 180px; }
+        .proxy-bar input.w-port { width: 70px; }
+        .proxy-bar input.w-dbms { width: 200px; }
+
+        .badge {
+            padding: 4px 11px; border-radius: 12px;
+            font-size: 11px; font-weight: 700; white-space: nowrap;
+        }
+        .badge-connected    { background: #4CAF50; color: #fff; }
+        .badge-disconnected { background: #607d8b; color: #fff; }
+        .badge-error        { background: #f44336; color: #fff; }
+        .badge-connecting   { background: #FF9800; color: #fff; }
+
+        .spinner {
+            width: 18px; height: 18px;
+            border: 3px solid #444; border-top-color: #3498db;
+            border-radius: 50%; animation: spin .7s linear infinite;
+            display: none; flex-shrink: 0;
+        }
+        .spinner.visible { display: inline-block; }
+
+        /* ── Error banner ── */
+        .err-banner {
+            background: #fff3e0; border: 1px solid #FF9800;
+            border-radius: 8px; padding: 10px 15px; margin-bottom: 12px;
+            font-size: 12px; color: #E65100; display: none;
+        }
+        .err-banner.visible { display: block; }
+
+        /* ── Process tabs ── */
+        .process-tabs {
+            display: flex; gap: 5px; margin-bottom: 12px;
+            background: rgba(255,255,255,.1); padding: 7px; border-radius: 12px;
+        }
+        .ptab {
+            flex: 1; padding: 12px 8px; border: none; border-radius: 8px;
+            cursor: pointer; font-size: 13px; font-weight: 600;
+            background: rgba(255,255,255,.15); color: white;
+            display: flex; flex-direction: column; align-items: center; gap: 3px;
+            position: relative; transition: all .2s;
+        }
+        .ptab:hover  { background: rgba(255,255,255,.25); }
+        .ptab.active { background: white; color: #2c3e50; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+        .ptab .t-icon { font-size: 18px; }
+        .ptab .t-name { font-size: 12px; }
+        .ptab .t-sub  { font-size: 10px; opacity: .65; }
+        .alarm-dot {
+            position: absolute; top: 6px; right: 7px;
+            background: #f44336; color: white;
+            font-size: 10px; font-weight: bold;
+            padding: 1px 5px; border-radius: 8px; display: none;
+        }
+
+        /* ── Controls ── */
+        .controls {
+            background: white; padding: 12px 18px;
+            border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,.1);
+            margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+        }
+        .controls button {
+            padding: 7px 14px; border: none; border-radius: 5px;
+            cursor: pointer; font-size: 12px; font-weight: 600; transition: .2s;
+        }
+        .btn-green { background: #4CAF50; color: white; }
+        .btn-green:hover { background: #43a047; }
+        .btn-blue  { background: #2196F3; color: white; }
+        .btn-blue:hover  { background: #1976D2; }
+        .btn-red   { background: #f44336; color: white; }
+        .btn-teal  { background: #009688; color: white; }
+        .controls select { border: 1px solid #ddd; padding: 7px 10px; border-radius: 5px; font-size: 12px; background: white; }
+
+        /* ── Alert summary ── */
+        .alert-row {
+            display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 12px;
+        }
+        .alert-card {
+            background: white; padding: 16px 18px;
+            border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,.1);
+            text-align: center; transition: transform .2s;
+        }
+        .alert-card:hover { transform: translateY(-2px); }
+        .alert-card.c-critical { border-left: 5px solid #f44336; }
+        .alert-card.c-warning  { border-left: 5px solid #FF9800; }
+        .alert-card.c-info     { border-left: 5px solid #2196F3; }
+        .alert-card.c-success  { border-left: 5px solid #4CAF50; }
+        .ac-icon  { font-size: 30px; margin-bottom: 4px; }
+        .ac-count { font-size: 34px; font-weight: bold; margin-bottom: 2px; }
+        .ac-count.cr { color: #f44336; }
+        .ac-count.wa { color: #FF9800; }
+        .ac-count.in { color: #2196F3; }
+        .ac-count.ok { color: #4CAF50; }
+        .ac-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .8px; }
+
+        /* ── Card ── */
+        .card {
+            background: white; padding: 20px 24px;
+            border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,.1);
+            margin-bottom: 12px;
+        }
+        .sec-title {
+            font-size: 15px; font-weight: 600; color: #333;
+            margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;
+        }
+
+        /* ── Status grid ── */
+        .status-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 10px;
+        }
+        .si {
+            padding: 10px 13px; border-radius: 7px;
+            background: #f7f7f7; border-left: 4px solid #3498db;
+        }
+        .si.alarm   { background: #ffebee; border-left-color: #f44336; }
+        .si.warning { background: #fff8e1; border-left-color: #FF9800; }
+        .si-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: .5px; }
+        .si-value { font-size: 16px; font-weight: bold; margin-top: 3px; color: #333; }
+        .si-value.dash { color: #bbb; }
+
+        /* ── Parameter cards ── */
+        .params-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(210px,1fr)); gap: 12px; margin-bottom: 12px;
+        }
+        .pc {
+            background: white; padding: 16px 18px;
+            border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,.1);
+            transition: transform .2s;
+        }
+        .pc:hover { transform: translateY(-2px); }
+        .pc.alarm   { border: 2px solid #f44336; background: #ffebee; }
+        .pc.warning { border: 2px solid #FF9800; background: #fff8e1; }
+
+        .pc-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 6px; }
+        .pc-label { font-size: 11px; color: #777; font-weight: 600; line-height: 1.3; }
+        .pc-status {
+            font-size: 10px; padding: 2px 6px; border-radius: 3px;
+            font-weight: 700; white-space: nowrap; flex-shrink: 0;
+        }
+        .st-ok   { background: #e8f5e9; color: #388E3C; }
+        .st-warn { background: #fff3e0; color: #F57C00; }
+        .st-err  { background: #ffebee; color: #D32F2F; }
+        .st-wait { background: #eeeeee; color: #9e9e9e; }
+
+        .pc-value { font-size: 28px; font-weight: bold; color: #3498db; line-height: 1.1; }
+        .pc-value.v-alarm { color: #f44336; }
+        .pc-value.v-warn  { color: #FF9800; }
+        .pc-value.v-wait  { color: #bdbdbd; font-size: 20px; }
+
+        .pc-range { font-size: 10px; color: #aaa; margin-top: 7px; }
+        .pc-bar   { height: 5px; background: #eee; border-radius: 3px; margin-top: 7px; overflow: hidden; }
+        .pc-fill  { height: 100%; border-radius: 3px; transition: width .5s; background: linear-gradient(90deg,#3498db,#2c3e50); }
+        .pc-fill.f-alarm { background: linear-gradient(90deg,#f44336,#d32f2f); }
+        .pc-fill.f-warn  { background: linear-gradient(90deg,#FF9800,#F57C00); }
+
+        /* ── Process panels ── */
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        .proc-badge {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 12px;
+        }
+        .pb-sub   { background: #e3f2fd; color: #1565C0; }
+        .pb-chrom { background: #f3e5f5; color: #6A1B9A; }
+        .pb-tff   { background: #e8f5e9; color: #1B5E20; }
+        .pb-sum   { background: #fff3e0; color: #E65100; }
+
+        /* ── Issues / Alarms ── */
+        .filter-row { display: flex; gap: 7px; margin-bottom: 12px; flex-wrap: wrap; }
+        .ftab {
+            padding: 5px 12px; border: none; background: #f5f5f5;
+            border-radius: 5px; cursor: pointer; font-size: 12px; transition: .2s;
+        }
+        .ftab.active { background: #3498db; color: white; }
+        .ftab:hover:not(.active) { background: #e0e0e0; }
+
+        .issues-list { max-height: 560px; overflow-y: auto; }
+
+        .issue {
+            display: flex; align-items: flex-start; padding: 13px;
+            margin-bottom: 9px; background: #f9f9f9;
+            border-radius: 7px; border-left: 5px solid #f44336;
+            transition: all .2s;
+        }
+        .issue:hover { background: #f4f4f4; transform: translateX(3px); box-shadow: 0 2px 6px rgba(0,0,0,.09); }
+        .issue.lv-warning { border-left-color: #FF9800; }
+        .issue.lv-info    { border-left-color: #2196F3; }
+        .issue.lv-ok      { border-left-color: #4CAF50; opacity: .55; }
+        .issue.hidden     { display: none; }
+
+        .i-bar { width: 7px; height: 40px; border-radius: 4px; margin-right: 11px; flex-shrink: 0; }
+        .sev-critical { background: linear-gradient(#f44336,#d32f2f); box-shadow: 0 0 7px rgba(244,67,54,.4); }
+        .sev-high     { background: linear-gradient(#FF9800,#F57C00); }
+        .sev-medium   { background: linear-gradient(#FFC107,#FFA000); }
+        .sev-low      { background: linear-gradient(#2196F3,#1976D2); }
+
+        .i-icon { font-size: 24px; margin-right: 10px; flex-shrink: 0; }
+        .i-body { flex: 1; }
+
+        .i-head { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; flex-wrap: wrap; }
+        .i-id { font-size: 10px; padding: 2px 6px; background: #666; color: white; border-radius: 3px; font-family: monospace; }
+        .i-tag { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; }
+        .tag-proc { background: #f3e5f5; color: #7B1FA2; }
+        .tag-proc-badge { background: #e8eaf6; color: #3949AB; }
+
+        .i-pri { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
+        .pri-urgent { background: #f44336; color: white; animation: pulse 1s infinite; }
+        .pri-high   { background: #FF9800; color: white; }
+        .pri-medium { background: #FFC107; color: #333; }
+        .pri-low    { background: #4CAF50; color: white; }
+
+        .i-title { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 4px; }
+        .i-meta  { display: flex; gap: 15px; font-size: 11px; color: #aaa; flex-wrap: wrap; }
+        .i-acts  { display: flex; gap: 5px; margin-top: 7px; }
+        .act-btn { padding: 4px 9px; border: none; border-radius: 3px; font-size: 11px; cursor: pointer; }
+        .act-ack { background: #2196F3; color: white; }
+        .act-res { background: #4CAF50; color: white; }
+        .act-btn:hover { opacity: .85; }
+
+        .i-ts   { min-width: 90px; text-align: right; flex-shrink: 0; }
+        .i-time { font-size: 12px; font-weight: 600; color: #444; }
+        .i-date { font-size: 10px; color: #bbb; }
+
+        /* ── Chart ── */
+        .chart-wrap { background: white; padding: 20px 24px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,.1); margin-bottom: 12px; }
+        canvas { max-height: 280px; }
+
+        /* ── No-data ── */
+        .no-data {
+            text-align: center; padding: 40px 20px; color: #bbb; font-size: 14px;
+        }
+        .no-data span { font-size: 36px; display: block; margin-bottom: 10px; }
+
+        /* ── SUM cross cards ── */
+        .cross-card { background: white; padding: 16px 18px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,.1); }
+        .top-bar { height: 4px; border-radius: 4px 4px 0 0; margin: -16px -18px 12px; }
+        .bar-sub   { background: #3498db; }
+        .bar-chrom { background: #9b59b6; }
+        .bar-tff   { background: #27ae60; }
+        .bar-cov   { background: #e67e22; }
+        .cross-title  { font-size: 12px; font-weight: 600; color: #666; }
+        .cross-status { font-size: 11px; padding: 2px 6px; border-radius: 3px; font-weight: 700; float: right; }
+        .cross-detail { font-size: 12px; color: #666; margin-top: 6px; line-height: 1.5; clear: both; }
+
+        .footer { text-align: center; color: rgba(255,255,255,.85); margin-top: 18px; font-size: 12px; }
+
+        /* ── API Call Log ── */
+        .log-panel {
+            background: #0d1117; border-radius: 10px;
+            margin-bottom: 18px; overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .log-header {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 16px; cursor: pointer;
+            background: #161b22; border-bottom: 1px solid #30363d;
+            user-select: none;
+        }
+        .log-header:hover { background: #1c2128; }
+        .log-title { color: #e6edf3; font-size: 13px; font-weight: 600; flex: 1; }
+        .log-stats { display: flex; gap: 10px; }
+        .log-stat {
+            font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+        }
+        .ls-total  { background: #21262d; color: #8b949e; }
+        .ls-ok     { background: #1a3a1a; color: #3fb950; }
+        .ls-err    { background: #3a1a1a; color: #f85149; }
+        .ls-rows   { background: #1a2a3a; color: #58a6ff; }
+        .log-caret { color: #8b949e; font-size: 12px; transition: transform .2s; }
+        .log-caret.open { transform: rotate(180deg); }
+
+        .log-toolbar {
+            display: flex; gap: 8px; align-items: center; padding: 8px 16px;
+            background: #161b22; border-bottom: 1px solid #30363d;
+        }
+        .log-toolbar input {
+            flex: 1; padding: 4px 8px; border-radius: 4px;
+            border: 1px solid #30363d; background: #0d1117;
+            color: #e6edf3; font-size: 11px; font-family: monospace;
+        }
+        .log-filter-btn {
+            padding: 3px 9px; border: none; border-radius: 4px;
+            font-size: 11px; font-weight: 600; cursor: pointer;
+            background: #21262d; color: #8b949e; transition: .15s;
+        }
+        .log-filter-btn.active { background: #1f6feb; color: white; }
+        .log-filter-btn:hover:not(.active) { background: #30363d; }
+        .log-clear { padding: 3px 9px; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; background: #3a1a1a; color: #f85149; }
+        .log-clear:hover { background: #5a2020; }
+
+        .log-body {
+            max-height: 380px; overflow-y: auto; font-family: 'Cascadia Code','Consolas','Courier New',monospace;
+        }
+        .log-body::-webkit-scrollbar { width: 6px; }
+        .log-body::-webkit-scrollbar-track { background: #0d1117; }
+        .log-body::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+        .log-entry {
+            display: grid;
+            grid-template-columns: 68px 45px 55px 85px 1fr 70px 60px;
+            align-items: center; gap: 0;
+            padding: 4px 0; border-bottom: 1px solid #161b22;
+            font-size: 11px; transition: background .1s;
+        }
+        .log-entry:hover { background: #161b22; }
+        .log-entry.hidden { display: none; }
+        .log-entry.log-err { border-left: 3px solid #f85149; }
+        .log-entry.log-ok  { border-left: 3px solid transparent; }
+
+        .le-time   { color: #8b949e; padding-left: 12px; white-space: nowrap; }
+        .le-method { font-weight: 700; text-align: center; }
+        .le-method.m-get  { color: #3fb950; }
+        .le-method.m-post { color: #58a6ff; }
+        .le-status { text-align: center; }
+        .le-status.s-ok  { color: #3fb950; }
+        .le-status.s-err { color: #f85149; font-weight: 700; }
+        .le-dur    { color: #e3b341; text-align: right; padding-right: 8px; }
+        .le-path   { color: #79c0ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; }
+        .le-detail { color: #8b949e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
+        .le-rows   { color: #a5d6ff; text-align: right; padding-right: 14px; white-space: nowrap; font-size: 10px; }
+
+        .log-entry.type-schema  .le-path { color: #d2a8ff; }
+        .log-entry.type-trend   .le-path { color: #ffa657; }
+        .log-entry.type-alarm   .le-path { color: #ff7b72; }
+        .log-entry.type-count   .le-path { color: #7ee787; }
+        .log-entry.type-latest  .le-path { color: #58a6ff; }
+        .log-entry.type-health  .le-path { color: #8b949e; }
+
+        .log-col-header {
+            display: grid;
+            grid-template-columns: 68px 45px 55px 85px 1fr 70px 60px;
+            padding: 5px 0; background: #161b22;
+            font-size: 10px; color: #484f58; font-family: monospace;
+            border-bottom: 1px solid #30363d; text-transform: uppercase; letter-spacing: .5px;
+        }
+        .log-col-header span:first-child  { padding-left: 12px; }
+        .log-col-header span:nth-child(6) { text-align: right; padding-right: 8px; }
+        .log-col-header span:last-child   { text-align: right; padding-right: 14px; }
+
+        /* Row-count summary table */
+        .row-summary {
+            border-top: 1px solid #30363d; padding: 10px 16px;
+            display: flex; gap: 20px; flex-wrap: wrap; align-items: center;
+        }
+        .row-summary-title { color: #484f58; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+        .row-tbl {
+            display: flex; align-items: center; gap: 6px; font-family: monospace; font-size: 11px;
+        }
+        .row-tbl-name { color: #79c0ff; }
+        .row-tbl-cnt  { color: #3fb950; font-weight: 700; }
+        .row-tbl-sep  { color: #30363d; }
+
+        /* theme color overrides */
+        .theme-chrom .pc-value { color: #9b59b6; }
+        .theme-chrom .pc-fill  { background: linear-gradient(90deg,#9b59b6,#6c3483); }
+        .theme-tff   .pc-value { color: #27ae60; }
+        .theme-tff   .pc-fill  { background: linear-gradient(90deg,#27ae60,#1a7a43); }
+    </style>
+</head>
+<body>
+<div class="dashboard-container">
+
+<!-- ══ Header ══ -->
+<div class="header">
+    <div>
+        <h1>
+            <span class="dot dot-off" id="mainDot"></span>
+            Enterprise C — Biopharmaceutical Process Dashboard
+        </h1>
+        <p style="margin-top:4px;color:#888;font-size:12px;">Real-time · SUB · CHROM · TFF · SUM — powered by AnyLog REST Proxy</p>
+    </div>
+    <div class="header-info">
+        <div><strong>Database:</strong> <span id="hdrDbms">—</span></div>
+        <div><strong>Node:</strong>     <span id="hdrNode">—</span></div>
+        <div><strong>Last Update:</strong> <span id="hdrUpdate">Never</span></div>
+        <div style="margin-top:4px;"><span id="hdrStatus" class="badge badge-disconnected">Not connected</span></div>
+    </div>
+</div>
+
+<!-- ══ Proxy config ══ -->
+<div class="proxy-bar">
+    <label>🔌 Host:</label>
+    <input id="cfgHost" class="w-host" value="localhost" placeholder="host or IP" />
+    <label>Port:</label>
+    <input id="cfgPort" class="w-port" value="8080" />
+    <label>Database:</label>
+    <input id="cfgDbms" class="w-dbms" value="manufacturing_historian" />
+    <button class="btn-blue"  style="font-size:12px;padding:6px 14px;" onclick="connect()">🔗 Connect</button>
+    <button class="btn-teal"  style="font-size:12px;padding:6px 14px;" onclick="discoverSchema()">🔍 Discover Schema</button>
+    <button style="font-size:12px;padding:6px 14px;background:#e67e22;color:white;border:none;border-radius:5px;cursor:pointer;" onclick="probeProxy()">🩺 Probe</button>
+    <span id="proxyBadge" class="badge badge-disconnected" style="margin-left:auto;">● Disconnected</span>
+    <div class="spinner" id="spinner"></div>
+</div>
+
+<!-- ══ Error banner ══ -->
+<div class="err-banner" id="errBanner"></div>
+
+<!-- ══ Process tabs ══ -->
+<div class="process-tabs">
+    <button class="ptab active" id="tab-sub"   onclick="switchTab('sub')">
+        <span class="t-icon">🧬</span><span class="t-name">SUB Unit 250</span><span class="t-sub">Bioreactor</span>
+        <span class="alarm-dot" id="adot-sub"></span>
+    </button>
+    <button class="ptab" id="tab-chrom" onclick="switchTab('chrom')">
+        <span class="t-icon">🔬</span><span class="t-name">CHROM</span><span class="t-sub">Chromatography</span>
+        <span class="alarm-dot" id="adot-chrom"></span>
+    </button>
+    <button class="ptab" id="tab-tff"   onclick="switchTab('tff')">
+        <span class="t-icon">💧</span><span class="t-name">TFF</span><span class="t-sub">Tangential Flow Filtration</span>
+        <span class="alarm-dot" id="adot-tff"></span>
+    </button>
+    <button class="ptab" id="tab-sum"   onclick="switchTab('sum')">
+        <span class="t-icon">📊</span><span class="t-name">SUM</span><span class="t-sub">Batch Summary</span>
+        <span class="alarm-dot" id="adot-sum"></span>
+    </button>
+</div>
+
+<!-- ══ Controls ══ -->
+<div class="controls">
+    <button class="btn-green" onclick="refreshCurrent()">🔄 Refresh</button>
+    <button class="btn-blue"  id="arBtn" onclick="toggleAR()">▶️ Auto-Refresh</button>
+    <select id="arInterval">
+        <option value="5000">Every 5s</option>
+        <option value="10000" selected>Every 10s</option>
+        <option value="30000">Every 30s</option>
+        <option value="60000">Every 60s</option>
+    </select>
+    <select id="timeHours" onchange="refreshCurrent()">
+        <option value="1" selected>Last 1 hr</option>
+        <option value="4">Last 4 hrs</option>
+        <option value="8">Last 8 hrs</option>
+        <option value="24">Last 24 hrs</option>
+    </select>
+    <button class="btn-teal" onclick="exportAlarms()">📥 Export CSV</button>
+</div>
+
+<!-- ══ Alert summary ══ -->
+<div class="alert-row">
+    <div class="alert-card c-critical"><div class="ac-icon">🔴</div><div class="ac-count cr" id="ac-crit">—</div><div class="ac-label">Critical Alarms</div></div>
+    <div class="alert-card c-warning"> <div class="ac-icon">🟠</div><div class="ac-count wa" id="ac-warn">—</div><div class="ac-label">Warnings</div></div>
+    <div class="alert-card c-info">    <div class="ac-icon">🔵</div><div class="ac-count in" id="ac-info">—</div><div class="ac-label">Info Events</div></div>
+    <div class="alert-card c-success"> <div class="ac-icon">🟢</div><div class="ac-count ok" id="ac-ok"  >—</div><div class="ac-label">Params Reporting</div></div>
+</div>
+
+<!-- ════════ SUB PANEL ════════ -->
+<div class="panel active" id="panel-sub">
+    <div class="proc-badge pb-sub">🧬 SUB Unit 250 — Bioreactor</div>
+    <div class="card">
+        <div class="sec-title">
+            Process Status
+            <span id="sub-stag" class="badge badge-disconnected" style="font-size:10px;">No Data</span>
+        </div>
+        <div class="status-grid">
+            <div class="si"><div class="si-label">Equipment State</div><div class="si-value dash" id="sub-st-equip">—</div></div>
+            <div class="si"><div class="si-label">Phase</div>          <div class="si-value dash" id="sub-st-phase">—</div></div>
+            <div class="si alarm"><div class="si-label">Active Alarms</div><div class="si-value dash" id="sub-st-alarms">—</div></div>
+            <div class="si"><div class="si-label">Batch ID</div>       <div class="si-value dash" id="sub-st-batch" style="font-size:13px;">—</div></div>
+            <div class="si"><div class="si-label">Rows (window)</div>  <div class="si-value dash" id="sub-st-rows">—</div></div>
+        </div>
+    </div>
+    <div class="params-grid" id="sub-params">
+        <div class="pc" style="grid-column:1/-1;">
+            <div class="no-data"><span>🔌</span>Connect to the REST proxy, then click <strong>Discover Schema</strong> to load live parameters.</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="sec-title">⚠️ SUB — Alarms &amp; Events
+            <select id="sub-sort" style="font-size:11px;padding:4px;" onchange="sortAlarms('sub')">
+                <option value="time">Time (newest)</option>
+                <option value="sev">Severity</option>
+            </select>
+        </div>
+        <div class="filter-row">
+            <button class="ftab active" onclick="filterAlarms('sub','all',this)">All</button>
+            <button class="ftab" onclick="filterAlarms('sub','critical',this)">Critical</button>
+            <button class="ftab" onclick="filterAlarms('sub','warning',this)">Warning</button>
+            <button class="ftab" onclick="filterAlarms('sub','info',this)">Info</button>
+        </div>
+        <div class="issues-list" id="sub-alarms">
+            <div class="no-data"><span>🔌</span>No alarm data — connect to proxy.</div>
+        </div>
+    </div>
+    <div class="chart-wrap">
+        <div class="sec-title">📈 SUB — Parameter Trends</div>
+        <canvas id="sub-chart" style="display:none;"></canvas>
+        <div class="no-data" id="sub-chart-nd"><span>📊</span>No trend data yet — connect and refresh.</div>
+    </div>
+</div>
+
+<!-- ════════ CHROM PANEL ════════ -->
+<div class="panel theme-chrom" id="panel-chrom">
+    <div class="proc-badge pb-chrom">🔬 CHROM — Chromatography</div>
+    <div class="card">
+        <div class="sec-title">
+            Process Status
+            <span id="chrom-stag" class="badge badge-disconnected" style="font-size:10px;">No Data</span>
+        </div>
+        <div class="status-grid">
+            <div class="si"><div class="si-label">Equipment State</div><div class="si-value dash" id="chrom-st-equip">—</div></div>
+            <div class="si"><div class="si-label">Step</div>           <div class="si-value dash" id="chrom-st-step">—</div></div>
+            <div class="si"><div class="si-label">Active Alarms</div>  <div class="si-value dash" id="chrom-st-alarms">—</div></div>
+            <div class="si"><div class="si-label">Batch ID</div>       <div class="si-value dash" id="chrom-st-batch" style="font-size:13px;">—</div></div>
+            <div class="si"><div class="si-label">Rows (window)</div>  <div class="si-value dash" id="chrom-st-rows">—</div></div>
+        </div>
+    </div>
+    <div class="params-grid" id="chrom-params">
+        <div class="pc" style="grid-column:1/-1;">
+            <div class="no-data"><span>🔌</span>Connect and discover schema to load CHROM parameters.</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="sec-title">⚠️ CHROM — Alarms &amp; Events
+            <select id="chrom-sort" style="font-size:11px;padding:4px;" onchange="sortAlarms('chrom')">
+                <option value="time">Time (newest)</option>
+                <option value="sev">Severity</option>
+            </select>
+        </div>
+        <div class="filter-row">
+            <button class="ftab active" onclick="filterAlarms('chrom','all',this)">All</button>
+            <button class="ftab" onclick="filterAlarms('chrom','critical',this)">Critical</button>
+            <button class="ftab" onclick="filterAlarms('chrom','warning',this)">Warning</button>
+            <button class="ftab" onclick="filterAlarms('chrom','info',this)">Info</button>
+        </div>
+        <div class="issues-list" id="chrom-alarms">
+            <div class="no-data"><span>🔌</span>No alarm data — connect to proxy.</div>
+        </div>
+    </div>
+    <div class="chart-wrap">
+        <div class="sec-title">📈 CHROM — Parameter Trends</div>
+        <canvas id="chrom-chart" style="display:none;"></canvas>
+        <div class="no-data" id="chrom-chart-nd"><span>📊</span>No trend data yet — connect and refresh.</div>
+    </div>
+</div>
+
+<!-- ════════ TFF PANEL ════════ -->
+<div class="panel theme-tff" id="panel-tff">
+    <div class="proc-badge pb-tff">💧 TFF — Tangential Flow Filtration</div>
+    <div class="card">
+        <div class="sec-title">
+            Process Status
+            <span id="tff-stag" class="badge badge-disconnected" style="font-size:10px;">No Data</span>
+        </div>
+        <div class="status-grid">
+            <div class="si"><div class="si-label">Equipment State</div><div class="si-value dash" id="tff-st-equip">—</div></div>
+            <div class="si"><div class="si-label">Step</div>           <div class="si-value dash" id="tff-st-step">—</div></div>
+            <div class="si"><div class="si-label">Active Alarms</div>  <div class="si-value dash" id="tff-st-alarms">—</div></div>
+            <div class="si"><div class="si-label">Batch ID</div>       <div class="si-value dash" id="tff-st-batch" style="font-size:13px;">—</div></div>
+            <div class="si"><div class="si-label">Rows (window)</div>  <div class="si-value dash" id="tff-st-rows">—</div></div>
+        </div>
+    </div>
+    <div class="params-grid" id="tff-params">
+        <div class="pc" style="grid-column:1/-1;">
+            <div class="no-data"><span>🔌</span>Connect and discover schema to load TFF parameters.</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="sec-title">⚠️ TFF — Alarms &amp; Events
+            <select id="tff-sort" style="font-size:11px;padding:4px;" onchange="sortAlarms('tff')">
+                <option value="time">Time (newest)</option>
+                <option value="sev">Severity</option>
+            </select>
+        </div>
+        <div class="filter-row">
+            <button class="ftab active" onclick="filterAlarms('tff','all',this)">All</button>
+            <button class="ftab" onclick="filterAlarms('tff','critical',this)">Critical</button>
+            <button class="ftab" onclick="filterAlarms('tff','warning',this)">Warning</button>
+            <button class="ftab" onclick="filterAlarms('tff','info',this)">Info</button>
+        </div>
+        <div class="issues-list" id="tff-alarms">
+            <div class="no-data"><span>🔌</span>No alarm data — connect to proxy.</div>
+        </div>
+    </div>
+    <div class="chart-wrap">
+        <div class="sec-title">📈 TFF — Parameter Trends</div>
+        <canvas id="tff-chart" style="display:none;"></canvas>
+        <div class="no-data" id="tff-chart-nd"><span>📊</span>No trend data yet — connect and refresh.</div>
+    </div>
+</div>
+
+<!-- ════════ SUM PANEL ════════ -->
+<div class="panel" id="panel-sum">
+    <div class="proc-badge pb-sum">📊 SUM — Batch Summary</div>
+    <div class="card">
+        <div class="sec-title">
+            Overall Batch Status
+            <span id="sum-stag" class="badge badge-disconnected" style="font-size:10px;">No Data</span>
+        </div>
+        <div class="status-grid">
+            <div class="si"><div class="si-label">Batch ID</div>     <div class="si-value dash" id="sum-st-batch">—</div></div>
+            <div class="si alarm"><div class="si-label">Total Alarms</div><div class="si-value dash" id="sum-st-alarms">—</div></div>
+            <div class="si"><div class="si-label">SUB Rows</div>     <div class="si-value dash" id="sum-st-sub">—</div></div>
+            <div class="si"><div class="si-label">CHROM Rows</div>   <div class="si-value dash" id="sum-st-chrom">—</div></div>
+            <div class="si"><div class="si-label">TFF Rows</div>     <div class="si-value dash" id="sum-st-tff">—</div></div>
+        </div>
+    </div>
+    <div class="params-grid">
+        <div class="cross-card">
+            <div class="top-bar bar-sub"></div>
+            <div><span class="cross-title">🧬 SUB Unit 250</span><span class="cross-status st-wait" id="sum-sub-badge">—</span></div>
+            <div class="cross-detail" id="sum-sub-detail">Connect to load live data.</div>
+        </div>
+        <div class="cross-card">
+            <div class="top-bar bar-chrom"></div>
+            <div><span class="cross-title">🔬 CHROM</span><span class="cross-status st-wait" id="sum-chrom-badge">—</span></div>
+            <div class="cross-detail" id="sum-chrom-detail">Connect to load live data.</div>
+        </div>
+        <div class="cross-card">
+            <div class="top-bar bar-tff"></div>
+            <div><span class="cross-title">💧 TFF</span><span class="cross-status st-wait" id="sum-tff-badge">—</span></div>
+            <div class="cross-detail" id="sum-tff-detail">Connect to load live data.</div>
+        </div>
+        <div class="cross-card">
+            <div class="top-bar bar-cov"></div>
+            <div><span class="cross-title">📡 Data Coverage</span><span class="cross-status st-wait" id="sum-cov-badge">—</span></div>
+            <div class="cross-detail" id="sum-cov-detail">Processes reporting in selected time window.</div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="sec-title">⚠️ All Active Alarms — Cross-Process</div>
+        <div class="filter-row">
+            <button class="ftab active" onclick="filterAlarms('sum','all',this)">All</button>
+            <button class="ftab" onclick="filterAlarms('sum','sub',this)">SUB</button>
+            <button class="ftab" onclick="filterAlarms('sum','chrom',this)">CHROM</button>
+            <button class="ftab" onclick="filterAlarms('sum','tff',this)">TFF</button>
+        </div>
+        <div class="issues-list" id="sum-alarms">
+            <div class="no-data"><span>🔌</span>No alarm data — connect to proxy.</div>
+        </div>
+    </div>
+    <div class="chart-wrap">
+        <div class="sec-title">📊 Cross-Process Alarm Timeline (24h)</div>
+        <canvas id="sum-chart" style="display:none;"></canvas>
+        <div class="no-data" id="sum-chart-nd"><span>📊</span>No data yet — connect and refresh.</div>
+    </div>
+</div>
+
+<!-- ════════ API CALL LOG ════════ -->
+<div class="log-panel" id="logPanel">
+    <div class="log-header" onclick="toggleLog()">
+        <span style="font-size:14px;">🖥️</span>
+        <span class="log-title">API Call Log</span>
+        <div class="log-stats">
+            <span class="log-stat ls-total" id="log-total">0 calls</span>
+            <span class="log-stat ls-ok"    id="log-ok">0 ok</span>
+            <span class="log-stat ls-err"   id="log-err">0 err</span>
+            <span class="log-stat ls-rows"  id="log-rows">0 rows</span>
+        </div>
+        <span class="log-caret" id="logCaret">▼</span>
+    </div>
+    <div id="logContent" style="display:none;">
+        <div class="log-toolbar">
+            <input id="logSearch" type="text" placeholder="Filter by path, table, SQL…" oninput="filterLog()" />
+            <button class="log-filter-btn active" onclick="setLogFilter('all',this)">All</button>
+            <button class="log-filter-btn"        onclick="setLogFilter('get',this)">GET</button>
+            <button class="log-filter-btn"        onclick="setLogFilter('post',this)">POST</button>
+            <button class="log-filter-btn"        onclick="setLogFilter('error',this)">Errors</button>
+            <button class="log-filter-btn"        onclick="setLogFilter('schema',this)">Schema</button>
+            <button class="log-filter-btn"        onclick="setLogFilter('query',this)">Query</button>
+            <button class="log-filter-btn"        onclick="setLogFilter('trend',this)">Trend</button>
+            <button class="log-clear" onclick="clearLog()">Clear</button>
+        </div>
+        <div class="log-col-header">
+            <span>Time</span>
+            <span style="text-align:center;">Method</span>
+            <span style="text-align:center;">Status</span>
+            <span style="text-align:right;padding-right:8px;">Duration</span>
+            <span style="padding-left:6px;">Proxy Endpoint → AnyLog Command / SQL</span>
+            <span style="text-align:right;padding-right:8px;">Table</span>
+            <span style="text-align:right;padding-right:14px;">Rows</span>
+        </div>
+        <div class="log-body" id="logBody">
+            <div style="padding:20px;text-align:center;color:#484f58;font-family:monospace;font-size:12px;">
+                — No API calls yet. Connect to the proxy to begin logging. —
+            </div>
+        </div>
+        <div class="row-summary" id="rowSummary">
+            <span class="row-summary-title">Rows returned by table:</span>
+            <span id="rowSumContent" style="color:#484f58;font-size:11px;font-family:monospace;">— No data yet —</span>
+        </div>
+    </div>
+</div>
+
+<div class="footer">AnyLog Network — Enterprise C Biopharmaceutical | REST Proxy | real-time data only</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+'use strict';
+
+// ── CONFIG ──────────────────────────────────────────────────────
+// Database name (matches your operator database)
+const DEFAULT_DBMS = 'manufacturing_historian';
+
+// Each process has an explicit list of tag tables to display.
+// Table naming: each tag = its own table, value column = "value".
+// Suffix hints: _pv = process value, _sp = setpoint, _pv_* = PV with EU suffix.
+// Only include tables with numeric data (skip _desc, _eu, _id, _name, _msg, _mode, _batch_id etc).
+// Max 12 tags per process shown on dashboard.
+
+const TAG_GROUPS = {
+    sub: [
+        { table:'sub_tic_250_001_pv_celsius',   col:'value', label:'TIC-250-001 Temp',   unit:'°C',  sp:{lo:35.5, hi:38.5, max:50} },
+        { table:'sub_tic_250_002_pv_celsius',   col:'value', label:'TIC-250-002 Temp',   unit:'°C',  sp:{lo:35.5, hi:38.5, max:50} },
+        { table:'sub_ti_250_001_pv_celsius',    col:'value', label:'TI-250-001 Temp',    unit:'°C'  },
+        { table:'sub_ti_250_002_pv_celsius',    col:'value', label:'TI-250-002 Temp',    unit:'°C'  },
+        { table:'sub_aic_250_003_pv_ph',        col:'value', label:'pH',                 unit:'pH',  sp:{lo:6.8, hi:7.2, max:14} },
+        { table:'sub_sic_250_008_pv_rpm',       col:'value', label:'Agitation',          unit:'RPM', sp:{lo:50, hi:300, max:400} },
+        { table:'sub_fic_250_001_pv_slpm',      col:'value', label:'Air Flow',           unit:'slpm' },
+        { table:'sub_fic_250_002_pv_slpm',      col:'value', label:'O₂ Flow',            unit:'slpm' },
+        { table:'sub_fic_250_003_pv_slpm',      col:'value', label:'CO₂ Flow',           unit:'slpm' },
+        { table:'sub_pic_250_001_pv_psi',       col:'value', label:'Pressure',           unit:'PSI' },
+        { table:'sub_wi_250_001_pv_kg',         col:'value', label:'Weight',             unit:'kg'  },
+        { table:'sub_sic_250_003_pv_l_per_min', col:'value', label:'Pump Flow',          unit:'L/min' },
+        { table:'sub_unit_250_state',    col:'value', label:'Unit State', isText:true },
+        { table:'sub_unit_250_phase',    col:'value', label:'Phase',      isText:true },
+        { table:'sub_unit_250_batch_id', col:'value', label:'Batch ID',   isText:true },
+        { table:'sub_unit_250_recipe',   col:'value', label:'Recipe',     isText:true },
+    ],
+    chrom: [
+        { table:'chrom_chr01_at001_pv',  col:'value', label:'AT-001',        unit:'' },
+        { table:'chrom_chr01_at002_pv',  col:'value', label:'AT-002',        unit:'' },
+        { table:'chrom_chr01_at003_pv',  col:'value', label:'AT-003',        unit:'' },
+        { table:'chrom_chr01_ft001_pv',  col:'value', label:'FT-001 Flow',   unit:'' },
+        { table:'chrom_chr01_p001a_pv',  col:'value', label:'P-001A',        unit:'' },
+        { table:'chrom_chr01_p001b_pv',  col:'value', label:'P-001B',        unit:'' },
+        { table:'chrom_chr01_pt002_pv',  col:'value', label:'PT-002',        unit:'' },
+        { table:'chrom_chr01_pt003_pv',  col:'value', label:'PT-003',        unit:'' },
+        { table:'chrom_chr01_tt001_pv',  col:'value', label:'TT-001 Temp',   unit:'' },
+        { table:'chrom_chr01_v001_pv',   col:'value', label:'V-001',         unit:'' },
+        { table:'chrom_chr01_v002_pv',   col:'value', label:'V-002',         unit:'' },
+        { table:'chrom_chr01_waste_pv',  col:'value', label:'Waste',         unit:'' },
+        { table:'chrom_chr01_state_pv',  col:'value', label:'State',   isText:true },
+        { table:'chrom_chr01_phase_pv',  col:'value', label:'Phase',   isText:true },
+        { table:'chrom_chr01_batch_id',  col:'value', label:'Batch ID',isText:true },
+    ],
+    tff: [
+        { table:'tff_tmp7m_psig',         col:'value', label:'TMP',              unit:'PSIG', sp:{lo:0, hi:30, max:50} },
+        { table:'tff_pi7f_psig',          col:'value', label:'Inlet Pressure',   unit:'PSIG' },
+        { table:'tff_pi8r_psig',          col:'value', label:'Retentate Press',  unit:'PSIG' },
+        { table:'tff_pi5r8_psig',         col:'value', label:'Permeate Press',   unit:'PSIG' },
+        { table:'tff_dpi7m_psig',         col:'value', label:'ΔP',               unit:'PSIG' },
+        { table:'tff_fi7f_lpm',           col:'value', label:'Feed Flow',        unit:'LPM'  },
+        { table:'tff_fi8p_lpm',           col:'value', label:'Permeate Flow',    unit:'LPM'  },
+        { table:'tff_fx7f_lmh',           col:'value', label:'Feed Flux',        unit:'LMH'  },
+        { table:'tff_fx8p_lmh',           col:'value', label:'Perm Flux',        unit:'LMH'  },
+        { table:'tff_ti8r_celsius',       col:'value', label:'Temperature',      unit:'°C'   },
+        { table:'tff_uv8r_au',            col:'value', label:'UV 280nm',         unit:'AU'   },
+        { table:'tff_wi17k_kg',           col:'value', label:'Permeate Weight',  unit:'kg'   },
+        { table:'tff_phase',              col:'value', label:'Phase',   isText:true },
+        { table:'tff_tff300_batch_id',    col:'value', label:'Batch ID',isText:true },
+    ],
+    sum: [
+        { table:'sum_tic501_pv_celsius',  col:'value', label:'TIC-501 Temp',     unit:'°C'  },
+        { table:'sum_sic501_pv_rpm',      col:'value', label:'SIC-501 Agit',     unit:'RPM' },
+        { table:'sum_sic501a_pv_lpm',     col:'value', label:'SIC-501A Flow',    unit:'LPM' },
+        { table:'sum_sic502_pv_lpm',      col:'value', label:'SIC-502 Flow',     unit:'LPM' },
+        { table:'sum_sic503_pv_lpm',      col:'value', label:'SIC-503 Flow',     unit:'LPM' },
+        { table:'sum_sic504_pv_lpm',      col:'value', label:'SIC-504 Flow',     unit:'LPM' },
+        { table:'sum_ai501_pv_ph',        col:'value', label:'pH',               unit:'pH'  },
+        { table:'sum_wi501_pv_kg',        col:'value', label:'Weight',           unit:'kg'  },
+        { table:'sum_batch_id',           col:'value', label:'Batch ID', isText:true },
+        { table:'sum_phase_id',           col:'value', label:'Phase',    isText:true },
+        { table:'sum_sum500_status',      col:'value', label:'Status',   isText:true },
+    ],
+};
+
+// Chart colours per process
+const COLORS = {
+    sub:   ['#f44336','#3498db','#4CAF50','#FF9800','#9c27b0','#00bcd4','#795548','#607d8b','#e91e63','#8bc34a','#ff5722','#009688'],
+    chrom: ['#9b59b6','#e67e22','#27ae60','#3498db','#f44336','#00bcd4','#FFC107','#607d8b','#ff5722','#8bc34a','#795548','#009688'],
+    tff:   ['#27ae60','#2196F3','#FF9800','#9b59b6','#f44336','#00bcd4','#FFC107','#795548','#e91e63','#8bc34a','#ff5722','#009688'],
+    sum:   ['#FF9800','#f44336','#3498db','#4CAF50','#9c27b0','#00bcd4','#FFC107','#795548'],
+};
+
+// Tables that hold text/state data — queried but displayed as text badges, not numbers
+const TEXT_TABLES = new Set([
+    'sub_unit_250_state','sub_unit_250_phase','sub_unit_250_batch_id','sub_unit_250_recipe',
+    'sub_unit_250_formula','chrom_chr01_state_pv','chrom_chr01_phase_pv','chrom_chr01_batch_id',
+    'tff_phase','tff_tff300_batch_id','sum_batch_id','sum_phase_id','sum_unit_id',
+]);
+
+// ── STATE ────────────────────────────────────────────────────────
+let connected   = false;
+let currentTab  = 'sub';
+let arTimer     = null;
+let arOn        = false;
+let alarmTable  = null;
+
+const PROCS = ['sub','chrom','tff'];
+
+// per-process state: vals = { tableName: latestValue }, alarms = []
+const state = {
+    sub:   { vals:{}, alarms:[] },
+    chrom: { vals:{}, alarms:[] },
+    tff:   { vals:{}, alarms:[] },
+};
+
+const charts = {};
+
+// ── PROXY HELPERS ────────────────────────────────────────────────
+function base() {
+    const h = (document.getElementById('cfgHost').value||'localhost').trim();
+    const p = (document.getElementById('cfgPort').value||'8080').trim();
+    return `http://${h}:${p}`;
+}
+function dbms()  { return (document.getElementById('cfgDbms').value||'').trim(); }
+function hours() { return parseInt(document.getElementById('timeHours').value)||1; }
+
+async function GET(path) {
+    const t0 = performance.now();
+    let status = 0, data = null, err = null;
+    try {
+        const r = await fetch(base()+path, { signal:AbortSignal.timeout(10000) });
+        status = r.status;
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        data = await r.json();
+        return data;
+    } catch(e) {
+        err = e; throw e;
+    } finally {
+        const dur = performance.now() - t0;
+        const rowCnt = data ? rows(data).length : 0;
+        // Classify call type
+        const type = path.includes('/tables') && !path.includes('/columns') ? 'schema'
+                   : path.includes('/columns') ? 'schema'
+                   : path.includes('/health')  ? 'health'
+                   : 'other';
+        logCall({ method:'GET', path, status: err ? (status||0) : status,
+                  dur, rowCnt, type, detail: path, table: extractTableFromPath(path), error: err });
+    }
+}
+
+async function POST(path, body) {
+    const t0 = performance.now();
+    let status = 0, data = null, err = null;
+    try {
+        const r = await fetch(base()+path, {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify(body), signal:AbortSignal.timeout(20000)
+        });
+        status = r.status;
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        data = await r.json();
+        return data;
+    } catch(e) {
+        err = e; throw e;
+    } finally {
+        const dur    = performance.now() - t0;
+        const rowCnt = data ? rows(data).length : 0;
+        const sql    = body?.sql || '';
+        const tbl    = body?.table || extractTableFromSQL(sql);
+        const type   = path.includes('/increment') ? 'trend'
+                     : path.includes('/alarm')     ? 'alarm'
+                     : sql.includes('count(')      ? 'count'
+                     : sql.length                  ? 'latest'
+                     : 'other';
+        // Build human-readable AnyLog command
+        const anylogCmd = buildAnyLogCmd(path, body);
+        logCall({ method:'POST', path, status: err ? (status||0) : status,
+                  dur, rowCnt, type, detail: anylogCmd || sql || path,
+                  table: tbl, error: err });
+    }
+}
+
+// ── LOG ENGINE ───────────────────────────────────────────────────
+const callLog   = [];          // { id, ts, method, path, status, dur, rowCnt, type, detail, table, error }
+let   logStats  = { total:0, ok:0, err:0, rows:0 };
+const rowsByTable = {};        // table → cumulative rows returned
+let   logOpen   = false;
+let   logFilter = 'all';
+let   nextLogId = 0;
+
+function logCall(entry) {
+    const id = nextLogId++;
+    const ok = !entry.error && entry.status >= 200 && entry.status < 300;
+    const rec = { id, ts: new Date(), ok, ...entry };
+    callLog.unshift(rec);        // newest first
+    if (callLog.length > 500) callLog.pop();
+
+    logStats.total++;
+    if (ok) logStats.ok++; else logStats.err++;
+    logStats.rows += rec.rowCnt;
+
+    if (rec.table && rec.rowCnt > 0) {
+        rowsByTable[rec.table] = (rowsByTable[rec.table] || 0) + rec.rowCnt;
+    }
+
+    updateLogStats();
+    if (logOpen) prependLogRow(rec);
+    updateRowSummary();
+}
+
+function updateLogStats() {
+    setText2('log-total', `${logStats.total} call${logStats.total!==1?'s':''}`);
+    setText2('log-ok',    `${logStats.ok} ok`);
+    setText2('log-err',   `${logStats.err} err`);
+    setText2('log-rows',  `${logStats.rows} rows`);
+}
+
+function setText2(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+}
+
+function updateRowSummary() {
+    const el = document.getElementById('rowSumContent');
+    if (!el) return;
+    const entries = Object.entries(rowsByTable);
+    if (!entries.length) { el.innerHTML = '<span style="color:#484f58;">— No data yet —</span>'; return; }
+    el.innerHTML = entries
+        .sort((a,b) => b[1]-a[1])
+        .map(([tbl,cnt]) =>
+            `<span class="row-tbl">
+                <span class="row-tbl-name">${tbl}</span>
+                <span class="row-tbl-sep">→</span>
+                <span class="row-tbl-cnt">${cnt.toLocaleString()}</span>
+             </span>`
+        ).join('<span class="row-tbl-sep" style="margin:0 4px;">|</span>');
+}
+
+function buildLogEntryHTML(rec) {
+    const time   = rec.ts.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const mCls   = rec.method==='GET' ? 'm-get' : 'm-post';
+    const sCls   = rec.ok ? 's-ok' : 's-err';
+    const eStat  = rec.ok ? rec.status || '200' : (rec.status || 'ERR');
+    const dur    = rec.dur < 1000 ? `${Math.round(rec.dur)}ms` : `${(rec.dur/1000).toFixed(1)}s`;
+    const rowTxt = rec.rowCnt > 0 ? rec.rowCnt.toLocaleString() : rec.ok ? '0' : '—';
+    const typeCls= `type-${rec.type||'other'}`;
+    const errCls = rec.ok ? 'log-ok' : 'log-err';
+    // Truncate long SQL for display; show full on hover via title
+    const detail = rec.detail.length > 120 ? rec.detail.slice(0,120)+'…' : rec.detail;
+    const tbl    = rec.table || '—';
+
+    return `<div class="log-entry ${errCls} ${typeCls}" data-method="${rec.method.toLowerCase()}"
+                 data-type="${rec.type||''}" data-ok="${rec.ok}" data-search="${(rec.path+' '+rec.detail+' '+tbl).toLowerCase()}"
+                 title="${escHtml(rec.detail)}">
+        <span class="le-time">${time}</span>
+        <span class="le-method ${mCls}">${rec.method}</span>
+        <span class="le-status ${sCls}">${eStat}</span>
+        <span class="le-dur">${dur}</span>
+        <span class="le-path">${escHtml(detail)}</span>
+        <span class="le-detail">${escHtml(tbl)}</span>
+        <span class="le-rows">${rowTxt}</span>
+    </div>`;
+}
+
+function prependLogRow(rec) {
+    const body = document.getElementById('logBody');
+    if (!body) return;
+    // Remove placeholder if present
+    const ph = body.querySelector('div[style*="padding:20px"]');
+    if (ph) ph.remove();
+    const tmp = document.createElement('div');
+    tmp.innerHTML = buildLogEntryHTML(rec);
+    body.insertBefore(tmp.firstElementChild, body.firstChild);
+    applyLogFilters();
+}
+
+function rebuildLogBody() {
+    const body = document.getElementById('logBody');
+    if (!body) return;
+    if (!callLog.length) {
+        body.innerHTML = '<div style="padding:20px;text-align:center;color:#484f58;font-family:monospace;font-size:12px;">— Log cleared —</div>';
+        return;
+    }
+    body.innerHTML = callLog.map(buildLogEntryHTML).join('');
+    applyLogFilters();
+}
+
+function toggleLog() {
+    logOpen = !logOpen;
+    const content = document.getElementById('logContent');
+    const caret   = document.getElementById('logCaret');
+    if (content) content.style.display = logOpen ? 'block' : 'none';
+    if (caret)   caret.classList.toggle('open', logOpen);
+    if (logOpen && callLog.length) rebuildLogBody();
+}
+
+function clearLog() {
+    callLog.length = 0;
+    logStats = { total:0, ok:0, err:0, rows:0 };
+    Object.keys(rowsByTable).forEach(k => delete rowsByTable[k]);
+    updateLogStats();
+    updateRowSummary();
+    rebuildLogBody();
+}
+
+function setLogFilter(f, btn) {
+    logFilter = f;
+    document.querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    applyLogFilters();
+}
+
+function filterLog() { applyLogFilters(); }
+
+function applyLogFilters() {
+    const search = (document.getElementById('logSearch')?.value||'').toLowerCase();
+    document.querySelectorAll('#logBody .log-entry').forEach(el => {
+        const method  = el.dataset.method  || '';
+        const type    = el.dataset.type    || '';
+        const ok      = el.dataset.ok;
+        const srchTxt = el.dataset.search  || '';
+
+        let visible = true;
+        if (logFilter === 'get')    visible = method === 'get';
+        else if (logFilter === 'post')   visible = method === 'post';
+        else if (logFilter === 'error')  visible = ok === 'false';
+        else if (logFilter === 'schema') visible = type === 'schema';
+        else if (logFilter === 'query')  visible = type === 'latest' || type === 'count' || type === 'alarm';
+        else if (logFilter === 'trend')  visible = type === 'trend';
+
+        if (visible && search) visible = srchTxt.includes(search);
+        el.classList.toggle('hidden', !visible);
+    });
+}
+
+// ── HELPERS: extract table/command from requests ─────────────────
+function extractTableFromPath(path) {
+    // e.g. /api/databases/myhist/tables/sub_unit_250/columns → sub_unit_250
+    const m = path.match(/\/tables\/([^/]+)(?:\/|$)/);
+    return m ? m[1] : '';
+}
+
+function extractTableFromSQL(sql) {
+    if (!sql) return '';
+    const m = sql.match(/FROM\s+(\w+)/i);
+    return m ? m[1] : '';
+}
+
+function buildAnyLogCmd(proxyPath, body) {
+    // Reconstruct what the proxy sends to AnyLog as a command header
+    if (!body) return proxyPath;
+    if (proxyPath.includes('/query/increment') && body.table) {
+        const proj = (body.projections||[]).join(', ');
+        return `sql ${body.dbms||dbms()} SELECT increment(${body.timeUnit}, ${body.intervalLength}, ${body.timeColumn}, ${proj}) FROM ${body.table} WHERE timestamp >= '${body.startTime}' AND timestamp <= '${body.endTime}'`;
+    }
+    if (proxyPath.includes('/query') && body.sql) {
+        return `sql ${body.dbms||dbms()} ${body.sql}`;
+    }
+    return proxyPath;
+}
+
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Normalise various AnyLog response shapes into a plain array of row objects
+function rows(data) {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    for (const key of ['Query','rows','data','result']) {
+        if (data[key]?.rows)  return data[key].rows;
+        if (Array.isArray(data[key])) return data[key];
+    }
+    // Look for first array-valued key whose items are objects
+    for (const v of Object.values(data)) {
+        if (Array.isArray(v) && v.length && typeof v[0]==='object') return v;
+    }
+    return [];
+}
+
+// Pull a string value from a row by trying common key variants
+function rowStr(r, keys) {
+    for (const k of keys) {
+        const v = r[k] ?? r[k.toLowerCase()] ?? r[k.toUpperCase()];
+        if (v !== undefined && v !== null) return String(v);
+    }
+    return '';
+}
+
+// ── CONNECTION ───────────────────────────────────────────────────
+async function connect() {
+    setStatus('connecting'); spin(true); hideBanner();
+    try {
+        const data = await GET('/health');
+        const ok = data.status?.toLowerCase()==='healthy'
+                || data.status?.toLowerCase()==='ok'
+                || data.connection==='established';
+        if (!ok) throw new Error('Proxy unhealthy: '+JSON.stringify(data));
+        connected = true;
+        setStatus('connected');
+        document.getElementById('hdrNode').textContent =
+            document.getElementById('cfgHost').value+':'+document.getElementById('cfgPort').value;
+        await discoverSchema();
+    } catch(e) {
+        connected = false; setStatus('error');
+        showBanner('Cannot reach proxy at '+base()+' — '+e.message);
+    } finally { spin(false); }
+}
+
+// ── SCHEMA DISCOVERY ─────────────────────────────────────────────
+// Tables are already known from TAG_GROUPS — no discovery needed.
+// discoverSchema just validates the DB name, sets it, and loads data.
+async function discoverSchema() {
+    if (!connected) { showBanner('Connect first.'); return; }
+    spin(true);
+    try {
+        let chosenDb = dbms().trim() || DEFAULT_DBMS;
+        document.getElementById('cfgDbms').value = chosenDb;
+        document.getElementById('hdrDbms').textContent = chosenDb;
+        hideBanner();
+        PROCS.forEach(p => buildCards(p));
+        await refreshAll();
+    } catch(e) {
+        showBanner('Load failed: ' + e.message);
+    } finally { spin(false); }
+}
+
+// ── PARSE AnyLog pipe-delimited ASCII table ───────────────────────
+function parsePipeTable(raw, colIdx) {
+    if (!raw || typeof raw !== 'string') return [];
+    const results = [];
+    const lines   = raw.split(/\r?\n/);
+    let   pastSep = false;
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (/^[-|=+ ]+$/.test(trimmed)) { pastSep = true; continue; }
+        if (!pastSep) continue;
+        const cells = trimmed.split('|').map(c => c.trim().toLowerCase());
+        const val   = cells[colIdx] || '';
+        if (!val || val.length < 2) continue;
+        if (/^(logical dbms|database type|table|table name|column|column name|owner|ip|config|storage|field|type|index)/.test(val)) continue;
+        results.push(val);
+    }
+    return results;
+}
+
+let activeDbs = [];
+
+// ── PARAMETER CARD BUILDER ───────────────────────────────────────
+function buildCards(proc) {
+    const container = document.getElementById(`${proc}-params`);
+    if (!container) return;
+    const tags = TAG_GROUPS[proc] || [];
+    if (!tags.length) {
+        container.innerHTML = `<div class="pc" style="grid-column:1/-1;"><div class="no-data"><span>⚠️</span>No tags defined for ${proc.toUpperCase()}.</div></div>`;
+        return;
+    }
+    container.innerHTML = tags.map(tag => {
+        const sp  = tag.sp;
+        const rng = sp ? `SP range: ${sp.lo}–${sp.hi} ${tag.unit||''}` : (tag.unit ? `Unit: ${tag.unit}` : `Table: ${tag.table}`);
+        return `
+        <div class="pc" id="pc-${proc}-${tag.table}">
+            <div class="pc-head">
+                <div class="pc-label" title="${tag.table}">${tag.label || fmtCol(tag.table)}</div>
+                <div class="pc-status st-wait" id="ps-${proc}-${tag.table}">⏳ WAITING</div>
+            </div>
+            <div class="pc-value v-wait" id="pv-${proc}-${tag.table}">—</div>
+            <div class="pc-range">${rng}</div>
+            <div class="pc-bar"><div class="pc-fill" id="pb-${proc}-${tag.table}" style="width:0%"></div></div>
+        </div>`;
+    }).join('');
+}
+
+function fmtCol(col) {
+    return col.replace(/_/g,' ').replace(/\b\w/g, c=>c.toUpperCase());
+}
+
+// ── FETCH LATEST VALUES ───────────────────────────────────────────
+// Each tag declares its own col name. Numeric tags: avg(col). Text tags: latest row.
+async function fetchLatest(proc) {
+    const tags = TAG_GROUPS[proc] || [];
+    if (!tags.length) return;
+    const h  = hours();
+    const db = dbms();
+
+    const numericTags = tags.filter(t => !t.isText);
+    const textTags    = tags.filter(t =>  t.isText);
+
+    // Numeric: parallel avg queries
+    const numResults = await Promise.allSettled(
+        numericTags.map(async tag => {
+            const col  = tag.col;
+            const sql  = `SELECT avg(${col}) as v FROM ${tag.table} WHERE timestamp >= NOW() - ${h} hours`;
+            const data = await POST('/api/query', { dbms: db, sql });
+            const row  = rows(data)[0] || {};
+            // AnyLog may return the alias 'v', or 'avg(col)', or the col name itself
+            const raw  = row.v ?? row[`avg(${col})`] ?? row[col] ?? row['avg(value)'];
+            return { table: tag.table, val: parseFloat(raw) };
+        })
+    );
+
+    const vals = {};
+    for (const r of numResults) {
+        if (r.status === 'fulfilled' && !isNaN(r.value.val))
+            vals[r.value.table] = r.value.val;
+    }
+
+    // Text: latest value — sequential to avoid overload
+    for (const tag of textTags) {
+        try {
+            const col  = tag.col;
+            const data = await POST('/api/query', { dbms: db,
+                sql: `SELECT ${col} FROM ${tag.table} ORDER BY timestamp DESC LIMIT 1` });
+            const row  = rows(data)[0] || {};
+            const val  = row[col] ?? row.value ?? null;
+            if (val !== null && val !== '') vals[tag.table] = String(val);
+        } catch(e) { /* text tags are non-critical */ }
+    }
+
+    state[proc].vals = vals;
+
+    // Row count from first numeric tag
+    if (numericTags[0]) {
+        try {
+            const cntData = await POST('/api/query', { dbms: db,
+                sql: `SELECT count(*) as cnt FROM ${numericTags[0].table} WHERE timestamp >= NOW() - ${h} hours` });
+            const cntRow = rows(cntData)[0] || {};
+            setText(`${proc}-st-rows`, cntRow.cnt ?? cntRow['count(*)'] ?? '—', false);
+        } catch(e) {}
+    }
+}
+
+// ── UPDATE CARDS ─────────────────────────────────────────────────
+function updateCards(proc) {
+    const tags = TAG_GROUPS[proc] || [];
+    const vals = state[proc].vals;
+    let alarmCnt = 0;
+
+    for (const tag of tags) {
+        const v  = vals[tag.table];
+        const pv = document.getElementById(`pv-${proc}-${tag.table}`);
+        const ps = document.getElementById(`ps-${proc}-${tag.table}`);
+        const pb = document.getElementById(`pb-${proc}-${tag.table}`);
+        const pc = document.getElementById(`pc-${proc}-${tag.table}`);
+        if (!pv) continue;
+
+        if (v === undefined || v === null) {
+            pv.textContent = '—'; pv.className = 'pc-value v-wait';
+            if (ps) { ps.textContent = 'NO DATA'; ps.className = 'pc-status st-wait'; }
+            if (pb) pb.style.width = '0%';
+            continue;
+        }
+
+        // Text tag
+        if (tag.isText) {
+            pv.textContent = String(v);
+            pv.className   = 'pc-value';
+            pv.style.cssText = 'font-size:13px;word-break:break-word;';
+            if (ps) { ps.textContent = '● STATE'; ps.className = 'pc-status st-ok'; }
+            if (pb) pb.style.width = '0%';
+            continue;
+        }
+
+        // Numeric tag
+        const num = parseFloat(v);
+        const dec = Math.abs(num) >= 100 ? 0 : Math.abs(num) >= 10 ? 1 : 2;
+        pv.textContent = num.toFixed(dec) + (tag.unit ? ' ' + tag.unit : '');
+
+        const sp = tag.sp;
+        let cls = 'ok', barPct = 0;
+        if (sp) {
+            barPct = Math.min(100, Math.max(0, (num / sp.max) * 100));
+            if (num < sp.lo || num > sp.hi) cls = 'alarm';
+            else if (num < sp.lo + (sp.hi - sp.lo) * 0.15 || num > sp.hi - (sp.hi - sp.lo) * 0.15) cls = 'warn';
+        }
+        if (cls === 'alarm') alarmCnt++;
+
+        pv.className = `pc-value${cls === 'alarm' ? ' v-alarm' : cls === 'warn' ? ' v-warn' : ''}`;
+        if (pc) pc.className = `pc${cls === 'alarm' ? ' alarm' : cls === 'warn' ? ' warning' : ''}`;
+        if (ps) {
+            ps.className   = `pc-status ${cls === 'alarm' ? 'st-err' : cls === 'warn' ? 'st-warn' : 'st-ok'}`;
+            ps.textContent = cls === 'alarm' ? '⚠️ ALARM' : cls === 'warn' ? '⚠ WARNING' : '✓ NORMAL';
+        }
+        if (pb) {
+            pb.style.width = barPct + '%';
+            pb.className   = `pc-fill${cls === 'alarm' ? ' f-alarm' : cls === 'warn' ? ' f-warn' : ''}`;
+        }
+    }
+
+    const stag = document.getElementById(`${proc}-stag`);
+    if (stag && Object.keys(vals).length) { stag.textContent = 'LIVE'; stag.className = 'badge badge-connected'; }
+    const adot = document.getElementById(`adot-${proc}`);
+    if (adot) { adot.textContent = alarmCnt; adot.style.display = alarmCnt > 0 ? 'inline-block' : 'none'; }
+    return alarmCnt;
+}
+
+// ── FETCH TREND (3 key tags, sequential) ─────────────────────────
+// Strictly sequential + only 3 tags to avoid 502 overload on operator node.
+// Picks the most meaningful numeric tags per process.
+const TREND_TAGS = {
+    sub:   ['sub_tic_250_001_pv_celsius', 'sub_aic_250_003_pv_ph', 'sub_sic_250_008_pv_rpm'],
+    chrom: ['chrom_chr01_at001_pv', 'chrom_chr01_pt002_pv', 'chrom_chr01_ft001_pv'],
+    tff:   ['tff_tmp7m_psig', 'tff_fi7f_lpm', 'tff_uv8r_au'],
+};
+
+async function fetchTrend(proc) {
+    const allTags  = TAG_GROUPS[proc] || [];
+    const keyNames = TREND_TAGS[proc] || [];
+    const trendTags = keyNames
+        .map(name => allTags.find(t => t.table === name))
+        .filter(Boolean);
+    if (!trendTags.length) return;
+
+    const h    = hours();
+    const unit = h > 8 ? 'hour' : 'minute';
+    const len  = h > 8 ? 1 : 5;
+    const db   = dbms();
+    const clrs = COLORS[proc] || COLORS.sub;
+
+    const datasets = [];
+    let   labels   = [];
+
+    for (let i = 0; i < trendTags.length; i++) {
+        const tag = trendTags[i];
+        const col = tag.col;
+        try {
+            const data = await POST('/api/query/increment', {
+                dbms: db, table: tag.table, timeColumn: 'timestamp',
+                startTime: `NOW() - ${h} hours`, endTime: 'NOW()',
+                timeUnit: unit, intervalLength: len,
+                projections: [`avg(${col})`]
+            });
+            const rws = rows(data);
+            if (!rws.length) continue;
+
+            if (!labels.length) {
+                labels = rws.map(row => {
+                    const ts = row.timestamp || row.time || row.period_start
+                             || row.end_ts || Object.values(row)[0];
+                    return ts ? new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+                });
+            }
+
+            datasets.push({
+                label: tag.label,
+                data: rws.map(row => {
+                    const v = row[`avg(${col})`] ?? row[`avg_${col}`]
+                            ?? row['avg_value'] ?? row[col] ?? row.value ?? null;
+                    return v !== null && v !== '' ? parseFloat(v) : null;
+                }),
+                borderColor: clrs[i],
+                backgroundColor: clrs[i] + '22',
+                tension: 0.3, pointRadius: 2, borderWidth: 2, fill: false, spanGaps: true,
+            });
+        } catch(e) { console.warn(`trend ${tag.table}:`, e.message); }
+    }
+
+    if (!labels.length || !datasets.length) return;
+
+    const canvas = document.getElementById(`${proc}-chart`);
+    const nd     = document.getElementById(`${proc}-chart-nd`);
+    if (!canvas) return;
+    canvas.style.display = 'block';
+    if (nd) nd.style.display = 'none';
+
+    if (charts[proc]) { charts[proc].destroy(); delete charts[proc]; }
+    charts[proc] = new Chart(canvas, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            plugins: {
+                legend: { position: 'top', labels: { color: '#555', boxWidth: 12, font: { size: 10 } } },
+                tooltip: { mode: 'index', intersect: false }
+            },
+            scales: {
+                x: { ticks: { color: '#666', maxTicksLimit: 12, font: { size: 10 } }, grid: { color: '#eee' } },
+                y: { ticks: { color: '#666', font: { size: 10 } }, grid: { color: '#eee' } }
+            }
+        }
+    });
+}
+
+
+
+// ── FETCH ALARMS (sepasoft batch events) ─────────────────────────
+// No dedicated alarm table exists. Use sepasoft out-of-band event tables
+// as process exception events, and batch state tables for context.
+const SEPASOFT_EVENTS = {
+    sub:   ['sepasoft_dissolved_oxygen_out_of_band_events_by_batch_id_and_phase',
+            'sepasoft_ph_out_of_band_events_by_batch_id_and_phase',
+            'sepasoft_temp_out_of_band_events_by_batch_id'],
+    chrom: ['sepasoft_dissolved_oxygen_out_of_band_events_by_batch_id_and_phase',
+            'sepasoft_ph_out_of_band_events_by_batch_id_and_phase'],
+    tff:   ['sepasoft_temp_out_of_band_events_by_batch_id'],
+};
+
+async function fetchAlarms(proc) {
+    const h  = hours();
+    const db = dbms();
+    const eventTables = SEPASOFT_EVENTS[proc] || [];
+    let allEvents = [];
+
+    for (const tbl of eventTables) {
+        try {
+            const data = await POST('/api/query', { dbms: db,
+                sql: `SELECT * FROM ${tbl} WHERE timestamp >= NOW() - ${h} hours ORDER BY timestamp DESC LIMIT 50` });
+            const evtRows = rows(data);
+            allEvents = allEvents.concat(evtRows.map(r => ({ ...r, _source_table: tbl })));
+        } catch(e) { console.warn(`fetchAlarms ${tbl}:`, e.message); }
+    }
+
+    // Sort by timestamp desc
+    allEvents.sort((a, b) => new Date(b.timestamp||0) - new Date(a.timestamp||0));
+    state[proc].alarms = allEvents;
+    renderAlarms(proc);
+}
+
+
+function renderAlarms(proc) {
+    const container = document.getElementById(`${proc}-alarms`);
+    if (!container) return;
+    const alarm_rows = state[proc].alarms;
+
+    if (!alarm_rows.length) {
+        container.innerHTML = `<div class="no-data"><span>✅</span>No out-of-band events in the selected time window.</div>`;
+        setText(`${proc}-st-alarms`, '0', false);
+        return;
+    }
+
+    setText(`${proc}-st-alarms`, alarm_rows.length, true);
+
+    container.innerHTML = alarm_rows.map((r, i) => {
+        const ts    = r.timestamp || r.time || r.event_time || r.start_time || '';
+        // Sepasoft column names vary — try common patterns
+        const title = r.description || r.message || r.alarm_name || r.event_type
+                    || r.out_of_band_type || r.deviation_type || r.event || r.name
+                    || Object.entries(r)
+                         .filter(([k]) => !['timestamp','row_id','insert_timestamp','tsd_id','_source_table'].includes(k.toLowerCase()) && k !== '_source_table')
+                         .map(([k,v]) => `${k}: ${v}`).slice(0,2).join(', ')
+                    || 'Event';
+        const src   = r._source_table || '';
+        const sev   = src.includes('dissolved_oxygen') ? 'high'
+                    : src.includes('ph') ? 'high'
+                    : src.includes('temp') ? 'medium' : 'low';
+        const icon  = sev === 'high' ? '🟠' : sev === 'medium' ? '🟡' : '🔵';
+        const lv    = sev === 'high' ? 'lv-warning' : 'lv-info';
+        const tFmt  = ts ? new Date(ts).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '—';
+        const dFmt  = ts ? new Date(ts).toLocaleDateString() : '';
+        const batch = r.batch_id || r.batch || '';
+        const phase = r.phase || r.phase_id || '';
+
+        return `
+        <div class="issue ${lv}" data-sev="${sev}" data-proc="${proc}">
+            <div class="i-bar sev-${sev}"></div>
+            <div class="i-icon">${icon}</div>
+            <div class="i-body">
+                <div class="i-head">
+                    <span class="i-id">${proc.toUpperCase()}-${String(i+1).padStart(3,'0')}</span>
+                    ${batch ? `<span class="i-tag tag-proc">Batch: ${batch}</span>` : ''}
+                    ${phase ? `<span class="i-tag tag-proc">Phase: ${phase}</span>` : ''}
+                    <span class="i-pri pri-${sev === 'high' ? 'high' : sev === 'medium' ? 'medium' : 'low'}">${sev.toUpperCase()}</span>
+                </div>
+                <div class="i-title">${title}</div>
+                <div class="i-meta">
+                    <span>🕐 ${ts ? new Date(ts).toLocaleString() : '—'}</span>
+                    <span style="color:#999;font-size:10px;">${src.replace(/_by_batch.*$/,'')}</span>
+                </div>
+                <div class="i-acts">
+                    <button class="act-btn act-ack" onclick="ackAlarm(this)">✓ Ack</button>
+                    <button class="act-btn act-res" onclick="resolveAlarm(this)">✓ Resolve</button>
+                </div>
+            </div>
+            <div class="i-ts"><div class="i-time">${tFmt}</div><div class="i-date">${dFmt}</div></div>
+        </div>`;
+    }).join('');
+}
+
+function ackAlarm(btn)     { btn.textContent='✓ Acked'; btn.disabled=true; btn.style.background='#9e9e9e'; }
+function resolveAlarm(btn) { btn.closest('.issue')?.classList.add('lv-ok'); btn.textContent='✓ Resolved'; btn.disabled=true; btn.style.background='#9e9e9e'; }
+
+// ── FILTER / SORT ─────────────────────────────────────────────────
+function filterAlarms(proc, type, btn) {
+    btn.closest('.filter-row')?.querySelectorAll('.ftab').forEach(t=>t.classList.remove('active'));
+    btn.classList.add('active');
+    const c = document.getElementById(`${proc}-alarms`);
+    if (!c) return;
+    c.querySelectorAll('.issue').forEach(el => {
+        const sev  = el.dataset.sev  || '';
+        const eprc = el.dataset.proc || '';
+        if (type==='all') { el.classList.remove('hidden'); return; }
+        if (['sub','chrom','tff'].includes(type)) { el.classList.toggle('hidden', eprc!==type); return; }
+        const m = {critical:['critical'],warning:['high','medium'],info:['low']};
+        el.classList.toggle('hidden', !(m[type]||[]).includes(sev));
+    });
+}
+
+function sortAlarms(proc) {
+    const key = document.getElementById(`${proc}-sort`).value;
+    const c   = document.getElementById(`${proc}-alarms`);
+    if (!c) return;
+    const items = [...c.querySelectorAll('.issue')];
+    const ord = {critical:0,high:1,medium:2,low:3};
+    if (key==='sev') items.sort((a,b)=>(ord[a.dataset.sev]||9)-(ord[b.dataset.sev]||9));
+    items.forEach(el=>c.appendChild(el));
+}
+
+// ── SUMMARY UPDATE ────────────────────────────────────────────────
+function updateSummary() {
+    const all = [...state.sub.alarms, ...state.chrom.alarms, ...state.tff.alarms];
+    const crit = all.filter(r=>/crit/i.test(r.severity||r.level||'')).length;
+    const warn = all.filter(r=>/high|alarm|warn|med/i.test(r.severity||r.level||'')).length;
+    const info = all.filter(r=>/low|info/i.test(r.severity||r.level||'')).length;
+
+    let reporting = 0;
+    for (const p of PROCS) reporting += Object.keys(state[p].vals).length;
+
+    setText('ac-crit', connected ? crit : '—', false);
+    setText('ac-warn', connected ? warn : '—', false);
+    setText('ac-info', connected ? info : '—', false);
+    setText('ac-ok',   connected ? reporting : '—', false);
+
+    const total = crit+warn+info;
+    const sdot = document.getElementById('adot-sum');
+    if (sdot) { sdot.textContent=total; sdot.style.display=total>0?'inline-block':'none'; }
+
+    setText('sum-st-alarms', connected ? total : '—', total>0);
+    setText('sum-st-batch',  document.getElementById('sub-st-batch')?.textContent||'—', false);
+    setText('sum-st-sub',    document.getElementById('sub-st-rows')?.textContent||'—', false);
+    setText('sum-st-chrom',  document.getElementById('chrom-st-rows')?.textContent||'—', false);
+    setText('sum-st-tff',    document.getElementById('tff-st-rows')?.textContent||'—', false);
+
+    const stag = document.getElementById('sum-stag');
+    if (stag && connected) { stag.textContent='LIVE'; stag.className='badge badge-connected'; }
+
+    updateSnapshotCards();
+    renderSumAlarms();
+    updateSumChart();
+}
+
+function updateSnapshotCards() {
+    for (const proc of PROCS) {
+        const tags   = TAG_GROUPS[proc] || [];
+        const vals   = state[proc].vals;
+        const alarms = state[proc].alarms;
+        const badge  = document.getElementById(`sum-${proc}-badge`);
+        const detail = document.getElementById(`sum-${proc}-detail`);
+
+        if (!tags.length || !Object.keys(vals).length) {
+            if (badge)  { badge.textContent='—'; badge.className='cross-status st-wait'; }
+            if (detail) detail.textContent='No data loaded.';
+            continue;
+        }
+
+        const summary = tags.slice(0,4).map(tag => {
+            const v = vals[tag.table];
+            const u = tag.unit ? ' '+tag.unit : '';
+            return v!==undefined ? `${tag.label}: ${v.toFixed(2)}${u}` : `${tag.label}: —`;
+        }).join(' | ');
+
+        if (detail) detail.textContent = summary;
+
+        const alarmCnt = alarms.filter(r=>/crit|high|alarm/i.test(r.severity||r.level||'')).length;
+        if (badge) {
+            badge.textContent = alarmCnt>0 ? `⚠ ${alarmCnt} ALARM${alarmCnt>1?'S':''}` : '✓ OK';
+            badge.className   = `cross-status ${alarmCnt>0?'st-err':'st-ok'}`;
+        }
+    }
+
+    // Coverage card
+    const rep    = PROCS.filter(p=>Object.keys(state[p].vals).length>0).length;
+    const covB   = document.getElementById('sum-cov-badge');
+    const covD   = document.getElementById('sum-cov-detail');
+    if (covD) covD.textContent = `${rep} of 3 processes reporting in the selected window.`;
+    if (covB) { covB.textContent=`${rep}/3`; covB.className=`cross-status ${rep===3?'st-ok':rep>0?'st-warn':'st-wait'}`; }
+}
+
+function renderSumAlarms() {
+    const container = document.getElementById('sum-alarms');
+    if (!container) return;
+    const all = [
+        ...state.sub.alarms.map(r=>({...r,_proc:'sub'})),
+        ...state.chrom.alarms.map(r=>({...r,_proc:'chrom'})),
+        ...state.tff.alarms.map(r=>({...r,_proc:'tff'})),
+    ];
+    if (!all.length) {
+        container.innerHTML=`<div class="no-data"><span>✅</span>No active alarms across all processes.</div>`;
+        return;
+    }
+    container.innerHTML = all.map((r,i) => {
+        const ts   = r.timestamp||r.time||r.event_time||'';
+        const title= r.description||r.message||r.alarm_name||r.event||r.name||'Alarm event';
+        const sev  = (r.severity||r.level||'info').toLowerCase();
+        const sc   = sev.includes('crit')?'critical':/high|alarm/.test(sev)?'high':sev.includes('med')?'medium':'low';
+        const lv   = sc==='critical'?'':sc==='high'?'lv-warning':'lv-info';
+        const icon = sc==='critical'?'🔴':sc==='high'?'🟠':sc==='medium'?'🟡':'🔵';
+        const proc = r._proc||'';
+        return `
+        <div class="issue ${lv}" data-sev="${sc}" data-proc="${proc}">
+            <div class="i-bar sev-${sc}"></div>
+            <div class="i-icon">${icon}</div>
+            <div class="i-body">
+                <div class="i-head">
+                    <span class="i-id">${proc.toUpperCase()}</span>
+                    <span class="i-tag tag-proc-badge">${proc.toUpperCase()}</span>
+                    <span class="i-pri pri-${sc==='critical'?'urgent':sc==='high'?'high':sc==='medium'?'medium':'low'}">${sc.toUpperCase()}</span>
+                </div>
+                <div class="i-title">${title}</div>
+                <div class="i-meta"><span>🕐 ${ts?new Date(ts).toLocaleString():'—'}</span></div>
+                <div class="i-acts"><button class="act-btn act-ack" onclick="ackAlarm(this)">✓ Ack</button></div>
+            </div>
+            <div class="i-ts">
+                <div class="i-time">${ts?new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'—'}</div>
+                <div class="i-date">${ts?new Date(ts).toLocaleDateString():''}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function updateSumChart() {
+    const now = new Date();
+    const buckets = { sub:new Array(24).fill(0), chrom:new Array(24).fill(0), tff:new Array(24).fill(0) };
+    for (const proc of PROCS) {
+        for (const r of state[proc].alarms) {
+            const t = new Date(r.timestamp||r.time||r.event_time||0);
+            const dh= Math.floor((now-t)/3600000);
+            if (dh>=0 && dh<24) buckets[proc][23-dh]++;
+        }
+    }
+    const labels = Array.from({length:24},(_,i)=>{
+        const d=new Date(now-(23-i)*3600000);
+        return d.getHours().toString().padStart(2,'0')+':00';
+    });
+    const datasets=[
+        {label:'SUB',  data:buckets.sub,   backgroundColor:'rgba(52,152,219,.75)'},
+        {label:'CHROM',data:buckets.chrom, backgroundColor:'rgba(155,89,182,.75)'},
+        {label:'TFF',  data:buckets.tff,   backgroundColor:'rgba(39,174,96,.75)'},
+    ];
+    if (charts.sum) {
+        charts.sum.data.labels=labels; charts.sum.data.datasets=datasets; charts.sum.update();
+    } else {
+        const ctx=document.getElementById('sum-chart').getContext('2d');
+        charts.sum=new Chart(ctx,{type:'bar',data:{labels,datasets},
+            options:{responsive:true,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}},plugins:{legend:{position:'top'}}}});
+    }
+    const sumChart = document.getElementById('sum-chart');
+    const sumNd    = document.getElementById('sum-chart-nd');
+    if (sumChart) sumChart.style.display = 'block';
+    if (sumNd)    sumNd.style.display    = 'none';
+}
+
+// ── REFRESH ORCHESTRATION ─────────────────────────────────────────
+async function refreshAll() {
+    if (!connected) return;
+    spin(true);
+    for (const proc of PROCS) {
+        await fetchLatest(proc);
+        updateCards(proc);
+        await fetchTrend(proc);
+        await fetchAlarms(proc);
+    }
+    updateSummary();
+    stamp(); spin(false);
+    // Global indicator
+    const totalAlarms = state.sub.alarms.length + state.chrom.alarms.length + state.tff.alarms.length;
+    const dot = document.getElementById('mainDot');
+    if (dot) dot.className = totalAlarms>0 ? 'dot dot-warn' : 'dot dot-ok';
+}
+
+async function refreshCurrent() {
+    if (!connected) { showBanner('Not connected — click Connect first.'); return; }
+    spin(true);
+    if (currentTab==='sum') {
+        await refreshAll();
+    } else {
+        const proc = currentTab;
+        await fetchLatest(proc);
+        updateCards(proc);
+        await fetchTrend(proc);
+        await fetchAlarms(proc);
+        updateSummary();
+    }
+    stamp(); spin(false);
+}
+
+// ── AUTO-REFRESH ──────────────────────────────────────────────────
+function toggleAR() {
+    arOn = !arOn;
+    const btn = document.getElementById('arBtn');
+    if (arOn) {
+        btn.textContent='⏸️ Pause'; btn.className='btn-red';
+        arTimer=setInterval(refreshCurrent, parseInt(document.getElementById('arInterval').value));
+    } else {
+        btn.textContent='▶️ Auto-Refresh'; btn.className='btn-blue';
+        clearInterval(arTimer);
+    }
+}
+
+// ── TAB SWITCHING ─────────────────────────────────────────────────
+function switchTab(proc) {
+    currentTab=proc;
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active'));
+    document.getElementById(`panel-${proc}`)?.classList.add('active');
+    document.getElementById(`tab-${proc}`)?.classList.add('active');
+}
+
+// ── EXPORT ────────────────────────────────────────────────────────
+function exportAlarms() {
+    const all = [
+        ...state.sub.alarms.map(r=>({...r,_proc:'SUB'})),
+        ...state.chrom.alarms.map(r=>({...r,_proc:'CHROM'})),
+        ...state.tff.alarms.map(r=>({...r,_proc:'TFF'})),
+    ];
+    if (!all.length) { alert('No alarm data to export.'); return; }
+    const keys = [...new Set(all.flatMap(r=>Object.keys(r).filter(k=>!k.startsWith('_'))))];
+    const csv  = ['Process,'+keys.join(','),
+        ...all.map(r=>[r._proc,...keys.map(k=>JSON.stringify(r[k]??''))].join(','))
+    ].join('\n');
+    const a=Object.assign(document.createElement('a'),{
+        href:URL.createObjectURL(new Blob([csv],{type:'text/csv'})),
+        download:`enterprise_c_alarms_${new Date().toISOString().slice(0,10)}.csv`
+    });
+    a.click();
+}
+
+// ── UI HELPERS ────────────────────────────────────────────────────
+function setText(id, val, isAlarm) {
+    const el=document.getElementById(id);
+    if (!el) return;
+    el.textContent=String(val);
+    el.className = isAlarm ? 'si-value' : (val==='—' ? 'si-value dash' : 'si-value');
+}
+function stamp()    { document.getElementById('hdrUpdate').textContent=new Date().toLocaleTimeString(); }
+function spin(on)   { document.getElementById('spinner').classList.toggle('visible',on); }
+function showBanner(msg, level) {
+    const b=document.getElementById('errBanner');
+    if (!b) return;
+    b.textContent=msg;
+    b.classList.add('visible');
+    // Colour by level
+    b.style.background = level==='info'  ? '#e3f2fd'
+                       : level==='warn'  ? '#fff8e1'
+                       : '#fff3e0';  // default: error orange
+    b.style.borderColor= level==='info'  ? '#2196F3'
+                       : level==='warn'  ? '#FFC107'
+                       : '#FF9800';
+    b.style.color      = level==='info'  ? '#0d47a1'
+                       : level==='warn'  ? '#f57f17'
+                       : '#E65100';
+}
+function hideBanner()    { document.getElementById('errBanner')?.classList.remove('visible'); }
+function setStatus(s) {
+    const m={
+        connected:   {txt:'● Connected',    cls:'badge-connected'},
+        disconnected:{txt:'● Disconnected', cls:'badge-disconnected'},
+        error:       {txt:'● Error',        cls:'badge-error'},
+        connecting:  {txt:'● Connecting…',  cls:'badge-connecting'},
+    };
+    const l=m[s]||m.disconnected;
+    const b=document.getElementById('proxyBadge');
+    const h=document.getElementById('hdrStatus');
+    if(b){b.textContent=l.txt; b.className='badge '+l.cls;}
+    if(h){h.textContent=l.txt.replace('● ',''); h.className='badge '+l.cls;}
+}
+
+// ── PROBE: dump raw responses from all discovery endpoints ────────
+async function probeProxy() {
+    const currentDb = dbms().trim() || 'YOUR_DB_NAME';
+    spin(true);
+    const results = [];
+    const endpoints = [
+        { method:'GET',  path:'/health' },
+        { method:'GET',  path:'/api/databases',
+          note:'Master node local DBs only — system databases' },
+        { method:'GET',  path:`/api/databases/${currentDb}/tables`,
+          note:`get tables where dbms = ${currentDb}  (routed to network)` },
+        { method:'GET',  path:'/api/nodes',
+          note:'Network nodes (cluster info)' },
+        { method:'POST', path:'/api/command',
+          body:{ command:`get tables where dbms = ${currentDb}`, destination:'network' },
+          note:'Alternative table query via command endpoint' },
+    ];
+    for (const ep of endpoints) {
+        const label = `${ep.method} ${ep.path}${ep.note ? '\n    ↳ AnyLog: '+ep.note : ''}`;
+        try {
+            const data = ep.method==='GET'
+                ? await GET(ep.path)
+                : await POST(ep.path, ep.body);
+            results.push(`✅ ${label}\n${JSON.stringify(data, null, 2)}`);
+        } catch(e) {
+            results.push(`❌ ${label}\n${e.message}`);
+        }
+    }
+    spin(false);
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#0d1117;color:#e6edf3;border-radius:10px;padding:20px;max-width:860px;width:100%;max-height:85vh;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.6;white-space:pre-wrap;word-break:break-all;box-shadow:0 20px 60px rgba(0,0,0,.6);';
+    box.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">' +
+        '<span style="font-size:14px;font-weight:bold;color:#58a6ff;">🩺 Proxy Diagnostic — Raw Responses</span>' +
+        '<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="background:#f85149;border:none;color:white;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px;">✕ Close</button>' +
+        '</div>' +
+        '<div style="color:#8b949e;font-size:10px;margin-bottom:12px;">Database field = "' + escHtml(currentDb) + '" | Proxy = ' + escHtml(base()) + '</div>' +
+        escHtml(results.join('\n\n' + '─'.repeat(60) + '\n\n'));
+    overlay.appendChild(box);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+    showBanner('Not connected. Enter proxy host / port / database and click Connect.');
+});
+</script>
+</body>
+</html>

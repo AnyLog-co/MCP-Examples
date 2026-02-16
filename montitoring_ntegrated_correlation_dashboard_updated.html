@@ -1,0 +1,2165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integrated System & Data Gap Correlation Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #333;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1900px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #1e3c72;
+            font-size: 2em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+        }
+        
+        .header-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-left: 10px;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-active {
+            background-color: #4CAF50;
+            box-shadow: 0 0 10px #4CAF50;
+        }
+        
+        .status-warning {
+            background-color: #ff9800;
+            box-shadow: 0 0 10px #ff9800;
+        }
+        
+        .status-error {
+            background-color: #f44336;
+            box-shadow: 0 0 10px #f44336;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #1e3c72;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #1e3c72;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .alert-card {
+            border-left: 4px solid #f44336;
+        }
+        
+        .alert-card h2 {
+            color: #f44336;
+            border-bottom-color: #f44336;
+        }
+        
+        .warning-card {
+            border-left: 4px solid #ff9800;
+        }
+        
+        .warning-card h2 {
+            color: #ff9800;
+            border-bottom-color: #ff9800;
+        }
+        
+        .success-card {
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .success-card h2 {
+            color: #4CAF50;
+            border-bottom-color: #4CAF50;
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .metric-box {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .metric-box.critical {
+            background: linear-gradient(135deg, #f44336 0%, #e91e63 100%);
+        }
+        
+        .metric-box.warning {
+            background: linear-gradient(135deg, #ff9800 0%, #ff5722 100%);
+        }
+        
+        .metric-box.success {
+            background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%);
+        }
+        
+        .metric-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .metric-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .correlation-matrix {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .correlation-box {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-top: 4px solid;
+        }
+        
+        .correlation-box.strong {
+            border-top-color: #f44336;
+            background: linear-gradient(to bottom, #fff5f5, white);
+        }
+        
+        .correlation-box.moderate {
+            border-top-color: #ff9800;
+            background: linear-gradient(to bottom, #fff8e1, white);
+        }
+        
+        .correlation-box.weak {
+            border-top-color: #4CAF50;
+            background: linear-gradient(to bottom, #e8f5e9, white);
+        }
+        
+        .correlation-title {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .correlation-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .correlation-label {
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .correlation-detail {
+            background: #f8f9fa;
+            border-left: 4px solid;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .correlation-detail.node-network {
+            border-left-color: #2196F3;
+        }
+        
+        .correlation-detail.node-data {
+            border-left-color: #ff9800;
+        }
+        
+        .correlation-detail.network-data {
+            border-left-color: #f44336;
+        }
+        
+        .correlation-detail.triple {
+            border-left-color: #9c27b0;
+            background: linear-gradient(to right, #f3e5f5, #f8f9fa);
+        }
+        
+        .correlation-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .correlation-strength-bar {
+            width: 100%;
+            height: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .correlation-strength-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+        
+        .correlation-strength-fill.strong {
+            background: linear-gradient(90deg, #f44336, #e91e63);
+        }
+        
+        .correlation-strength-fill.moderate {
+            background: linear-gradient(90deg, #ff9800, #ff5722);
+        }
+        
+        .correlation-strength-fill.weak {
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+        }
+        
+        .event-item {
+            background: #f8f9fa;
+            border-left: 4px solid;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 0.95em;
+        }
+        
+        .event-item.node {
+            border-left-color: #2196F3;
+        }
+        
+        .event-item.network {
+            border-left-color: #ff9800;
+        }
+        
+        .event-item.data {
+            border-left-color: #f44336;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        
+        .badge-critical {
+            background-color: #721c24;
+            color: white;
+        }
+        
+        .badge-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .badge-warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+        
+        th {
+            background: #1e3c72;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+        
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .impact-critical {
+            color: #f44336;
+            font-weight: bold;
+        }
+        
+        .impact-high {
+            color: #ff9800;
+            font-weight: bold;
+        }
+        
+        .impact-medium {
+            color: #ffc107;
+        }
+        
+        .impact-low {
+            color: #4CAF50;
+        }
+        
+        .refresh-button, .export-button {
+            background: #1e3c72;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .refresh-button:hover, .export-button:hover {
+            background: #2a5298;
+            transform: translateY(-1px);
+        }
+        
+        .refresh-button.paused {
+            background: #ff9800;
+            animation: pulse-warning 2s infinite;
+        }
+        
+        .refresh-button.paused:hover {
+            background: #ff5722;
+        }
+        
+        @keyframes pulse-warning {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.7); }
+            50% { box-shadow: 0 0 0 10px rgba(255, 152, 0, 0); }
+        }
+        
+        .timeline {
+            position: relative;
+            padding: 20px 0;
+        }
+        
+        .timeline-item {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            position: relative;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 45px;
+            bottom: -25px;
+            width: 2px;
+            background: #e9ecef;
+        }
+        
+        .timeline-item:last-child::before {
+            display: none;
+        }
+        
+        .timeline-marker {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            flex-shrink: 0;
+            z-index: 1;
+        }
+        
+        .timeline-marker.node {
+            border-color: #2196F3;
+        }
+        
+        .timeline-marker.network {
+            border-color: #ff9800;
+        }
+        
+        .timeline-marker.data {
+            border-color: #f44336;
+        }
+        
+        .timeline-marker.correlated {
+            border-color: #9c27b0;
+            background: linear-gradient(135deg, #f3e5f5, white);
+            animation: pulse-correlated 2s infinite;
+        }
+        
+        @keyframes pulse-correlated {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .timeline-content {
+            flex: 1;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .timeline-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+        }
+        
+        .timeline-time {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .timeline-details {
+            color: #555;
+            margin-top: 10px;
+            font-size: 0.95em;
+        }
+        
+        .correlation-links {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        .correlation-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+        
+        .link-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9em;
+            flex-shrink: 0;
+        }
+        
+        .link-icon.node {
+            background: #e3f2fd;
+            color: #2196F3;
+        }
+        
+        .link-icon.network {
+            background: #fff8e1;
+            color: #ff9800;
+        }
+        
+        .link-icon.data {
+            background: #ffebee;
+            color: #f44336;
+        }
+        
+        .recommendation {
+            background: #e8f5e9;
+            border-left: 3px solid #4CAF50;
+            padding: 12px;
+            margin-top: 10px;
+            border-radius: 4px;
+        }
+        
+        .recommendation-title {
+            font-weight: bold;
+            color: #2e7d32;
+            margin-bottom: 5px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        
+        .filter-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        select, input[type="datetime-local"] {
+            padding: 8px 12px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            font-size: 0.95em;
+        }
+        
+        .sort-button {
+            background: white;
+            border: 2px solid #1e3c72;
+            color: #1e3c72;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .sort-button:hover {
+            background: #1e3c72;
+            color: white;
+        }
+        
+        .sort-button.active {
+            background: #1e3c72;
+            color: white;
+        }
+        
+        .sort-arrow {
+            font-size: 0.8em;
+        }
+        
+        .time-range-label {
+            font-weight: 600;
+            color: #1e3c72;
+        }
+        /* ── AnyLog REST Proxy controls ───────────────────────────── */
+        .proxy-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 15px;padding:10px 12px;background:#f6f8fa;border:1px solid #e5e7eb;border-radius:8px;}
+        .proxy-controls label{font-size:12px;color:#334155;display:flex;gap:6px;align-items:center;}
+        .proxy-controls input{padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;}
+        .proxy-title{font-weight:700;color:#1e3c72;margin-right:6px;}
+        .proxy-status{font-size:12px;padding:3px 8px;border-radius:999px;background:#e2e8f0;color:#334155;}
+        .proxy-status.ok{background:#dcfce7;color:#166534;}
+        .proxy-status.err{background:#fee2e2;color:#991b1b;}
+
+        /* ── API Call Log ─────────────────────────────────────────── */
+        .log-panel{position:fixed;right:16px;bottom:16px;width:560px;max-width:calc(100vw - 32px);background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;z-index:9999;}
+        .log-header{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;user-select:none;}
+        .log-title{font-weight:700;}
+        .log-stats{margin-left:auto;display:flex;gap:8px;font-size:11px;opacity:.9;}
+        .log-stat{padding:2px 6px;border-radius:999px;background:#161b22;border:1px solid #30363d;}
+        .log-stat.ok{background:rgba(35,134,54,.2);border-color:rgba(35,134,54,.4);}
+        .log-stat.err{background:rgba(248,81,73,.2);border-color:rgba(248,81,73,.4);}
+        .log-caret{opacity:.8;transition:.15s transform;}
+        .log-caret.open{transform:rotate(180deg);}
+        .log-content{border-top:1px solid #30363d;}
+        .log-tools{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid #30363d;flex-wrap:wrap;}
+        #logSearch{flex:1;min-width:160px;background:#0b0f14;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:6px 8px;font-size:11px;}
+        .log-filter-btn{background:#161b22;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;}
+        .log-filter-btn.active{border-color:#58a6ff;color:#58a6ff;}
+        .log-body{max-height:240px;overflow:auto;}
+        .log-placeholder{padding:16px;text-align:center;color:#8b949e;font-size:11px;}
+        .log-entry{display:grid;grid-template-columns:72px 52px 54px 62px 1fr 120px 60px;gap:8px;padding:6px 10px;border-bottom:1px solid #21262d;font-size:11px;align-items:center;}
+        .log-entry:hover{background:#161b22;}
+        .le-method{padding:2px 6px;border-radius:999px;text-align:center;}
+        .m-get{background:rgba(88,166,255,.15);border:1px solid rgba(88,166,255,.35);}
+        .m-post{background:rgba(163,113,247,.15);border:1px solid rgba(163,113,247,.35);}
+        .le-status{padding:2px 6px;border-radius:999px;text-align:center;}
+        .s-ok{background:rgba(35,134,54,.2);border:1px solid rgba(35,134,54,.4);}
+        .s-err{background:rgba(248,81,73,.2);border:1px solid rgba(248,81,73,.4);}
+        .le-path{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .le-detail{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#8b949e;}
+        .le-rows{text-align:right;color:#8b949e;}
+
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                🔗 Integrated System & Data Gap Correlation Dashboard
+                <span id="systemStatus" class="status-indicator status-active"></span>
+            </h1>
+
+            <div class="proxy-controls">
+                <div class="proxy-title">🔌 AnyLog REST Proxy</div>
+                <label>Host <input id="cfgHost" placeholder="localhost" style="width:140px;"></label>
+                <label>Port <input id="cfgPort" placeholder="8080" style="width:90px;"></label>
+                <label>DBMS <input id="cfgDbms" placeholder="database_name" style="width:160px;"></label>
+                <button class="control-button" onclick="connectProxy()">Connect</button>
+                <button class="control-button" onclick="refreshLiveData(true)">Refresh</button>
+                <span id="proxyStatus" class="proxy-status">not connected</span>
+            </div>
+
+
+            <div class="subtitle">
+                Three-way correlation analysis: Node Health (node_insight) ↔ Network Issues (switches) ↔ Data Gaps
+            </div>
+            <div class="header-controls">
+                <div>
+                    Last Update: <span id="lastUpdate">Never</span>
+                    <span id="pausedIndicator" style="display: none; margin-left: 15px; color: #ff9800; font-weight: bold;">⏸ PAUSED</span>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="refresh-button" onclick="togglePause()" id="pauseButton">
+                        ⏸ Pause Auto-Refresh
+                    </button>
+
+                    <div class="refresh-config" style="display:inline-flex; align-items:center; gap:8px; margin-left:10px; flex-wrap:wrap;">
+                        <label style="font-size:12px; opacity:.85;">History (min):</label>
+                        <input id="historyMinutesInput" type="number" min="1" step="1" value="60" style="width:90px; padding:6px 8px; border:1px solid #ddd; border-radius:6px;">
+                        <label style="font-size:12px; opacity:.85;">Refresh (sec):</label>
+                        <input id="refreshSecondsInput" type="number" min="2" step="1" value="30" style="width:80px; padding:6px 8px; border:1px solid #ddd; border-radius:6px;">
+                        <button class="refresh-button" onclick="applyRefreshSettings()" style="padding:8px 10px;">Apply</button>
+                    </div>
+    
+                    <button class="refresh-button" onclick="refreshData()">🔄 Refresh Now</button>
+                    <button class="export-button" onclick="exportReport()">📥 Export Report</button>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Correlation Overview -->
+        <div class="card full-width">
+            <h2>📊 Correlation Strength Matrix</h2>
+            <div class="correlation-matrix">
+                <div class="correlation-box strong" id="nodeNetworkBox">
+                    <div class="correlation-title">Node Issues ↔ Network Problems</div>
+                    <div class="correlation-value" id="nodeNetworkCorr">--</div>
+                    <div class="correlation-label" id="nodeNetworkLabel">--</div>
+                    <div style="font-size: 0.8em; color: #666; margin-top: 10px;" id="nodeNetworkCount">-- events</div>
+                </div>
+                
+                <div class="correlation-box moderate" id="nodeDataBox">
+                    <div class="correlation-title">Node Issues ↔ Data Gaps</div>
+                    <div class="correlation-value" id="nodeDataCorr">--</div>
+                    <div class="correlation-label" id="nodeDataLabel">--</div>
+                    <div style="font-size: 0.8em; color: #666; margin-top: 10px;" id="nodeDataCount">-- events</div>
+                </div>
+                
+                <div class="correlation-box strong" id="networkDataBox">
+                    <div class="correlation-title">Network Problems ↔ Data Gaps</div>
+                    <div class="correlation-value" id="networkDataCorr">--</div>
+                    <div class="correlation-label" id="networkDataLabel">--</div>
+                    <div style="font-size: 0.8em; color: #666; margin-top: 10px;" id="networkDataCount">-- events</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Summary Metrics -->
+        <div class="grid">
+            <div class="card alert-card">
+                <h2>🖥️ Node Issues</h2>
+                <div class="metric-box warning">
+                    <div class="metric-value" id="nodeIssuesCount">0</div>
+                    <div class="metric-label">Active Node Problems</div>
+                </div>
+                <div id="nodeIssuesList"></div>
+            </div>
+            
+            <div class="card warning-card">
+                <h2>🔀 Network Issues</h2>
+                <div class="metric-box warning">
+                    <div class="metric-value" id="networkIssuesCount">0</div>
+                    <div class="metric-label">Switch/Connection Problems</div>
+                </div>
+                <div id="networkIssuesList"></div>
+            </div>
+            
+            <div class="card alert-card">
+                <h2>📊 Data Gaps</h2>
+                <div class="metric-box critical">
+                    <div class="metric-value" id="dataGapsCount">0</div>
+                    <div class="metric-label">Critical Data Gaps</div>
+                </div>
+                <div id="dataGapsList"></div>
+            </div>
+        </div>
+        
+        <!-- Triple Correlation Events -->
+        <div class="card full-width alert-card">
+            <h2>🎯 Triple Correlation Events (Node + Network + Data)</h2>
+            <div id="tripleCorrelationContainer">
+                <div class="loading">Analyzing three-way correlations</div>
+            </div>
+        </div>
+        
+        <!-- Detailed Correlations -->
+        <div class="card full-width">
+            <h2>🔗 Detailed Correlation Analysis</h2>
+            <div id="detailedCorrelationsContainer">
+                <div class="loading">Loading correlation details</div>
+            </div>
+        </div>
+        
+        <!-- Unified Timeline -->
+        <div class="card full-width">
+            <h2>⏱️ Unified Event Timeline with Correlations</h2>
+            <div class="filter-controls">
+                <span class="time-range-label">Time Range:</span>
+                <button class="sort-button active" onclick="setTimeRange('1h')" id="range-1h">Last 1 Hour</button>
+                <button class="sort-button" onclick="setTimeRange('6h')" id="range-6h">Last 6 Hours</button>
+                <button class="sort-button" onclick="setTimeRange('24h')" id="range-24h">Last 24 Hours</button>
+                <button class="sort-button" onclick="setTimeRange('7d')" id="range-7d">Last 7 Days</button>
+                <button class="sort-button" onclick="setTimeRange('custom')" id="range-custom">Custom</button>
+                
+                <span style="border-left: 2px solid #ddd; height: 30px; margin: 0 5px;"></span>
+                
+                <span class="time-range-label">Sort:</span>
+                <button class="sort-button active" onclick="setSortOrder('desc')" id="sort-desc">
+                    Newest First <span class="sort-arrow">▼</span>
+                </button>
+                <button class="sort-button" onclick="setSortOrder('asc')" id="sort-asc">
+                    Oldest First <span class="sort-arrow">▲</span>
+                </button>
+            </div>
+            
+            <div class="filter-controls" id="customTimeRange" style="display: none;">
+                <label>From:</label>
+                <input type="datetime-local" id="timeFrom" onchange="applyCustomTimeRange()">
+                <label>To:</label>
+                <input type="datetime-local" id="timeTo" onchange="applyCustomTimeRange()">
+                <button class="sort-button" onclick="applyCustomTimeRange()">Apply</button>
+            </div>
+            
+            <div class="filter-controls">
+                <select id="timelineFilter" onchange="filterTimeline()">
+                    <option value="all">All Events</option>
+                    <option value="correlated">Correlated Events Only</option>
+                    <option value="node">Node Issues</option>
+                    <option value="network">Network Issues</option>
+                    <option value="data">Data Gaps</option>
+                </select>
+                <select id="nodeFilter" onchange="filterTimeline()">
+                    <option value="all">All Nodes</option>
+                </select>
+                <select id="severityFilter" onchange="filterTimeline()">
+                    <option value="all">All Severities</option>
+                    <option value="critical">Critical Only</option>
+                    <option value="high">High Priority</option>
+                </select>
+                
+                <span style="margin-left: auto; color: #666; font-size: 0.9em;" id="eventCount">
+                    Showing 0 events
+                </span>
+            </div>
+            <div id="timelineContainer">
+                <div class="loading">Loading unified timeline</div>
+            </div>
+        </div>
+        
+        <!-- Correlation Impact Table -->
+        <div class="card full-width">
+            <h2>📈 Correlation Impact Analysis</h2>
+            <div class="filter-controls">
+                <span class="time-range-label">Sort by:</span>
+                <button class="sort-button active" onclick="sortTable('time')" id="table-sort-time">
+                    Time <span class="sort-arrow">▼</span>
+                </button>
+                <button class="sort-button" onclick="sortTable('correlation')" id="table-sort-correlation">
+                    Correlation Score
+                </button>
+                <button class="sort-button" onclick="sortTable('impact')" id="table-sort-impact">
+                    Impact (Records Lost)
+                </button>
+                <button class="sort-button" onclick="sortTable('severity')" id="table-sort-severity">
+                    Severity
+                </button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th onclick="sortTableByColumn('time')" style="cursor: pointer;">
+                            Time Window <span id="time-sort-indicator">▼</span>
+                        </th>
+                        <th>Node Issue</th>
+                        <th>Network Issue</th>
+                        <th>Data Gap</th>
+                        <th onclick="sortTableByColumn('correlation')" style="cursor: pointer;">
+                            Correlation Score <span id="correlation-sort-indicator"></span>
+                        </th>
+                        <th>Root Cause</th>
+                        <th onclick="sortTableByColumn('impact')" style="cursor: pointer;">
+                            Impact <span id="impact-sort-indicator"></span>
+                        </th>
+                        <th>Recommendation</th>
+                    </tr>
+                </thead>
+                <tbody id="correlationImpactTable">
+                    <tr><td colspan="8" style="text-align: center;">Loading correlation impact data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Node-by-Node Analysis -->
+        <div class="card full-width">
+            <h2>🖥️ Per-Node Correlation Analysis</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Node</th>
+                        <th>CPU %</th>
+                        <th>Free Space %</th>
+                        <th>Errors/Period</th>
+                        <th>Network Errors</th>
+                        <th>Data Gaps Caused</th>
+                        <th>Correlation Strength</th>
+                        <th>Primary Issue</th>
+                    </tr>
+                </thead>
+                <tbody id="nodeAnalysisTable">
+                    <tr><td colspan="8" style="text-align: center;">Loading node analysis...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+
+// ── REST PROXY CONFIG (AnyLog REST Proxy) ─────────────────────────────
+function base() {
+  const h = (document.getElementById('cfgHost')?.value || localStorage.getItem('anylog_proxy_host') || 'localhost').trim();
+  const p = (document.getElementById('cfgPort')?.value || localStorage.getItem('anylog_proxy_port') || '8080').trim();
+  localStorage.setItem('anylog_proxy_host', h);
+  localStorage.setItem('anylog_proxy_port', p);
+  return `http://${h}:${p}`;
+}
+function dbms() {
+  const v = (document.getElementById('cfgDbms')?.value || localStorage.getItem('anylog_proxy_dbms') || '').trim();
+  localStorage.setItem('anylog_proxy_dbms', v);
+  return v;
+}
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function rows(data){
+  if(!data) return [];
+  if(Array.isArray(data)) return data;
+  for(const key of ['Query','rows','data','result']){
+    if(data[key]?.rows) return data[key].rows;
+    if(Array.isArray(data[key])) return data[key];
+  }
+  for(const v of Object.values(data)){
+    if(Array.isArray(v) && v.length && typeof v[0]==='object') return v;
+  }
+  return [];
+}
+function extractTableFromSQL(sql){
+  if(!sql) return '';
+  const m = sql.match(/FROM\s+(\w+)/i);
+  return m ? m[1] : '';
+}
+function buildAnyLogCmd(proxyPath, body){
+  if(!body) return proxyPath;
+  if(proxyPath.includes('/query/increment') && body.table){
+    const proj = (body.projections||[]).join(', ');
+    return `sql ${body.dbms||dbms()} SELECT increment(${body.timeUnit}, ${body.intervalLength}, ${body.timeColumn}, ${proj}) FROM ${body.table} WHERE ${body.timeColumn} >= '${body.startTime}' AND ${body.timeColumn} <= '${body.endTime}'`;
+  }
+  if(proxyPath.includes('/query') && body.sql){
+    return `sql ${body.dbms||dbms()} ${body.sql}`;
+  }
+  return proxyPath;
+}
+
+// ── API CALL LOG (ported from enterprise_c_dashboard) ─────────────────
+const callLog=[]; let logStats={total:0, ok:0, err:0, rows:0}; let nextLogId=0;
+let logOpen=false, logFilter='all';
+function setText2(id,val){ const el=document.getElementById(id); if(el) el.textContent=val; }
+function updateLogStats(){
+  setText2('log-total', `${logStats.total} call${logStats.total!==1?'s':''}`);
+  setText2('log-ok', `${logStats.ok} ok`);
+  setText2('log-err', `${logStats.err} err`);
+  setText2('log-rows', `${logStats.rows} rows`);
+}
+function logCall(entry){
+  const id=nextLogId++;
+  const ok=!entry.error && entry.status>=200 && entry.status<300;
+  const rec={id, ts:new Date(), ok, ...entry};
+  callLog.unshift(rec); if(callLog.length>500) callLog.pop();
+  logStats.total++; if(ok) logStats.ok++; else logStats.err++;
+  logStats.rows += rec.rowCnt||0;
+  updateLogStats();
+  if(logOpen) prependLogRow(rec);
+  // Always log to console (even if panel not present)
+  const msg = `${rec.method} ${rec.path} [${rec.ok?rec.status:'ERR'}] ${Math.round(rec.dur)}ms`;
+  if(rec.ok) console.debug(msg, rec); else console.warn(msg, rec.error||rec);
+}
+function buildLogEntryHTML(rec){
+  const time=rec.ts.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const mCls=rec.method==='GET'?'m-get':'m-post';
+  const sCls=rec.ok?'s-ok':'s-err';
+  const eStat=rec.ok?(rec.status||'200'):(rec.status||'ERR');
+  const dur=rec.dur<1000?`${Math.round(rec.dur)}ms`:`${(rec.dur/1000).toFixed(1)}s`;
+  const rowTxt=rec.rowCnt>0?rec.rowCnt.toLocaleString():(rec.ok?'0':'—');
+  const detail=(rec.detail||'').length>140?(rec.detail||'').slice(0,140)+'…':(rec.detail||'');
+  const tbl=rec.table||'—';
+  return `<div class="log-entry ${rec.ok?'log-ok':'log-err'}" data-method="${rec.method.toLowerCase()}"
+               data-ok="${rec.ok}" data-search="${(rec.path+' '+(rec.detail||'')+' '+tbl).toLowerCase()}"
+               title="${escHtml(rec.detail||rec.path)}">
+      <span class="le-time">${time}</span>
+      <span class="le-method ${mCls}">${rec.method}</span>
+      <span class="le-status ${sCls}">${eStat}</span>
+      <span class="le-dur">${dur}</span>
+      <span class="le-path">${escHtml(detail||rec.path)}</span>
+      <span class="le-detail">${escHtml(tbl)}</span>
+      <span class="le-rows">${rowTxt}</span>
+  </div>`;
+}
+function prependLogRow(rec){
+  const body=document.getElementById('logBody'); if(!body) return;
+  const ph=body.querySelector('.log-placeholder'); if(ph) ph.remove();
+  const tmp=document.createElement('div'); tmp.innerHTML=buildLogEntryHTML(rec);
+  body.insertBefore(tmp.firstElementChild, body.firstChild);
+  filterLog();
+}
+function rebuildLogBody(){
+  const body=document.getElementById('logBody'); if(!body) return;
+  body.innerHTML = callLog.length ? callLog.map(buildLogEntryHTML).join('') :
+    '<div class="log-placeholder">— No API calls yet. —</div>';
+  filterLog();
+}
+function toggleLog(){
+  logOpen=!logOpen;
+  const content=document.getElementById('logContent');
+  const caret=document.getElementById('logCaret');
+  if(content) content.style.display=logOpen?'block':'none';
+  if(caret) caret.classList.toggle('open', logOpen);
+  if(logOpen) rebuildLogBody();
+}
+function clearLog(){ callLog.length=0; logStats={total:0,ok:0,err:0,rows:0}; nextLogId=0; updateLogStats(); rebuildLogBody(); }
+function filterLog(){
+  const q=(document.getElementById('logSearch')?.value||'').toLowerCase();
+  const entries=[...document.querySelectorAll('#logBody .log-entry')];
+  for(const el of entries){
+    const hay=el.dataset.search||'';
+    const okFlag=el.dataset.ok==='true';
+    const method=el.dataset.method;
+    let vis=true;
+    if(logFilter==='error') vis = !okFlag;
+    else if(logFilter==='get') vis = method==='get';
+    else if(logFilter==='post') vis = method==='post';
+    if(vis && q) vis = hay.includes(q);
+    el.style.display = vis ? 'grid' : 'none';
+  }
+}
+function setLogFilter(f, btn){
+  logFilter=f;
+  document.querySelectorAll('.log-filter-btn').forEach(b=>b.classList.remove('active'));
+  btn?.classList.add('active');
+  filterLog();
+}
+
+// ── HTTP WRAPPERS (all requests logged) ───────────────────────────────
+async function GET(path){
+  const t0=performance.now(); let status=0, data=null, err=null;
+  try{
+    const r=await fetch(base()+path, {method:'GET', signal:AbortSignal.timeout(20000)});
+    status=r.status;
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    data=await r.json();
+    return data;
+  }catch(e){ err=e; throw e;
+  }finally{
+    const dur=performance.now()-t0; const rowCnt=data?rows(data).length:0;
+    logCall({method:'GET', path, status: err?(status||0):status, dur, rowCnt, type:'get', detail:path, table:'' , error:err});
+  }
+}
+async function POST(path, body){
+  const t0=performance.now(); let status=0, data=null, err=null;
+  try{
+    const r=await fetch(base()+path,{method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(body), signal:AbortSignal.timeout(30000)});
+    status=r.status;
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    data=await r.json();
+    return data;
+  }catch(e){ err=e; throw e;
+  }finally{
+    const dur=performance.now()-t0; const rowCnt=data?rows(data).length:0;
+    const sql=body?.sql||''; const tbl=body?.table||extractTableFromSQL(sql);
+    logCall({method:'POST', path, status: err?(status||0):status, dur, rowCnt, type:'post',
+        detail: buildAnyLogCmd(path, body) || sql || path, table: tbl, error:err});
+  }
+}
+
+
+// ── LIVE DATA LOADER ───────────────────────────────────────────────
+let corrProxyConnected=false;
+async function connectProxy(){
+  const st=document.getElementById('proxyStatus');
+  if(st){st.textContent='connecting…'; st.className='proxy-status';}
+  try{
+    const h=await GET('/health');
+    corrProxyConnected = (h.status||'').toLowerCase()==='healthy' || h.connection==='established' || (h.status||'').toLowerCase()==='ok';
+    if(!corrProxyConnected) throw new Error('Proxy not healthy');
+    if(st){st.textContent='connected'; st.className='proxy-status ok';}
+    await refreshLiveData(true);
+  }catch(e){
+    corrProxyConnected=false;
+    if(st){st.textContent='error'; st.className='proxy-status err';}
+    console.warn('Proxy connect failed', e);
+  }
+}
+
+function num(v){ const n=Number(v); return Number.isFinite(n)?n:0; }
+function firstVal(r, keys){ for(const k of keys){ if(r[k]!=null) return r[k]; const kl=k.toLowerCase(); if(r[kl]!=null) return r[kl]; const ku=k.toUpperCase(); if(r[ku]!=null) return r[ku]; } return null; }
+
+
+function withHistoryFilter(sql){
+  const mins = Math.max(1, parseInt(historyMinutes || 60, 10));
+  const col = (timeColumn || 'timestamp').trim();
+  if (/where/i.test(sql)) return `${sql} AND ${col} >= NOW() - ${mins} minutes`;
+  return `${sql} WHERE ${col} >= NOW() - ${mins} minutes`;
+}
+
+async function refreshLiveData(renderNow=false){
+  if(!dbms()) { console.warn('DBMS not set'); if(renderNow) renderAll(); return; }
+  try{
+    const [nodesRes, nicsRes, swRes, dockRes, tablesRes] = await Promise.allSettled([
+      POST('/api/query', {dbms: dbms(), sql: withHistoryFilter('SELECT * FROM node_insight LIMIT 500')}),
+      POST('/api/query', {dbms: dbms(), sql: withHistoryFilter('SELECT * FROM nic_info LIMIT 500')}),
+      POST('/api/query', {dbms: dbms(), sql: withHistoryFilter('SELECT * FROM switch LIMIT 200')}),
+      POST('/api/query', {dbms: dbms(), sql: withHistoryFilter('SELECT * FROM docker_insight LIMIT 500')}),
+      GET(`/api/databases/${encodeURIComponent(dbms())}/tables`)
+    ]);
+    const nodeRows = nodesRes.status==='fulfilled' ? rows(nodesRes.value) : [];
+    const nicRows  = nicsRes.status==='fulfilled'  ? rows(nicsRes.value)  : [];
+    const swRows   = swRes.status==='fulfilled'    ? rows(swRes.value)    : [];
+    const dockRows = dockRes.status==='fulfilled' ? rows(dockRes.value) : [];
+
+    // Find a gaps table if present
+    let gapTable = null;
+    if(tablesRes.status==='fulfilled'){
+      const trows = rows(tablesRes.value);
+      const names = trows.map(r=>r.table||r.name||r.table_name||r.TABLE||r.TABLE_NAME).filter(Boolean);
+      gapTable = names.find(n=>/gap|missing|drop/i.test(n)) || null;
+    }
+
+    let gapRows=[];
+    if(gapTable){
+      const gr = await POST('/api/query', {dbms: dbms(), sql:`SELECT * FROM ${gapTable} LIMIT 300`});
+      gapRows = rows(gr);
+    }
+
+    window.__liveCorrelationData = buildCorrelationData(nodeRows, nicRows, swRows, dockRows, gapRows);
+  } catch(e){
+    console.warn('Live refresh failed; keeping existing data', e);
+  } finally {
+    if(renderNow) renderAll();
+  }
+}
+
+function buildCorrelationData(nodeRows, nicRows, swRows, dockRows, gapRows){
+  const now = new Date();
+  const nodeIssues=[];
+  for(const r of nodeRows){
+    const node = firstVal(r,['node','node_name','host','host_name','hostname']) || 'unknown';
+    const tsRaw = firstVal(r,['timestamp','ts','time','date']);
+    const timestamp = tsRaw ? new Date(tsRaw) : now;
+    const cpu = num(firstVal(r,['cpu_percent','cpu','cpu_pct']));
+    const diskFree = num(firstVal(r,['disk_free','disk_free_percent','disk_free_pct','disk_percent_free']));
+    const errors = num(firstVal(r,['errors','error_count','err_count','new_errors']));
+
+    if(cpu>80) nodeIssues.push({timestamp,type:'node',node,issue:'high_cpu',severity: cpu>90?'critical':'high',value:cpu,threshold:80,description:`High CPU usage: ${cpu.toFixed(1)}%`});
+    if(diskFree && diskFree<20) nodeIssues.push({timestamp,type:'node',node,issue:'low_disk',severity: diskFree<10?'critical':'high',value:diskFree,threshold:20,description:`Low disk space: ${diskFree.toFixed(1)}% free`});
+    if(errors>100) nodeIssues.push({timestamp,type:'node',node,issue:'high_errors',severity: errors>200?'high':'medium',value:errors,threshold:100,description:`Error spike: ${errors} new errors`});
+  }
+
+
+  const dockerIssues=[];
+  for(const r of (dockRows||[])){
+    const host = firstVal(r,['host','host_name','node','hostname']) || firstVal(r,['node','node_name']) || 'unknown';
+    const container = firstVal(r,['container','container_name','name','service']) || 'container';
+    const tsRaw = firstVal(r,['timestamp','ts','time','date']);
+    const timestamp = tsRaw ? new Date(tsRaw) : now;
+    const status = String(firstVal(r,['status','state'])||'').toLowerCase();
+    const restarts = num(firstVal(r,['restarts','restart_count']));
+    const cpu = num(firstVal(r,['cpu_percent','cpu','cpu_pct']));
+    const mem = num(firstVal(r,['mem_percent','memory_percent','mem','mem_pct']));
+    if(status && !['running','up','ok'].includes(status)){
+      dockerIssues.push({timestamp,type:'node',node:host,issue:'container_down',severity:'high',value:status,threshold:'running',description:`Container ${container} is ${status}`});
+    }
+    if(restarts>5){
+      dockerIssues.push({timestamp,type:'node',node:host,issue:'container_restarts',severity:restarts>20?'critical':'high',value:restarts,threshold:5,description:`Container ${container} restarts: ${restarts}`});
+    }
+    if(cpu>80){
+      dockerIssues.push({timestamp,type:'node',node:host,issue:'container_high_cpu',severity:cpu>90?'critical':'high',value:cpu,threshold:80,description:`Container ${container} CPU: ${cpu.toFixed(1)}%`});
+    }
+    if(mem>80){
+      dockerIssues.push({timestamp,type:'node',node:host,issue:'container_high_mem',severity:mem>90?'critical':'high',value:mem,threshold:80,description:`Container ${container} memory: ${mem.toFixed(1)}%`});
+    }
+  }
+
+  const networkIssues=[];
+  for(const r of nicRows){
+    const host = firstVal(r,['host','host_name','node','hostname']) || 'unknown';
+    const nic = firstVal(r,['name','nic','interface']) || 'nic';
+    const status = String(firstVal(r,['status','state'])||'').toLowerCase();
+    if(status && status!=='up' && status!=='running' && status!=='ok'){
+      networkIssues.push({timestamp: now, type:'network', node: host, issue:'nic_down', severity:'high', value:status, threshold:'up', description:`NIC ${nic} is ${status}`});
+    }
+  }
+  for(const r of swRows){
+    const sw = firstVal(r,['name','switch','switch_name']) || 'switch';
+    const connected = String(firstVal(r,['connected','online','status'])||'').toLowerCase();
+    if(connected==='false' || connected==='disconnected'){
+      networkIssues.push({timestamp: now, type:'network', node: sw, issue:'switch_down', severity:'high', value:'down', threshold:'up', description:`Switch ${sw} not connected`});
+    }
+  }
+
+  const dataGaps=[];
+  for(const r of gapRows){
+    const tsRaw = firstVal(r,['timestamp','ts','time','date']);
+    const timestamp = tsRaw ? new Date(tsRaw) : now;
+    const table = firstVal(r,['table','table_name','metric','stream']) || 'unknown_table';
+    const recordsLost = num(firstVal(r,['records_lost','records','missing','gap_size']));
+    const sev = String(firstVal(r,['severity','level','impact'])||'').toLowerCase();
+    const severity = /crit/.test(sev)?'critical':/high/.test(sev)?'high':/med/.test(sev)?'medium':/low/.test(sev)?'low':(recordsLost>10000?'high':recordsLost>0?'medium':'low');
+    if(recordsLost>0 || sev) dataGaps.push({timestamp,type:'data',table,issue:'data_gap',severity,recordsLost,description:`Data gap in ${table}: ${recordsLost||'unknown'} records`});
+  }
+
+  const correlations = analyzeCorrelations([...nodeIssues, ...dockerIssues], networkIssues, dataGaps);
+  return {
+    nodeIssues: [...nodeIssues, ...dockerIssues],
+    networkIssues,
+    dataGaps,
+    correlations,
+    allEvents: [...nodeIssues, ...dockerIssues, ...networkIssues, ...dataGaps].sort((a,b)=>b.timestamp-a.timestamp)
+  };
+}
+
+function renderAll(){
+  const data = generateMockData();
+  currentData = data;
+  renderCorrelationMatrix(data);
+  renderSummaryMetrics(data);
+  renderTripleCorrelations(data);
+  renderDetailedCorrelations(data);
+  renderUnifiedTimeline(data);
+  renderCorrelationsTable(data);
+  renderGapAnalysis(data);
+  renderRecommendations(data);
+}
+
+        // State
+        let currentData = null;
+        let timeRange = '1h'; // default to last 1 hour
+        let sortOrder = 'desc'; // newest first
+        let tableSortField = 'time';
+        let tableSortOrder = 'desc';
+        let customTimeFrom = null;
+        let customTimeTo = null;
+        let isPaused = false;
+        let autoRefreshInterval = null;
+        let refreshSeconds = 30;
+        let historyMinutes = 60;
+        let timeColumn = "timestamp";
+        
+        // Switch-to-device mapping
+        const switchDeviceMap = {
+            'Switch 2 (172.79.89.10)': [2, 3, 4, 5],
+            'Switch 3 (172.79.89.20)': [7, 8],
+            'Switch 4 (172.79.89.30)': [10, 12, 13, 15, 28, 32],
+            'Switch 5 (172.79.89.40)': [14, 16, 18, 19, 23, 25, 30],
+            'Switch 6 (172.79.89.50)': [21, 22, 24, 26],
+            'Switch 7 (172.79.89.60)': [31]
+        };
+        
+        // Device-to-data-source mapping
+        const deviceDataSourceMap = {
+            2: ['bottle_factory:input_1'],
+            3: ['bottle_factory:input_2'],
+            7: ['manufacturing_historian:sub_unit_250_batch_id'],
+            8: ['manufacturing_historian:sub_tic_250_001_pv_celsius'],
+            12: ['bottle_factory:input_12'],
+            14: ['manufacturing_historian:sum_batch_id'],
+            16: ['manufacturing_historian:sum_sic501_pv_rpm'],
+            25: ['bottle_factory:input_25']
+        };
+        
+        // Time range and sorting functions
+        function setTimeRange(range) {
+            timeRange = range;
+        // sync minutes selector
+        const map={ '1h':60,'6h':360,'24h':1440,'7d':10080 };
+        if(map[range]){ historyMinutes=map[range]; const i=document.getElementById('historyMinutesInput'); if(i) i.value=historyMinutes; }
+        if(range==='custom'){ const i=document.getElementById('historyMinutesInput'); if(i) { historyMinutes=Math.max(1,parseInt(i.value||historyMinutes,10)); } }
+
+            
+            // Update button states
+            ['1h', '6h', '24h', '7d', 'custom'].forEach(r => {
+                const btn = document.getElementById(`range-${r}`);
+                if (btn) {
+                    btn.classList.toggle('active', r === range);
+                }
+            });
+            
+            // Show/hide custom time range inputs
+            const customDiv = document.getElementById('customTimeRange');
+            if (customDiv) {
+                customDiv.style.display = range === 'custom' ? 'flex' : 'none';
+            }
+            
+            if (range === 'custom') {
+                // Set default custom range if not set
+                if (!customTimeFrom || !customTimeTo) {
+                    const now = new Date();
+                    const yesterday = new Date(now - 24 * 3600000);
+                    document.getElementById('timeFrom').value = formatDateTimeLocal(yesterday);
+                    document.getElementById('timeTo').value = formatDateTimeLocal(now);
+                }
+            }
+            
+            filterTimeline();
+        }
+        
+        function setSortOrder(order) {
+            sortOrder = order;
+            
+            // Update button states
+            document.getElementById('sort-desc').classList.toggle('active', order === 'desc');
+            document.getElementById('sort-asc').classList.toggle('active', order === 'asc');
+            
+            filterTimeline();
+        }
+        
+        function applyCustomTimeRange() {
+            const fromInput = document.getElementById('timeFrom').value;
+            const toInput = document.getElementById('timeTo').value;
+            
+            if (fromInput && toInput) {
+                customTimeFrom = new Date(fromInput);
+                customTimeTo = new Date(toInput);
+                filterTimeline();
+            }
+        }
+        
+        function formatDateTimeLocal(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+        
+        function getTimeRangeInMs(range) {
+            switch(range) {
+                case '1h': return 3600000;
+                case '6h': return 6 * 3600000;
+                case '24h': return 24 * 3600000;
+                case '7d': return 7 * 24 * 3600000;
+                default: return 24 * 3600000;
+            }
+        }
+        
+        function filterEventsByTime(events) {
+            const now = new Date();
+            let filteredEvents;
+            
+            if (timeRange === 'custom' && customTimeFrom && customTimeTo) {
+                filteredEvents = events.filter(e => 
+                    e.timestamp >= customTimeFrom && e.timestamp <= customTimeTo
+                );
+            } else {
+                const rangeMs = getTimeRangeInMs(timeRange);
+                const cutoff = new Date(now - rangeMs);
+                filteredEvents = events.filter(e => e.timestamp >= cutoff);
+            }
+            
+            // Apply sort order
+            if (sortOrder === 'asc') {
+                return filteredEvents.sort((a, b) => a.timestamp - b.timestamp);
+            } else {
+                return filteredEvents.sort((a, b) => b.timestamp - a.timestamp);
+            }
+        }
+        
+        function sortTable(field) {
+            // Toggle sort order if clicking same field
+            if (tableSortField === field) {
+                tableSortOrder = tableSortOrder === 'desc' ? 'asc' : 'desc';
+            } else {
+                tableSortField = field;
+                tableSortOrder = 'desc';
+            }
+            
+            // Update button states
+            ['time', 'correlation', 'impact', 'severity'].forEach(f => {
+                const btn = document.getElementById(`table-sort-${f}`);
+                if (btn) {
+                    btn.classList.toggle('active', f === field);
+                    const arrow = btn.querySelector('.sort-arrow');
+                    if (arrow) {
+                        arrow.textContent = f === field ? (tableSortOrder === 'desc' ? '▼' : '▲') : '';
+                    }
+                }
+            });
+            
+            if (currentData) {
+                renderCorrelationImpactTable(currentData);
+            }
+        }
+        
+        function sortTableByColumn(field) {
+            sortTable(field);
+        }
+        
+        function sortCorrelations(correlations, field, order) {
+            const sorted = [...correlations];
+            
+            sorted.sort((a, b) => {
+                let valueA, valueB;
+                
+                switch(field) {
+                    case 'time':
+                        valueA = a.gap.timestamp.getTime();
+                        valueB = b.gap.timestamp.getTime();
+                        break;
+                    case 'correlation':
+                        valueA = a.correlationScore;
+                        valueB = b.correlationScore;
+                        break;
+                    case 'impact':
+                        valueA = a.gap.recordsLost;
+                        valueB = b.gap.recordsLost;
+                        break;
+                    case 'severity':
+                        const severityOrder = { critical: 3, high: 2, medium: 1, low: 0 };
+                        valueA = severityOrder[a.gap.severity] || 0;
+                        valueB = severityOrder[b.gap.severity] || 0;
+                        break;
+                    default:
+                        return 0;
+                }
+                
+                return order === 'desc' ? valueB - valueA : valueA - valueB;
+            });
+            
+            return sorted;
+        }
+        
+        function generateMockData() {
+            if (window.__liveCorrelationData) return window.__liveCorrelationData;
+
+            const now = new Date();
+            
+            // Generate events across a wider time range for better filtering
+            const generateTimeInRange = (hoursAgo) => {
+                return new Date(now - (hoursAgo * 3600000 + Math.random() * 3600000));
+            };
+            
+            // Node issues from node_insight
+            const nodeIssues = [
+                {
+                    timestamp: generateTimeInRange(0.25), // 15 min ago
+                    type: 'node',
+                    node: 'Site2@172.79.89.202:32148',
+                    issue: 'high_cpu',
+                    severity: 'high',
+                    value: 87.3,
+                    threshold: 80,
+                    description: 'High CPU usage: 87.3%'
+                },
+                {
+                    timestamp: generateTimeInRange(0.3), // 18 min ago
+                    type: 'node',
+                    node: 'Site2@172.79.89.202:32148',
+                    issue: 'low_disk',
+                    severity: 'critical',
+                    value: 15.6,
+                    threshold: 20,
+                    description: 'Critical disk space: 15.6% free'
+                },
+                {
+                    timestamp: generateTimeInRange(0.17), // 10 min ago
+                    type: 'node',
+                    node: 'Site1@172.79.89.201:32148',
+                    issue: 'high_errors',
+                    severity: 'high',
+                    value: 219,
+                    threshold: 100,
+                    description: 'Error spike: 219 new errors'
+                },
+                {
+                    timestamp: generateTimeInRange(0.75), // 45 min ago
+                    type: 'node',
+                    node: 'historian@172.79.89.201:32158',
+                    issue: 'high_errors',
+                    severity: 'medium',
+                    value: 126,
+                    threshold: 100,
+                    description: 'Elevated errors: 126 new errors'
+                },
+                {
+                    timestamp: generateTimeInRange(2), // 2 hours ago
+                    type: 'node',
+                    node: 'Site3@172.79.89.206:32158',
+                    issue: 'high_cpu',
+                    severity: 'medium',
+                    value: 75,
+                    threshold: 80,
+                    description: 'Elevated CPU: 75%'
+                },
+                {
+                    timestamp: generateTimeInRange(5), // 5 hours ago
+                    type: 'node',
+                    node: 'Site1@172.79.89.201:32148',
+                    issue: 'network_error',
+                    severity: 'critical',
+                    value: 5,
+                    threshold: 0,
+                    description: 'Network errors detected: 5'
+                },
+                {
+                    timestamp: generateTimeInRange(12), // 12 hours ago
+                    type: 'node',
+                    node: 'Site2@172.79.89.202:32148',
+                    issue: 'high_errors',
+                    severity: 'high',
+                    value: 180,
+                    threshold: 100,
+                    description: 'Error spike: 180 new errors'
+                }
+            ];
+            
+            // Network issues
+            const networkIssues = [
+                {
+                    timestamp: generateTimeInRange(0.27), // 16 min ago
+                    type: 'network',
+                    switch: 'Switch 5 (172.79.89.40)',
+                    issue: 'port_down',
+                    severity: 'high',
+                    affectedDevices: [14, 16],
+                    description: 'Switch 5 ports down: 2 ports affected'
+                },
+                {
+                    timestamp: generateTimeInRange(0.67), // 40 min ago
+                    type: 'network',
+                    switch: 'Switch 4 (172.79.89.30)',
+                    issue: 'disconnected',
+                    severity: 'critical',
+                    affectedDevices: [10, 12, 13, 15, 28, 32],
+                    description: 'Switch 4 disconnected'
+                },
+                {
+                    timestamp: generateTimeInRange(3), // 3 hours ago
+                    type: 'network',
+                    switch: 'Switch 3 (172.79.89.20)',
+                    issue: 'port_down',
+                    severity: 'medium',
+                    affectedDevices: [7],
+                    description: 'Switch 3 port down: 1 port affected'
+                },
+                {
+                    timestamp: generateTimeInRange(8), // 8 hours ago
+                    type: 'network',
+                    switch: 'Switch 6 (172.79.89.50)',
+                    issue: 'port_down',
+                    severity: 'high',
+                    affectedDevices: [21, 22],
+                    description: 'Switch 6 ports down: 2 ports affected'
+                }
+            ];
+            
+            // Data gaps
+            const dataGaps = [
+                {
+                    timestamp: generateTimeInRange(0.28), // 17 min ago
+                    type: 'data',
+                    database: 'manufacturing_historian',
+                    dataSource: 'sum_batch_id',
+                    device: 14,
+                    severity: 'critical',
+                    duration: 180,
+                    recordsLost: 540,
+                    description: 'Data gap: 180s, 540 records lost'
+                },
+                {
+                    timestamp: generateTimeInRange(0.25), // 15 min ago
+                    type: 'data',
+                    database: 'bottle_factory',
+                    dataSource: 'input_12',
+                    device: 12,
+                    severity: 'critical',
+                    duration: 240,
+                    recordsLost: 720,
+                    description: 'Data gap: 240s, 720 records lost'
+                },
+                {
+                    timestamp: generateTimeInRange(0.7), // 42 min ago
+                    type: 'data',
+                    database: 'bottle_factory',
+                    dataSource: 'input_25',
+                    device: 25,
+                    severity: 'high',
+                    duration: 120,
+                    recordsLost: 360,
+                    description: 'Data gap: 120s, 360 records lost'
+                },
+                {
+                    timestamp: generateTimeInRange(3.2), // ~3 hours ago
+                    type: 'data',
+                    database: 'manufacturing_historian',
+                    dataSource: 'sub_unit_250_batch_id',
+                    device: 7,
+                    severity: 'medium',
+                    duration: 90,
+                    recordsLost: 270,
+                    description: 'Data gap: 90s, 270 records lost'
+                },
+                {
+                    timestamp: generateTimeInRange(5.5), // ~5.5 hours ago
+                    type: 'data',
+                    database: 'bottle_factory',
+                    dataSource: 'input_2',
+                    device: 3,
+                    severity: 'high',
+                    duration: 150,
+                    recordsLost: 450,
+                    description: 'Data gap: 150s, 450 records lost'
+                },
+                {
+                    timestamp: generateTimeInRange(9), // 9 hours ago
+                    type: 'data',
+                    database: 'bottle_factory',
+                    dataSource: 'input_1',
+                    device: 2,
+                    severity: 'medium',
+                    duration: 75,
+                    recordsLost: 225,
+                    description: 'Data gap: 75s, 225 records lost'
+                }
+            ];
+            
+            // Analyze correlations
+            const correlations = analyzeCorrelations([...nodeIssues, ...dockerIssues], networkIssues, dataGaps);
+            
+            return {
+                nodeIssues,
+                networkIssues,
+                dataGaps,
+                correlations,
+                allEvents: [...nodeIssues, ...networkIssues, ...dataGaps].sort((a, b) => b.timestamp - a.timestamp)
+            };
+        }
+        
+        function analyzeCorrelations(nodeIssues, networkIssues, dataGaps) {
+            const correlations = [];
+            const timeWindow = 5 * 60000; // 5 minutes
+            
+            // Find triple correlations
+            dataGaps.forEach(gap => {
+                const gapTime = gap.timestamp.getTime();
+                
+                // Find related network issues
+                const relatedNetwork = networkIssues.filter(net => {
+                    const timeDiff = Math.abs(net.timestamp.getTime() - gapTime);
+                    const deviceMatch = net.affectedDevices.includes(gap.device);
+                    return timeDiff < timeWindow && deviceMatch;
+                });
+                
+                // Find which switch controls this device
+                let deviceSwitch = null;
+                for (const [sw, devices] of Object.entries(switchDeviceMap)) {
+                    if (devices.includes(gap.device)) {
+                        deviceSwitch = sw;
+                        break;
+                    }
+                }
+                
+                // Find related node issues
+                const relatedNode = nodeIssues.filter(node => {
+                    const timeDiff = Math.abs(node.timestamp.getTime() - gapTime);
+                    return timeDiff < timeWindow;
+                });
+                
+                // Calculate correlation strength
+                const hasNetwork = relatedNetwork.length > 0;
+                const hasNode = relatedNode.length > 0;
+                const isTriple = hasNetwork && hasNode;
+                
+                let correlationScore = 0;
+                if (isTriple) correlationScore = 95;
+                else if (hasNetwork) correlationScore = 85;
+                else if (hasNode) correlationScore = 70;
+                else correlationScore = 20;
+                
+                correlations.push({
+                    gap: gap,
+                    networkIssues: relatedNetwork,
+                    nodeIssues: relatedNode,
+                    deviceSwitch: deviceSwitch,
+                    isTriple: isTriple,
+                    correlationScore: correlationScore,
+                    rootCause: determineRootCause(relatedNode, relatedNetwork, gap)
+                });
+            });
+            
+            return correlations;
+        }
+        
+        function determineRootCause(nodeIssues, networkIssues, gap) {
+            if (networkIssues.length > 0 && nodeIssues.length > 0) {
+                return `Combined: ${networkIssues[0].issue} + ${nodeIssues[0].issue}`;
+            } else if (networkIssues.length > 0) {
+                return `Network: ${networkIssues[0].issue}`;
+            } else if (nodeIssues.length > 0) {
+                return `Node: ${nodeIssues[0].issue}`;
+            }
+            return 'Unknown - no correlation found';
+        }
+        
+        function renderCorrelationMatrix(data) {
+            // Calculate correlation percentages
+            const totalGaps = data.dataGaps.length;
+            
+            const nodeDataCorr = data.correlations.filter(c => c.nodeIssues.length > 0).length;
+            const networkDataCorr = data.correlations.filter(c => c.networkIssues.length > 0).length;
+            const tripleCorr = data.correlations.filter(c => c.isTriple).length;
+            
+            const nodeDataPct = totalGaps > 0 ? Math.round((nodeDataCorr / totalGaps) * 100) : 0;
+            const networkDataPct = totalGaps > 0 ? Math.round((networkDataCorr / totalGaps) * 100) : 0;
+            const nodeNetworkPct = tripleCorr > 0 ? 95 : 45; // Estimate
+            
+            // Node-Network correlation
+            document.getElementById('nodeNetworkCorr').textContent = nodeNetworkPct + '%';
+            document.getElementById('nodeNetworkLabel').textContent = 
+                nodeNetworkPct > 70 ? 'STRONG' : nodeNetworkPct > 40 ? 'MODERATE' : 'WEAK';
+            document.getElementById('nodeNetworkCount').textContent = tripleCorr + ' correlated events';
+            document.getElementById('nodeNetworkBox').className = 
+                'correlation-box ' + (nodeNetworkPct > 70 ? 'strong' : nodeNetworkPct > 40 ? 'moderate' : 'weak');
+            
+            // Node-Data correlation
+            document.getElementById('nodeDataCorr').textContent = nodeDataPct + '%';
+            document.getElementById('nodeDataLabel').textContent = 
+                nodeDataPct > 70 ? 'STRONG' : nodeDataPct > 40 ? 'MODERATE' : 'WEAK';
+            document.getElementById('nodeDataCount').textContent = nodeDataCorr + ' correlated events';
+            document.getElementById('nodeDataBox').className = 
+                'correlation-box ' + (nodeDataPct > 70 ? 'strong' : nodeDataPct > 40 ? 'moderate' : 'weak');
+            
+            // Network-Data correlation
+            document.getElementById('networkDataCorr').textContent = networkDataPct + '%';
+            document.getElementById('networkDataLabel').textContent = 
+                networkDataPct > 70 ? 'STRONG' : networkDataPct > 40 ? 'MODERATE' : 'WEAK';
+            document.getElementById('networkDataCount').textContent = networkDataCorr + ' correlated events';
+            document.getElementById('networkDataBox').className = 
+                'correlation-box ' + (networkDataPct > 70 ? 'strong' : networkDataPct > 40 ? 'moderate' : 'weak');
+        }
+        
+        function renderSummaryMetrics(data) {
+            document.getElementById('nodeIssuesCount').textContent = data.nodeIssues.length;
+            document.getElementById('networkIssuesCount').textContent = data.networkIssues.length;
+            document.getElementById('dataGapsCount').textContent = data.dataGaps.length;
+            
+            // Node issues list
+            const nodeList = document.getElementById('nodeIssuesList');
+            nodeList.innerHTML = data.nodeIssues.slice(0, 3).map(issue => `
+                <div class="event-item node">
+                    <strong>${issue.node}</strong><br>
+                    <small>${issue.description}</small>
+                </div>
+            `).join('');
+            
+            // Network issues list
+            const networkList = document.getElementById('networkIssuesList');
+            networkList.innerHTML = data.networkIssues.slice(0, 3).map(issue => `
+                <div class="event-item network">
+                    <strong>${issue.switch}</strong><br>
+                    <small>${issue.description}</small>
+                </div>
+            `).join('');
+            
+            // Data gaps list
+            const dataList = document.getElementById('dataGapsList');
+            dataList.innerHTML = data.dataGaps.slice(0, 3).map(gap => `
+                <div class="event-item data">
+                    <strong>${gap.database}:${gap.dataSource}</strong><br>
+                    <small>${gap.description}</small>
+                </div>
+            `).join('');
+        }
+        
+        function renderTripleCorrelations(data) {
+            const container = document.getElementById('tripleCorrelationContainer');
+            const triples = data.correlations.filter(c => c.isTriple);
+            
+            if (triples.length === 0) {
+                container.innerHTML = '<p style="text-align: center; padding: 30px; color: #4CAF50;">✅ No triple correlation events detected</p>';
+                return;
+            }
+            
+            container.innerHTML = triples.map(corr => `
+                <div class="correlation-detail triple">
+                    <div class="correlation-header">
+                        <span>
+                            <strong>Triple Correlation Event</strong>
+                            <span class="badge badge-critical">${corr.correlationScore}% correlation</span>
+                        </span>
+                        <span style="color: #666; font-size: 0.9em;">${corr.gap.timestamp.toLocaleString()}</span>
+                    </div>
+                    <div class="correlation-strength-bar">
+                        <div class="correlation-strength-fill strong" style="width: ${corr.correlationScore}%;"></div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 15px 0;">
+                        <div>
+                            <div style="font-weight: bold; color: #2196F3; margin-bottom: 5px;">🖥️ Node Issue</div>
+                            ${corr.nodeIssues.map(ni => `<div style="font-size: 0.9em;">${ni.node}<br>${ni.description}</div>`).join('')}
+                        </div>
+                        <div>
+                            <div style="font-weight: bold; color: #ff9800; margin-bottom: 5px;">🔀 Network Issue</div>
+                            ${corr.networkIssues.map(ni => `<div style="font-size: 0.9em;">${ni.switch}<br>${ni.description}</div>`).join('')}
+                        </div>
+                        <div>
+                            <div style="font-weight: bold; color: #f44336; margin-bottom: 5px;">📊 Data Gap</div>
+                            <div style="font-size: 0.9em;">${corr.gap.database}:${corr.gap.dataSource}<br>${corr.gap.description}</div>
+                        </div>
+                    </div>
+                    <div class="recommendation">
+                        <div class="recommendation-title">💡 Root Cause & Recommendation:</div>
+                        ${corr.rootCause}<br>
+                        ${getRecommendation(corr)}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function getRecommendation(corr) {
+            if (corr.isTriple) {
+                return 'IMMEDIATE ACTION: Multiple simultaneous issues detected. Address network connectivity first, then investigate node performance.';
+            } else if (corr.networkIssues.length > 0) {
+                return 'Check switch connectivity and port status. Verify physical connections to affected devices.';
+            } else if (corr.nodeIssues.length > 0) {
+                const issue = corr.nodeIssues[0];
+                if (issue.issue === 'high_cpu') {
+                    return 'Review active queries and background processes. Consider query optimization.';
+                } else if (issue.issue === 'low_disk') {
+                    return 'URGENT: Free up disk space immediately. Archive or delete old data.';
+                } else if (issue.issue === 'high_errors') {
+                    return 'Review operator logs for error details. Check data publisher connectivity.';
+                }
+            }
+            return 'Monitor situation. If persists, investigate data source configuration.';
+        }
+        
+        function renderDetailedCorrelations(data) {
+            const container = document.getElementById('detailedCorrelationsContainer');
+            
+            container.innerHTML = data.correlations.map(corr => {
+                const strengthClass = corr.correlationScore > 70 ? 'strong' : 
+                                     corr.correlationScore > 40 ? 'moderate' : 'weak';
+                
+                return `
+                    <div class="correlation-detail ${corr.isTriple ? 'triple' : corr.networkIssues.length > 0 ? 'network-data' : 'node-data'}">
+                        <div class="correlation-header">
+                            <span>
+                                <strong>${corr.gap.database}:${corr.gap.dataSource}</strong>
+                                <span class="badge badge-${corr.gap.severity === 'critical' ? 'critical' : 'warning'}">${corr.gap.severity}</span>
+                            </span>
+                            <span>${corr.correlationScore}% correlation</span>
+                        </div>
+                        <div>
+                            <strong>Data Gap:</strong> ${corr.gap.duration}s, ${corr.gap.recordsLost} records lost<br>
+                            <strong>Device:</strong> ${corr.gap.device} (${corr.deviceSwitch || 'Unknown switch'})<br>
+                            <strong>Root Cause:</strong> ${corr.rootCause}
+                        </div>
+                        ${(corr.nodeIssues.length > 0 || corr.networkIssues.length > 0) ? `
+                        <div class="correlation-links">
+                            ${corr.nodeIssues.map(ni => `
+                                <div class="correlation-link">
+                                    <div class="link-icon node">🖥️</div>
+                                    <div><strong>Node:</strong> ${ni.node} - ${ni.description}</div>
+                                </div>
+                            `).join('')}
+                            ${corr.networkIssues.map(ni => `
+                                <div class="correlation-link">
+                                    <div class="link-icon network">🔀</div>
+                                    <div><strong>Network:</strong> ${ni.switch} - ${ni.description}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function renderUnifiedTimeline(data) {
+            const container = document.getElementById('timelineContainer');
+            
+            // Apply time range filter
+            let events = filterEventsByTime(data.allEvents);
+            
+            // Apply other filters
+            const eventTypeFilter = document.getElementById('timelineFilter').value;
+            const nodeFilterValue = document.getElementById('nodeFilter').value;
+            const severityFilterValue = document.getElementById('severityFilter').value;
+            
+            if (eventTypeFilter !== 'all') {
+                if (eventTypeFilter === 'correlated') {
+                    events = events.filter(event => {
+                        if (event.type === 'data') {
+                            const correlation = data.correlations.find(c => c.gap === event);
+                            return correlation && (correlation.nodeIssues.length > 0 || correlation.networkIssues.length > 0);
+                        }
+                        return false;
+                    });
+                } else {
+                    events = events.filter(e => e.type === eventTypeFilter);
+                }
+            }
+            
+            if (nodeFilterValue !== 'all') {
+                events = events.filter(e => {
+                    if (e.type === 'node') return e.node === nodeFilterValue;
+                    if (e.type === 'data') {
+                        const correlation = data.correlations.find(c => c.gap === e);
+                        return correlation && correlation.nodeIssues.some(ni => ni.node === nodeFilterValue);
+                    }
+                    return true;
+                });
+            }
+            
+            if (severityFilterValue !== 'all') {
+                events = events.filter(e => e.severity === severityFilterValue);
+            }
+            
+            // Update event count
+            document.getElementById('eventCount').textContent = `Showing ${events.length} events`;
+            
+            if (events.length === 0) {
+                container.innerHTML = '<p style="text-align: center; padding: 40px; color: #666;">No events found for the selected time range and filters</p>';
+                return;
+            }
+            
+            // Limit to 20 events for performance
+            const displayEvents = events.slice(0, 20);
+            
+            container.innerHTML = `
+                <div class="timeline">
+                    ${displayEvents.map(event => {
+                        // Find correlations for this event
+                        let correlation = null;
+                        if (event.type === 'data') {
+                            correlation = data.correlations.find(c => c.gap === event);
+                        }
+                        
+                        const isCorrelated = correlation && (correlation.nodeIssues.length > 0 || correlation.networkIssues.length > 0);
+                        
+                        return `
+                            <div class="timeline-item">
+                                <div class="timeline-marker ${isCorrelated ? 'correlated' : event.type}">
+                                    ${event.type === 'node' ? '🖥️' : event.type === 'network' ? '🔀' : '📊'}
+                                </div>
+                                <div class="timeline-content">
+                                    <div class="timeline-header">
+                                        <div>
+                                            <strong>${event.description}</strong>
+                                            <span class="badge badge-${event.severity === 'critical' ? 'critical' : event.severity === 'high' ? 'danger' : 'warning'}">
+                                                ${event.severity}
+                                            </span>
+                                            ${isCorrelated ? '<span class="badge badge-info">CORRELATED</span>' : ''}
+                                        </div>
+                                        <div class="timeline-time">${event.timestamp.toLocaleString()}</div>
+                                    </div>
+                                    <div class="timeline-details">
+                                        ${event.type === 'node' ? `
+                                            Node: ${event.node}<br>
+                                            Issue: ${event.issue.replace('_', ' ')}<br>
+                                            Value: ${event.value} (threshold: ${event.threshold})
+                                        ` : event.type === 'network' ? `
+                                            Switch: ${event.switch}<br>
+                                            Affected Devices: ${event.affectedDevices.join(', ')}<br>
+                                            Issue: ${event.issue.replace('_', ' ')}
+                                        ` : `
+                                            Database: ${event.database}:${event.dataSource}<br>
+                                            Duration: ${event.duration}s | Records Lost: ${event.recordsLost}<br>
+                                            Device: ${event.device}
+                                        `}
+                                    </div>
+                                    ${isCorrelated ? `
+                                    <div class="correlation-links">
+                                        ${correlation.nodeIssues.map(ni => `
+                                            <div class="correlation-link">
+                                                <div class="link-icon node">🖥️</div>
+                                                <div>${ni.node} - ${ni.issue.replace('_', ' ')}</div>
+                                            </div>
+                                        `).join('')}
+                                        ${correlation.networkIssues.map(ni => `
+                                            <div class="correlation-link">
+                                                <div class="link-icon network">🔀</div>
+                                                <div>${ni.switch} - ${ni.issue.replace('_', ' ')}</div>
+                                            </div>
+                                        `).join('')}
+                                        <div class="recommendation">
+                                            <div class="recommendation-title">💡 Recommendation:</div>
+                                            ${getRecommendation(correlation)}
+                                        </div>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                ${events.length > 20 ? `<p style="text-align: center; color: #666; margin-top: 20px;">Showing first 20 of ${events.length} events. Adjust filters to see more specific results.</p>` : ''}
+            `;
+        }
+        
+        function renderCorrelationImpactTable(data) {
+            const tbody = document.getElementById('correlationImpactTable');
+            
+            // Apply sorting
+            const sortedCorrelations = sortCorrelations(data.correlations, tableSortField, tableSortOrder);
+            
+            tbody.innerHTML = sortedCorrelations.map(corr => `
+                <tr>
+                    <td>${corr.gap.timestamp.toLocaleString()}</td>
+                    <td>${corr.nodeIssues.length > 0 ? corr.nodeIssues.map(n => n.issue.replace('_', ' ')).join(', ') : 'None'}</td>
+                    <td>${corr.networkIssues.length > 0 ? corr.networkIssues.map(n => n.issue.replace('_', ' ')).join(', ') : 'None'}</td>
+                    <td>${corr.gap.database}:${corr.gap.dataSource}</td>
+                    <td class="impact-${corr.correlationScore > 70 ? 'critical' : corr.correlationScore > 40 ? 'high' : 'low'}">
+                        ${corr.correlationScore}%
+                    </td>
+                    <td>${corr.rootCause}</td>
+                    <td class="impact-${corr.gap.severity === 'critical' ? 'critical' : 'high'}">${corr.gap.recordsLost} records</td>
+                    <td style="font-size: 0.85em;">${getRecommendation(corr).substring(0, 50)}...</td>
+                </tr>
+            `).join('');
+        }
+        
+        function renderNodeAnalysisTable(data) {
+            const tbody = document.getElementById('nodeAnalysisTable');
+            
+            // Aggregate by node
+            const nodes = [
+                { name: 'Site1@172.79.89.201:32148', cpu: 15.2, space: 50.67, errors: 219, netErrors: 0 },
+                { name: 'Site2@172.79.89.202:32148', cpu: 87.3, space: 15.6, errors: 132, netErrors: 0 },
+                { name: 'Site3@172.79.89.206:32158', cpu: 8.1, space: 84.63, errors: 45, netErrors: 0 },
+                { name: 'historian@172.79.89.201:32158', cpu: 18.7, space: 62.4, errors: 126, netErrors: 0 }
+            ];
+            
+            tbody.innerHTML = nodes.map(node => {
+                const nodeCorr = data.correlations.filter(c => 
+                    c.nodeIssues.some(ni => ni.node === node.name)
+                ).length;
+                
+                const correlation = nodeCorr > 0 ? 
+                    (node.errors > 100 || node.cpu > 80 || node.space < 20 ? 85 : 65) : 30;
+                
+                const primaryIssue = 
+                    node.cpu > 80 ? 'High CPU' :
+                    node.space < 20 ? 'Low Disk' :
+                    node.errors > 100 ? 'High Errors' :
+                    'Normal';
+                
+                return `
+                    <tr>
+                        <td>${node.name}</td>
+                        <td class="${node.cpu > 80 ? 'impact-critical' : ''}">${node.cpu}%</td>
+                        <td class="${node.space < 20 ? 'impact-critical' : ''}">${node.space}%</td>
+                        <td class="${node.errors > 100 ? 'impact-high' : ''}">${node.errors}</td>
+                        <td class="${node.netErrors > 0 ? 'impact-critical' : 'impact-low'}">${node.netErrors}</td>
+                        <td class="${nodeCorr > 2 ? 'impact-critical' : nodeCorr > 0 ? 'impact-high' : ''}">${nodeCorr}</td>
+                        <td class="impact-${correlation > 70 ? 'critical' : correlation > 40 ? 'high' : 'low'}">${correlation}%</td>
+                        <td>${primaryIssue}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        function filterTimeline() {
+            if (currentData) {
+                renderUnifiedTimeline(currentData);
+            }
+        }
+        
+        function exportReport() {
+            alert('Would export comprehensive correlation report with all three-way analysis');
+        }
+        
+        function togglePause() {
+            isPaused = !isPaused;
+            
+            const pauseButton = document.getElementById('pauseButton');
+            const pausedIndicator = document.getElementById('pausedIndicator');
+            const systemStatus = document.getElementById('systemStatus');
+            
+            if (isPaused) {
+                // Pause state
+                pauseButton.textContent = '▶ Resume Auto-Refresh';
+                pauseButton.classList.add('paused');
+                pausedIndicator.style.display = 'inline';
+                systemStatus.classList.remove('status-active', 'status-warning', 'status-error');
+                systemStatus.classList.add('status-warning');
+                
+                // Clear the interval
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
+
+
+
+function applyRefreshSettings(){
+  const r = document.getElementById('refreshSecondsInput');
+  const h = document.getElementById('historyMinutesInput');
+  refreshSeconds = Math.max(2, parseInt(r?.value || refreshSeconds, 10));
+  historyMinutes = Math.max(1, parseInt(h?.value || historyMinutes, 10));
+
+  if (autoRefreshInterval) { clearInterval(autoRefreshInterval); autoRefreshInterval = null; }
+  autoRefreshInterval = setInterval(() => {
+    if (!isPaused) refreshData();
+  }, refreshSeconds * 1000);
+
+  refreshData();
+}
+            } else {
+                // Resume state
+                pauseButton.textContent = '⏸ Pause Auto-Refresh';
+                pauseButton.classList.remove('paused');
+                pausedIndicator.style.display = 'none';
+                
+                // Refresh immediately
+                refreshData();
+                
+                // Restart the interval
+                autoRefreshInterval = setInterval(refreshData, 30000);
+            }
+        }
+        
+        function refreshData() {
+            // Live refresh (uses AnyLog REST Proxy); falls back to mock if not connected.
+            refreshLiveData(true);
+        }
+Initialize
+        refreshData();
+        
+        // Auto-refresh every 30 seconds (stored in variable so it can be paused)
+        autoRefreshInterval = setInterval(() => {
+            if (!isPaused) {
+                refreshData();
+            }
+        }, 30000);
+    </script>
+
+<!-- API CALL LOG (shared with enterprise_c_dashboard) -->
+<div class="log-panel" id="logPanel">
+  <div class="log-header" onclick="toggleLog()">
+    <span style="font-size:14px;">🖥️</span>
+    <span class="log-title">API Call Log</span>
+    <div class="log-stats">
+      <span class="log-stat" id="log-total">0 calls</span>
+      <span class="log-stat ok" id="log-ok">0 ok</span>
+      <span class="log-stat err" id="log-err">0 err</span>
+      <span class="log-stat" id="log-rows">0 rows</span>
+    </div>
+    <span class="log-caret" id="logCaret">▾</span>
+  </div>
+  <div class="log-content" id="logContent" style="display:none;">
+    <div class="log-tools">
+      <input id="logSearch" placeholder="search…" oninput="filterLog()" />
+      <button class="log-filter-btn active" onclick="setLogFilter('all', this)">All</button>
+      <button class="log-filter-btn" onclick="setLogFilter('error', this)">Errors</button>
+      <button class="log-filter-btn" onclick="setLogFilter('get', this)">GET</button>
+      <button class="log-filter-btn" onclick="setLogFilter('post', this)">POST</button>
+      <button class="log-filter-btn" onclick="clearLog()">Clear</button>
+    </div>
+    <div class="log-body" id="logBody"><div class="log-placeholder">— No API calls yet. —</div></div>
+  </div>
+</div>
+
+
+</body>
+</html>

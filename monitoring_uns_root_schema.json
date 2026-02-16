@@ -1,0 +1,1466 @@
+{
+  "command": "blockchain get uns",
+  "generated_for": "Monitoring UNS root (schema-driven from AnyLog get columns output)",
+  "generated_at": "2026-02-14T06:30:47.932634Z",
+  "policies": [
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "423e555c5ec3885f2bb5d9d2d6627f63",
+        "ledger": "global",
+        "name": "Monitoring",
+        "namespace": "Monitoring",
+        "source_node": "Site1@localhost:32049",
+        "uns_level": "root",
+        "description": "Root UNS namespace for infrastructure monitoring sourced from the monitoring DBMS. Contains table schemas and normalized metric views."
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "dbc18be8e5b7797c1fa6bc37e7624dfb",
+        "ledger": "global",
+        "name": "node_insight",
+        "namespace": "Monitoring/node_insight",
+        "source_node": "Site1@localhost:32049",
+        "parent": "423e555c5ec3885f2bb5d9d2d6627f63",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "table",
+        "description": "UNS node bound to monitoring table 'node_insight'. Children include columns/* (schema) and measurements/* (metrics/telemetry)."
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "ledger": "global",
+        "name": "columns",
+        "namespace": "Monitoring/node_insight/columns",
+        "source_node": "Site1@localhost:32049",
+        "parent": "dbc18be8e5b7797c1fa6bc37e7624dfb",
+        "uns_level": "branch",
+        "description": "Schema branch. One child node per physical column in the table, with data type and inferred unit when applicable."
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "e19b66f780070165d7a8e068af2496cc",
+        "ledger": "global",
+        "name": "measurements",
+        "namespace": "Monitoring/node_insight/measurements",
+        "source_node": "Site1@localhost:32049",
+        "parent": "dbc18be8e5b7797c1fa6bc37e7624dfb",
+        "uns_level": "branch",
+        "description": "Measurement branch. One child node per metric-like column for dashboards/alerting."
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "d320997a5b5507c5a6aca0ebe2504830",
+        "ledger": "global",
+        "name": "row_id",
+        "namespace": "Monitoring/node_insight/columns/row_id",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'row_id' (integer). Kind: identifier.",
+        "column_type": "integer",
+        "column_kind": "identifier"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "05cc8b5468116008655ed3cd02cc67df",
+        "ledger": "global",
+        "name": "insert_timestamp",
+        "namespace": "Monitoring/node_insight/columns/insert_timestamp",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'insert_timestamp' (timestamp without time zone). Kind: timestamp. Unit: time.",
+        "column_type": "timestamp without time zone",
+        "column_kind": "timestamp",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "8bf0b0a1937dd377912b1c7a6b7fc047",
+        "ledger": "global",
+        "name": "tsd_name",
+        "namespace": "Monitoring/node_insight/columns/tsd_name",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'tsd_name' (char(3)). Kind: dimension.",
+        "column_type": "char(3)",
+        "column_kind": "dimension"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "eb840a3d80506012ab2991252bfc58ac",
+        "ledger": "global",
+        "name": "tsd_id",
+        "namespace": "Monitoring/node_insight/columns/tsd_id",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'tsd_id' (int). Kind: identifier.",
+        "column_type": "int",
+        "column_kind": "identifier"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "6dbad334e7da13577f952857c4e9165d",
+        "ledger": "global",
+        "name": "node_name",
+        "namespace": "Monitoring/node_insight/columns/node_name",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'node_name' (character varying). Kind: dimension.",
+        "column_type": "character varying",
+        "column_kind": "dimension"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "bac2e697b8c60640cdb23fea4568c1ef",
+        "ledger": "global",
+        "name": "status",
+        "namespace": "Monitoring/node_insight/columns/status",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'status' (character varying). Kind: dimension.",
+        "column_type": "character varying",
+        "column_kind": "dimension"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "b00d441ce50c1edbd10f93c68d514b32",
+        "ledger": "global",
+        "name": "operational_time",
+        "namespace": "Monitoring/node_insight/columns/operational_time",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'operational_time' (time). Kind: duration. Unit: time.",
+        "column_type": "time",
+        "column_kind": "duration",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "d455557766b9b4173eeed317f7869b46",
+        "ledger": "global",
+        "name": "operational_time",
+        "namespace": "Monitoring/node_insight/measurements/operational_time",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e19b66f780070165d7a8e068af2496cc",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'operational_time' derived from table 'node_insight.operational_time' (time). Unit: time.",
+        "source_column": "operational_time",
+        "column_type": "time",
+        "metric_kind": "duration",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "bf17c42e845beb5037e3e2634c0cfc60",
+        "ledger": "global",
+        "name": "processing_time",
+        "namespace": "Monitoring/node_insight/columns/processing_time",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'processing_time' (time). Kind: duration. Unit: time.",
+        "column_type": "time",
+        "column_kind": "duration",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "6922b37567b5f05c8d52d89b823f873c",
+        "ledger": "global",
+        "name": "processing_time",
+        "namespace": "Monitoring/node_insight/measurements/processing_time",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e19b66f780070165d7a8e068af2496cc",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'processing_time' derived from table 'node_insight.processing_time' (time). Unit: time.",
+        "source_column": "processing_time",
+        "column_type": "time",
+        "metric_kind": "duration",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "57d7c2a1bdb0c2ada280ec1cf14f5ad8",
+        "ledger": "global",
+        "name": "elapsed_time",
+        "namespace": "Monitoring/node_insight/columns/elapsed_time",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'elapsed_time' (time). Kind: duration. Unit: time.",
+        "column_type": "time",
+        "column_kind": "duration",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "eb97f683070a38ca3ebab1247462b9c4",
+        "ledger": "global",
+        "name": "elapsed_time",
+        "namespace": "Monitoring/node_insight/measurements/elapsed_time",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e19b66f780070165d7a8e068af2496cc",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'elapsed_time' derived from table 'node_insight.elapsed_time' (time). Unit: time.",
+        "source_column": "elapsed_time",
+        "column_type": "time",
+        "metric_kind": "duration",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "7f8a0e901835dfd643fbb19ef8b25b7d",
+        "ledger": "global",
+        "name": "new_rows",
+        "namespace": "Monitoring/node_insight/columns/new_rows",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'new_rows' (int). Kind: counter.",
+        "column_type": "int",
+        "column_kind": "counter"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "78b8d571eea9d80fa86c246ef43c2835",
+        "ledger": "global",
+        "name": "new_rows",
+        "namespace": "Monitoring/node_insight/measurements/new_rows",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e19b66f780070165d7a8e068af2496cc",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'new_rows' derived from table 'node_insight.new_rows' (int).",
+        "source_column": "new_rows",
+        "column_type": "int",
+        "metric_kind": "counter"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "169228235d1f5a68b5726719054745bd",
+        "ledger": "global",
+        "name": "total_rows",
+        "namespace": "Monitoring/node_insight/columns/total_rows",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'total_rows' (int). Kind: counter.",
+        "column_type": "int",
+        "column_kind": "counter"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "06ec8e988a86f5151a6d94e67cd7c8f6",
+        "ledger": "global",
+        "name": "total_rows",
+        "namespace": "Monitoring/node_insight/measurements/total_rows",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e19b66f780070165d7a8e068af2496cc",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'total_rows' derived from table 'node_insight.total_rows' (int).",
+        "source_column": "total_rows",
+        "column_type": "int",
+        "metric_kind": "counter"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "c539b1cc1bf1dca5c421c20c0076a363",
+        "ledger": "global",
+        "name": "new_errors",
+        "namespace": "Monitoring/node_insight/columns/new_errors",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'new_errors' (int). Kind: counter.",
+        "column_type": "int",
+        "column_kind": "counter"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "55167196939d116d3b1783e7e6861e4b",
+        "ledger": "global",
+        "name": "new_errors",
+        "namespace": "Monitoring/node_insight/measurements/new_errors",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e19b66f780070165d7a8e068af2496cc",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'new_errors' derived from table 'node_insight.new_errors' (int).",
+        "source_column": "new_errors",
+        "column_type": "int",
+        "metric_kind": "counter"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "382fa44f5c89f1abc7c5af72888e4a3d",
+        "ledger": "global",
+        "name": "total_errors",
+        "namespace": "Monitoring/node_insight/columns/total_errors",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'total_errors' (int). Kind: counter.",
+        "column_type": "int",
+        "column_kind": "counter"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "613e9d41d485ecbedf28e89552ba1eb3",
+        "ledger": "global",
+        "name": "total_errors",
+        "namespace": "Monitoring/node_insight/measurements/total_errors",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e19b66f780070165d7a8e068af2496cc",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'total_errors' derived from table 'node_insight.total_errors' (int).",
+        "source_column": "total_errors",
+        "column_type": "int",
+        "metric_kind": "counter"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "321127d3cfd47d076cb37f9c7f4287e6",
+        "ledger": "global",
+        "name": "avg_rows_sec",
+        "namespace": "Monitoring/node_insight/columns/avg_rows_sec",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'avg_rows_sec' (float). Kind: metric. Unit: 1/s.",
+        "column_type": "float",
+        "column_kind": "metric",
+        "unit": "1/s"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "5ed9b69e0dd52098468cfc1a7d1e17c8",
+        "ledger": "global",
+        "name": "avg_rows_sec",
+        "namespace": "Monitoring/node_insight/measurements/avg_rows_sec",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e19b66f780070165d7a8e068af2496cc",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'avg_rows_sec' derived from table 'node_insight.avg_rows_sec' (float). Unit: 1/s.",
+        "source_column": "avg_rows_sec",
+        "column_type": "float",
+        "metric_kind": "metric",
+        "unit": "1/s"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "bc4cb07aa152efdc2b7aaa1e82ac6cab",
+        "ledger": "global",
+        "name": "timestamp",
+        "namespace": "Monitoring/node_insight/columns/timestamp",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'timestamp' (timestamp without time zone). Kind: timestamp. Unit: time.",
+        "column_type": "timestamp without time zone",
+        "column_kind": "timestamp",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "49dbcf3e6c9b09d1639c5154212ad49d",
+        "ledger": "global",
+        "name": "node_type",
+        "namespace": "Monitoring/node_insight/columns/node_type",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'node_type' (char(9)). Kind: dimension.",
+        "column_type": "char(9)",
+        "column_kind": "dimension"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "35b6a9dc54bc2b2214f2f7b388f11b7a",
+        "ledger": "global",
+        "name": "free_space_percent",
+        "namespace": "Monitoring/node_insight/columns/free_space_percent",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'free_space_percent' (float). Kind: metric. Unit: %.",
+        "column_type": "float",
+        "column_kind": "metric",
+        "unit": "%"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "fabf672919413e8245868807d3acc457",
+        "ledger": "global",
+        "name": "free_space_percent",
+        "namespace": "Monitoring/node_insight/measurements/free_space_percent",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e19b66f780070165d7a8e068af2496cc",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'free_space_percent' derived from table 'node_insight.free_space_percent' (float). Unit: %.",
+        "source_column": "free_space_percent",
+        "column_type": "float",
+        "metric_kind": "metric",
+        "unit": "%"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "4a14946bf97fca3b1336860359a3f0ac",
+        "ledger": "global",
+        "name": "cpu_percent",
+        "namespace": "Monitoring/node_insight/columns/cpu_percent",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'cpu_percent' (float). Kind: metric. Unit: %.",
+        "column_type": "float",
+        "column_kind": "metric",
+        "unit": "%"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "770f5304cee9389f1e5df86eca01bfa0",
+        "ledger": "global",
+        "name": "cpu_percent",
+        "namespace": "Monitoring/node_insight/measurements/cpu_percent",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e19b66f780070165d7a8e068af2496cc",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'cpu_percent' derived from table 'node_insight.cpu_percent' (float). Unit: %.",
+        "source_column": "cpu_percent",
+        "column_type": "float",
+        "metric_kind": "metric",
+        "unit": "%"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "37ab24b869a0d0358f47079bc86443c3",
+        "ledger": "global",
+        "name": "packets_recv",
+        "namespace": "Monitoring/node_insight/columns/packets_recv",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'packets_recv' (int). Kind: metric. Unit: packets.",
+        "column_type": "int",
+        "column_kind": "metric",
+        "unit": "packets"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "f6c585d84aa4de1ee77f22f106b97685",
+        "ledger": "global",
+        "name": "packets_recv",
+        "namespace": "Monitoring/node_insight/measurements/packets_recv",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e19b66f780070165d7a8e068af2496cc",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'packets_recv' derived from table 'node_insight.packets_recv' (int). Unit: packets.",
+        "source_column": "packets_recv",
+        "column_type": "int",
+        "metric_kind": "metric",
+        "unit": "packets"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "bd5749df99f2888d6e4de5cffa4e5499",
+        "ledger": "global",
+        "name": "packets_sent",
+        "namespace": "Monitoring/node_insight/columns/packets_sent",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'packets_sent' (int). Kind: metric. Unit: packets.",
+        "column_type": "int",
+        "column_kind": "metric",
+        "unit": "packets"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "d8704820bc8a48de2666dc66e87c675e",
+        "ledger": "global",
+        "name": "packets_sent",
+        "namespace": "Monitoring/node_insight/measurements/packets_sent",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e19b66f780070165d7a8e068af2496cc",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'packets_sent' derived from table 'node_insight.packets_sent' (int). Unit: packets.",
+        "source_column": "packets_sent",
+        "column_type": "int",
+        "metric_kind": "metric",
+        "unit": "packets"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "204edbbad637ae81183ee0e652afc369",
+        "ledger": "global",
+        "name": "network_error",
+        "namespace": "Monitoring/node_insight/columns/network_error",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e005a36cf3d35d058cca1a4bd7c71dc0",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "column",
+        "description": "Physical column 'network_error' (int). Kind: metric.",
+        "column_type": "int",
+        "column_kind": "metric"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "0966248594a703f408e1a65fe706f2c3",
+        "ledger": "global",
+        "name": "network_error",
+        "namespace": "Monitoring/node_insight/measurements/network_error",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e19b66f780070165d7a8e068af2496cc",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'network_error' derived from table 'node_insight.network_error' (int).",
+        "source_column": "network_error",
+        "column_type": "int",
+        "metric_kind": "metric"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "e2af9b91e5ff3aeb080f7f2be5ffeed0",
+        "ledger": "global",
+        "name": "docker_insight",
+        "namespace": "Monitoring/docker_insight",
+        "source_node": "Site1@localhost:32049",
+        "parent": "423e555c5ec3885f2bb5d9d2d6627f63",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "table",
+        "description": "UNS node bound to monitoring table 'docker_insight'. Children include columns/* (schema) and measurements/* (metrics/telemetry)."
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "81237343f4fb52bd0ce7da71c73b5368",
+        "ledger": "global",
+        "name": "columns",
+        "namespace": "Monitoring/docker_insight/columns",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e2af9b91e5ff3aeb080f7f2be5ffeed0",
+        "uns_level": "branch",
+        "description": "Schema branch. One child node per physical column in the table, with data type and inferred unit when applicable."
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "560ce21424fc1e8c99219eab6202a42f",
+        "ledger": "global",
+        "name": "measurements",
+        "namespace": "Monitoring/docker_insight/measurements",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e2af9b91e5ff3aeb080f7f2be5ffeed0",
+        "uns_level": "branch",
+        "description": "Measurement branch. One child node per metric-like column for dashboards/alerting."
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "847a13865a7fae6f68d7db5765df007f",
+        "ledger": "global",
+        "name": "row_id",
+        "namespace": "Monitoring/docker_insight/columns/row_id",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'row_id' (integer). Kind: identifier.",
+        "column_type": "integer",
+        "column_kind": "identifier"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "276715de8f204280fa97b4d69e4260f1",
+        "ledger": "global",
+        "name": "insert_timestamp",
+        "namespace": "Monitoring/docker_insight/columns/insert_timestamp",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'insert_timestamp' (timestamp without time zone). Kind: timestamp. Unit: time.",
+        "column_type": "timestamp without time zone",
+        "column_kind": "timestamp",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "f740c106e70239c05e62033457ea6f92",
+        "ledger": "global",
+        "name": "tsd_name",
+        "namespace": "Monitoring/docker_insight/columns/tsd_name",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'tsd_name' (char(3)). Kind: dimension.",
+        "column_type": "char(3)",
+        "column_kind": "dimension"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "0ad7b039e26f40f3e194d7cfefdbb580",
+        "ledger": "global",
+        "name": "tsd_id",
+        "namespace": "Monitoring/docker_insight/columns/tsd_id",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'tsd_id' (int). Kind: identifier.",
+        "column_type": "int",
+        "column_kind": "identifier"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "91c4737f0ee7da0980cd7f04b5c1b143",
+        "ledger": "global",
+        "name": "hostname",
+        "namespace": "Monitoring/docker_insight/columns/hostname",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'hostname' (char(6)). Kind: dimension.",
+        "column_type": "char(6)",
+        "column_kind": "dimension"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "fbae7f870d5febcf00dfcb40f28113c5",
+        "ledger": "global",
+        "name": "container",
+        "namespace": "Monitoring/docker_insight/columns/container",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'container' (character varying). Kind: dimension.",
+        "column_type": "character varying",
+        "column_kind": "dimension"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "bcab44b73089843932fcf3e2e64a793b",
+        "ledger": "global",
+        "name": "created",
+        "namespace": "Monitoring/docker_insight/columns/created",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'created' (timestamp without time zone). Kind: timestamp.",
+        "column_type": "timestamp without time zone",
+        "column_kind": "timestamp"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "44ada2357269b4f4251fa2012cee393f",
+        "ledger": "global",
+        "name": "timestamp",
+        "namespace": "Monitoring/docker_insight/columns/timestamp",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'timestamp' (timestamp without time zone). Kind: timestamp. Unit: time.",
+        "column_type": "timestamp without time zone",
+        "column_kind": "timestamp",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "5f7ee47116581fcbb7c5e1b5473420d3",
+        "ledger": "global",
+        "name": "uptime",
+        "namespace": "Monitoring/docker_insight/columns/uptime",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'uptime' (time). Kind: duration. Unit: time.",
+        "column_type": "time",
+        "column_kind": "duration",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "7ebba53892b203eff4f7f85a54518be6",
+        "ledger": "global",
+        "name": "uptime",
+        "namespace": "Monitoring/docker_insight/measurements/uptime",
+        "source_node": "Site1@localhost:32049",
+        "parent": "560ce21424fc1e8c99219eab6202a42f",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'uptime' derived from table 'docker_insight.uptime' (time). Unit: time.",
+        "source_column": "uptime",
+        "column_type": "time",
+        "metric_kind": "duration",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "aea3980eac1f2d5e3f2b175c7eda8826",
+        "ledger": "global",
+        "name": "memory_usage_bytes",
+        "namespace": "Monitoring/docker_insight/columns/memory_usage_bytes",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'memory_usage_bytes' (bigint). Kind: metric. Unit: bytes.",
+        "column_type": "bigint",
+        "column_kind": "metric",
+        "unit": "bytes"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "e48d286a2ffe71238a8eee034dfe91e8",
+        "ledger": "global",
+        "name": "memory_usage_bytes",
+        "namespace": "Monitoring/docker_insight/measurements/memory_usage_bytes",
+        "source_node": "Site1@localhost:32049",
+        "parent": "560ce21424fc1e8c99219eab6202a42f",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'memory_usage_bytes' derived from table 'docker_insight.memory_usage_bytes' (bigint). Unit: bytes.",
+        "source_column": "memory_usage_bytes",
+        "column_type": "bigint",
+        "metric_kind": "metric",
+        "unit": "bytes"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "f8a4a5a03d8bba2494cdc08cb9aabca3",
+        "ledger": "global",
+        "name": "disk_read_bytes",
+        "namespace": "Monitoring/docker_insight/columns/disk_read_bytes",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'disk_read_bytes' (bigint). Kind: metric. Unit: bytes.",
+        "column_type": "bigint",
+        "column_kind": "metric",
+        "unit": "bytes"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "9b582dc60ef9ca9c2a917991ae300011",
+        "ledger": "global",
+        "name": "disk_read_bytes",
+        "namespace": "Monitoring/docker_insight/measurements/disk_read_bytes",
+        "source_node": "Site1@localhost:32049",
+        "parent": "560ce21424fc1e8c99219eab6202a42f",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'disk_read_bytes' derived from table 'docker_insight.disk_read_bytes' (bigint). Unit: bytes.",
+        "source_column": "disk_read_bytes",
+        "column_type": "bigint",
+        "metric_kind": "metric",
+        "unit": "bytes"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "d7a402d99f481ea811f64cc7770ee6ae",
+        "ledger": "global",
+        "name": "disk_write_bytes",
+        "namespace": "Monitoring/docker_insight/columns/disk_write_bytes",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'disk_write_bytes' (bigint). Kind: metric. Unit: bytes.",
+        "column_type": "bigint",
+        "column_kind": "metric",
+        "unit": "bytes"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "9ab6b88a506caab9c6dd9e36424331ef",
+        "ledger": "global",
+        "name": "disk_write_bytes",
+        "namespace": "Monitoring/docker_insight/measurements/disk_write_bytes",
+        "source_node": "Site1@localhost:32049",
+        "parent": "560ce21424fc1e8c99219eab6202a42f",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'disk_write_bytes' derived from table 'docker_insight.disk_write_bytes' (bigint). Unit: bytes.",
+        "source_column": "disk_write_bytes",
+        "column_type": "bigint",
+        "metric_kind": "metric",
+        "unit": "bytes"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "7be23a39249acbe1201a499622bb8eb0",
+        "ledger": "global",
+        "name": "network_rx_packets",
+        "namespace": "Monitoring/docker_insight/columns/network_rx_packets",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'network_rx_packets' (int). Kind: metric. Unit: packets.",
+        "column_type": "int",
+        "column_kind": "metric",
+        "unit": "packets"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "59f3e6f21af2e7763505c2b09d4feb51",
+        "ledger": "global",
+        "name": "network_rx_packets",
+        "namespace": "Monitoring/docker_insight/measurements/network_rx_packets",
+        "source_node": "Site1@localhost:32049",
+        "parent": "560ce21424fc1e8c99219eab6202a42f",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'network_rx_packets' derived from table 'docker_insight.network_rx_packets' (int). Unit: packets.",
+        "source_column": "network_rx_packets",
+        "column_type": "int",
+        "metric_kind": "metric",
+        "unit": "packets"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "9fe45e497bc867916647c72cfa43f0ae",
+        "ledger": "global",
+        "name": "network_tx_packets",
+        "namespace": "Monitoring/docker_insight/columns/network_tx_packets",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'network_tx_packets' (int). Kind: metric. Unit: packets.",
+        "column_type": "int",
+        "column_kind": "metric",
+        "unit": "packets"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "206f3a2ff227393cbecc1b6529610c61",
+        "ledger": "global",
+        "name": "network_tx_packets",
+        "namespace": "Monitoring/docker_insight/measurements/network_tx_packets",
+        "source_node": "Site1@localhost:32049",
+        "parent": "560ce21424fc1e8c99219eab6202a42f",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'network_tx_packets' derived from table 'docker_insight.network_tx_packets' (int). Unit: packets.",
+        "source_column": "network_tx_packets",
+        "column_type": "int",
+        "metric_kind": "metric",
+        "unit": "packets"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "1423d5eeb8d7d0528dc2a417be1f4167",
+        "ledger": "global",
+        "name": "user_id",
+        "namespace": "Monitoring/docker_insight/columns/user_id",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'user_id' (char(4)). Kind: dimension.",
+        "column_type": "char(4)",
+        "column_kind": "dimension"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "61565384c177dbb2ebf523f62037c53c",
+        "ledger": "global",
+        "name": "process_id",
+        "namespace": "Monitoring/docker_insight/columns/process_id",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'process_id' (int). Kind: identifier.",
+        "column_type": "int",
+        "column_kind": "identifier"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "cd7875b4d157f46bac642ba6f7539851",
+        "ledger": "global",
+        "name": "parent_process_id",
+        "namespace": "Monitoring/docker_insight/columns/parent_process_id",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'parent_process_id' (int). Kind: identifier.",
+        "column_type": "int",
+        "column_kind": "identifier"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "dbe4e1ef5d9cd22b890ca0d7c0c611ab",
+        "ledger": "global",
+        "name": "cpu_usage",
+        "namespace": "Monitoring/docker_insight/columns/cpu_usage",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'cpu_usage' (float). Kind: metric. Unit: %.",
+        "column_type": "float",
+        "column_kind": "metric",
+        "unit": "%"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "0157a04b58bacfcfcf59a392f5b7ad49",
+        "ledger": "global",
+        "name": "cpu_usage",
+        "namespace": "Monitoring/docker_insight/measurements/cpu_usage",
+        "source_node": "Site1@localhost:32049",
+        "parent": "560ce21424fc1e8c99219eab6202a42f",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'cpu_usage' derived from table 'docker_insight.cpu_usage' (float). Unit: %.",
+        "source_column": "cpu_usage",
+        "column_type": "float",
+        "metric_kind": "metric",
+        "unit": "%"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "8df27a826b1ba326d14f70686cc3bd5e",
+        "ledger": "global",
+        "name": "start_time",
+        "namespace": "Monitoring/docker_insight/columns/start_time",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'start_time' (char(5)). Kind: metric.",
+        "column_type": "char(5)",
+        "column_kind": "metric"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "dabaa4e0d1a17c7c3200a363f69abe95",
+        "ledger": "global",
+        "name": "start_time",
+        "namespace": "Monitoring/docker_insight/measurements/start_time",
+        "source_node": "Site1@localhost:32049",
+        "parent": "560ce21424fc1e8c99219eab6202a42f",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'start_time' derived from table 'docker_insight.start_time' (char(5)).",
+        "source_column": "start_time",
+        "column_type": "char(5)",
+        "metric_kind": "metric"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "40446951558121765f26b51a93ec3945",
+        "ledger": "global",
+        "name": "terminal",
+        "namespace": "Monitoring/docker_insight/columns/terminal",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'terminal' (char(5)). Kind: dimension.",
+        "column_type": "char(5)",
+        "column_kind": "dimension"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "6eabcecaefaa071c4e4a2e6a11581483",
+        "ledger": "global",
+        "name": "cpu_time",
+        "namespace": "Monitoring/docker_insight/columns/cpu_time",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'cpu_time' (time). Kind: duration. Unit: time.",
+        "column_type": "time",
+        "column_kind": "duration",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "b3679b2dc1286a4c45c8e60ca0e33ea4",
+        "ledger": "global",
+        "name": "cpu_time",
+        "namespace": "Monitoring/docker_insight/measurements/cpu_time",
+        "source_node": "Site1@localhost:32049",
+        "parent": "560ce21424fc1e8c99219eab6202a42f",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "metric",
+        "description": "Monitoring metric 'cpu_time' derived from table 'docker_insight.cpu_time' (time). Unit: time.",
+        "source_column": "cpu_time",
+        "column_type": "time",
+        "metric_kind": "duration",
+        "unit": "time"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "5ee8bc156a5344dfd17987c6928e3d69",
+        "ledger": "global",
+        "name": "command",
+        "namespace": "Monitoring/docker_insight/columns/command",
+        "source_node": "Site1@localhost:32049",
+        "parent": "81237343f4fb52bd0ce7da71c73b5368",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "column",
+        "description": "Physical column 'command' (character varying). Kind: dimension.",
+        "column_type": "character varying",
+        "column_kind": "dimension"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "58c15ab78c6ed0bc78b9452b253f995d",
+        "ledger": "global",
+        "name": "dimensions",
+        "namespace": "Monitoring/node_insight/dimensions",
+        "source_node": "Site1@localhost:32049",
+        "parent": "dbc18be8e5b7797c1fa6bc37e7624dfb",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "branch",
+        "description": "Dimensions branch. Contains non-metric fields used for grouping, filtering, and joining (e.g., host/container identifiers, status, types).",
+        "branch_type": "dimensions"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "28034aaeade1b11884a7e849c61ad6ce",
+        "ledger": "global",
+        "name": "tsd_name",
+        "namespace": "Monitoring/node_insight/dimensions/tsd_name",
+        "source_node": "Site1@localhost:32049",
+        "parent": "58c15ab78c6ed0bc78b9452b253f995d",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "dimension",
+        "description": "Dimension 'tsd_name' from table 'node_insight'. Type: char(3). Use for group-by, filters, and joins.",
+        "source_column": "tsd_name",
+        "column_type": "char(3)"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "5f174dab95eaee62926a25c5f800725b",
+        "ledger": "global",
+        "name": "node_name",
+        "namespace": "Monitoring/node_insight/dimensions/node_name",
+        "source_node": "Site1@localhost:32049",
+        "parent": "58c15ab78c6ed0bc78b9452b253f995d",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "dimension",
+        "description": "Dimension 'node_name' from table 'node_insight'. Type: character varying. Use for group-by, filters, and joins.",
+        "source_column": "node_name",
+        "column_type": "character varying"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "16921a77786d8cf01b2edbe33819e5f6",
+        "ledger": "global",
+        "name": "status",
+        "namespace": "Monitoring/node_insight/dimensions/status",
+        "source_node": "Site1@localhost:32049",
+        "parent": "58c15ab78c6ed0bc78b9452b253f995d",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "dimension",
+        "description": "Dimension 'status' from table 'node_insight'. Type: character varying. Use for group-by, filters, and joins.",
+        "source_column": "status",
+        "column_type": "character varying"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "e12de896f18a582c30426e9d4484758a",
+        "ledger": "global",
+        "name": "node_type",
+        "namespace": "Monitoring/node_insight/dimensions/node_type",
+        "source_node": "Site1@localhost:32049",
+        "parent": "58c15ab78c6ed0bc78b9452b253f995d",
+        "dbms": "monitoring",
+        "table": "node_insight",
+        "uns_level": "dimension",
+        "description": "Dimension 'node_type' from table 'node_insight'. Type: char(9). Use for group-by, filters, and joins.",
+        "source_column": "node_type",
+        "column_type": "char(9)"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "c3361e6799b3e486038459b27cd7ced9",
+        "ledger": "global",
+        "name": "dimensions",
+        "namespace": "Monitoring/docker_insight/dimensions",
+        "source_node": "Site1@localhost:32049",
+        "parent": "e2af9b91e5ff3aeb080f7f2be5ffeed0",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "branch",
+        "description": "Dimensions branch. Contains non-metric fields used for grouping, filtering, and joining (e.g., host/container identifiers, status, types).",
+        "branch_type": "dimensions"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "90083adbd59424822a78d64fd980e8be",
+        "ledger": "global",
+        "name": "tsd_name",
+        "namespace": "Monitoring/docker_insight/dimensions/tsd_name",
+        "source_node": "Site1@localhost:32049",
+        "parent": "c3361e6799b3e486038459b27cd7ced9",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "dimension",
+        "description": "Dimension 'tsd_name' from table 'docker_insight'. Type: char(3). Use for group-by, filters, and joins.",
+        "source_column": "tsd_name",
+        "column_type": "char(3)"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "80e8522ec17d8a1f72670631bfadc4f6",
+        "ledger": "global",
+        "name": "hostname",
+        "namespace": "Monitoring/docker_insight/dimensions/hostname",
+        "source_node": "Site1@localhost:32049",
+        "parent": "c3361e6799b3e486038459b27cd7ced9",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "dimension",
+        "description": "Dimension 'hostname' from table 'docker_insight'. Type: char(6). Use for group-by, filters, and joins.",
+        "source_column": "hostname",
+        "column_type": "char(6)"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "bc0ad7226db5b1e380fb0274f055dd29",
+        "ledger": "global",
+        "name": "container",
+        "namespace": "Monitoring/docker_insight/dimensions/container",
+        "source_node": "Site1@localhost:32049",
+        "parent": "c3361e6799b3e486038459b27cd7ced9",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "dimension",
+        "description": "Dimension 'container' from table 'docker_insight'. Type: character varying. Use for group-by, filters, and joins.",
+        "source_column": "container",
+        "column_type": "character varying"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "1d331dd520bd38d3eca0ad754ba8f83d",
+        "ledger": "global",
+        "name": "user_id",
+        "namespace": "Monitoring/docker_insight/dimensions/user_id",
+        "source_node": "Site1@localhost:32049",
+        "parent": "c3361e6799b3e486038459b27cd7ced9",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "dimension",
+        "description": "Dimension 'user_id' from table 'docker_insight'. Type: char(4). Use for group-by, filters, and joins.",
+        "source_column": "user_id",
+        "column_type": "char(4)"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "de6ffcd49a58621a0dec8237dd53ec88",
+        "ledger": "global",
+        "name": "terminal",
+        "namespace": "Monitoring/docker_insight/dimensions/terminal",
+        "source_node": "Site1@localhost:32049",
+        "parent": "c3361e6799b3e486038459b27cd7ced9",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "dimension",
+        "description": "Dimension 'terminal' from table 'docker_insight'. Type: char(5). Use for group-by, filters, and joins.",
+        "source_column": "terminal",
+        "column_type": "char(5)"
+      }
+    },
+    {
+      "uns": {
+        "date": "2026-02-14T06:30:47.932634Z",
+        "id": "27ba14c6061c8cf3a1e6d30c89a5435e",
+        "ledger": "global",
+        "name": "command",
+        "namespace": "Monitoring/docker_insight/dimensions/command",
+        "source_node": "Site1@localhost:32049",
+        "parent": "c3361e6799b3e486038459b27cd7ced9",
+        "dbms": "monitoring",
+        "table": "docker_insight",
+        "uns_level": "dimension",
+        "description": "Dimension 'command' from table 'docker_insight'. Type: character varying. Use for group-by, filters, and joins.",
+        "source_column": "command",
+        "column_type": "character varying"
+      }
+    }
+  ]
+}

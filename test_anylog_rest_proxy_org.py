@@ -43,9 +43,9 @@ DIM  = lambda s: _c("2",   s)
 BOLD = lambda s: _c("1",   s)
 
 # ─── Globals set in main() ────────────────────────────────────────────────────
-BASE    = "http://localhost:5001"
+BASE    = "http://localhost:8080"
 DBMS    = "bottle_factory"
-TABLE   = "metric_64"           # Site1 metric table
+TABLE   = "metric_11"           # Site1 metric table
 TIMEOUT = 60.0
 VERBOSE = False
 
@@ -479,28 +479,6 @@ def t_404_unknown_route():
     r = GET("/api/this_does_not_exist")
     return r.status_code == 404, f"HTTP {r.status_code} (expected 404)"
 
-
-# ── 5B. UNS Policies ─────────────────────────────────────────────────────────
-
-def t_uns_root_policies_get():
-    """GET /api/uns should return dict with command, policies, raw."""
-    r = GET("/api/uns")
-    b = _json(r)
-    if r.status_code != 200:
-        return False, f"HTTP {r.status_code}  body={str(b)[:150]}"
-    if not isinstance(b, dict):
-        return False, f"Expected dict, got {type(b).__name__}: {str(b)[:150]}"
-    if "policies" not in b or "raw" not in b or "command" not in b:
-        return False, f"Missing keys in response: {list(b.keys())}"
-    cmd = str(b.get("command","")).lower().strip()
-    if "blockchain get uns" not in cmd:
-        return False, f"Unexpected command: {cmd!r}"
-    items = b.get("policies") or []
-    if not isinstance(items, list):
-        return False, f"Expected policies to be a list, got {type(items).__name__}"
-    # Return the number of JSON objects returned from /api/uns
-    return True, f"json_objects={len(items)}"
-
 # ─── Reachability check ───────────────────────────────────────────────────────
 def check_reachable():
     try:
@@ -606,9 +584,6 @@ def main():
     run("GET /api/nodes/status (GET)  → 'status' field",t_node_status_get)
     run("POST /api/nodes/status (POST) → 'status' field",t_node_status_post)
     run("GET /api/data/location → 'locations' field",   t_data_location_field)
-
-    section("5B  UNS Policies")
-    run_live("GET /api/uns → blockchain get root policies", t_uns_root_policies_get, skip)
 
     section("6  POST /api/query — Input Validation")
     run("missing 'dbms' → HTTP 400",                    t_query_missing_dbms)

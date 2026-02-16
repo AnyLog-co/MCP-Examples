@@ -129,31 +129,24 @@ class AnyLogError(Exception):
         super().__init__(f"AnyLog err {err_code}: {err_text}")
 
 
-
 def _extract_anylog_error(exc_str: str) -> dict | None:
     """
-    AnyLog sometimes embeds a JSON error payload inside the exception string
-    raised by urllib3/requests when chunked transfer decoding fails.
+    AnyLog sends its error JSON where the HTTP chunk-length header should be,
+    so urllib3 raises InvalidChunkLength and embeds the JSON in the exception
+    message.  Extract it if present.
 
-    We locate and parse the *first valid JSON object* found anywhere in the
-    exception text using JSONDecoder.raw_decode (more robust than regex when
-    the payload contains nested braces inside strings).
+    Example embedded payload:
+      {"method":"get","node":"...","err_code":26,"err_text":"Time Out",
+       "local_msg":"{\"Result.set\":\"REST Server Timeout\"}"}
     """
-    if not exc_str:
+    # Find the first {...} blob in the exception string
+    m = re.search(r'\{[^{}]+\}', exc_str)
+    if not m:
         return None
-    dec = json.JSONDecoder()
-    # Try every '{' as a potential start of a JSON object
-    for i, ch in enumerate(exc_str):
-        if ch != "{":
-            continue
-        try:
-            obj, _ = dec.raw_decode(exc_str[i:])
-            if isinstance(obj, dict) and ("err_code" in obj or "err_text" in obj):
-                return obj
-        except Exception:
-            continue
-    return None
-
+    try:
+        return json.loads(m.group())
+    except json.JSONDecodeError:
+        return None
 
 
 def anylog_get(command: str, sql_query: bool = False) -> str:
@@ -572,25 +565,6 @@ def api_command():
         return _err(str(exc))
     finally:
         CFG["timeout"] = orig_timeout
-
-
-
-# ===========================================================================
-# UNS policies (blockchain root policies)
-# ===========================================================================
-@app.route("/api/uns", methods=["GET"])
-def uns_root_policies():
-    """Return UNS root policies via AnyLog blockchain."""
-    cmd = "blockchain get uns"
-    try:
-        raw = run_command(cmd)
-        policies = _parse_rows(raw)
-        return jsonify({"command": cmd, "policies": policies, "raw": raw})
-    except AnyLogError as exc:
-        log.warning("[PROXY] AnyLog error %d: %s", exc.err_code, exc.err_text)
-        return _err(f"AnyLog error {exc.err_code}: {exc.err_text}", exc.raw[:300], 502)
-    except Exception as exc:
-        return _err("Failed to get UNS root policies", str(exc))
 
 
 # ===========================================================================

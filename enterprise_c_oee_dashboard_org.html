@@ -7,450 +7,409 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-:root{
-      --sub:#3498db;
-      --tff:#27ae60;
-      --chrom:#9b59b6;
-      --sum:#e67e22;
-      --ok:#4CAF50;
-      --warn:#FF9800;
-      --err:#f44336;
-      --info:#2196F3;
-      --idle:#9e9e9e;
-    }
+  :root {
+    --bg:        #080c10;
+    --surface:   #0d1318;
+    --panel:     #111820;
+    --border:    #1e2d3a;
+    --border2:   #243040;
+    --text:      #c8d8e8;
+    --dim:       #4a6070;
+    --mono:      'Share Tech Mono', monospace;
+    --head:      'Barlow Condensed', sans-serif;
+    --body:      'Barlow', sans-serif;
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    --ok:        #00e5a0;
+    --warn:      #f0c040;
+    --err:       #ff4560;
+    --info:      #38b6ff;
+    --idle:      #607080;
 
-    body{
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
-      color:#333;
-      padding:20px;
-      min-height:100vh;
-    }
-    .dashboard-container{ max-width:1900px; margin:0 auto; }
+    --sub:       #00e5a0;
+    --tff:       #38b6ff;
+    --chrom:     #c060ff;
+    --sum:       #f0c040;
 
-    /* ── Header (match Enterprise C dashboard) ── */
-    .masthead{
-      background:#fff;
-      padding:18px 25px;
-      border-radius:12px;
-      box-shadow:0 4px 6px rgba(0,0,0,0.1);
-      margin-bottom:12px;
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      position:static;
-      border-bottom:none;
-    }
-    .masthead-left{ display:flex; align-items:center; gap:14px; }
-    .logo-badge{
-      width:34px;height:34px;border-radius:10px;
-      background: linear-gradient(135deg,#3498db,#2c3e50);
-      display:flex;align-items:center;justify-content:center;
-      font-weight:800;color:#fff;font-size:13px;
-      font-family: inherit;
-    }
-    .masthead h1{ color:#2c3e50; font-size:22px; letter-spacing:0; font-weight:700; font-family:inherit; }
-    .masthead h1 span{ color:#3498db; }
-    .masthead-sub{ margin-top:4px;color:#888;font-size:12px; line-height:1.3; font-family:inherit; }
+    --glow-ok:   0 0 16px rgba(0,229,160,0.35);
+    --glow-warn: 0 0 16px rgba(240,192,64,0.35);
+    --glow-err:  0 0 16px rgba(255,69,96,0.35);
+    --glow-info: 0 0 16px rgba(56,182,255,0.35);
+  }
 
-    /* controls bar styled like dashboard controls */
-    .controls{
-      background:#1a252f;
-      padding:10px 18px;
-      border-radius:10px;
-      margin-left:12px;
-      display:flex;
-      gap:10px;
-      align-items:center;
-      flex-wrap:wrap;
-      box-shadow:0 4px 6px rgba(0,0,0,0.08);
-    }
-    .ctrl-group{ display:flex; align-items:center; gap:6px; }
-    .ctrl-group label{ color:#aaa; font-size:12px; white-space:nowrap; text-transform:none; letter-spacing:0; }
-    .ctrl-group input, .ctrl-group select{
-      padding:5px 9px;
-      border-radius:5px;
-      border:1px solid #555;
-      background:#2c3e50;
-      color:#eee;
-      font-size:12px;
-      outline:none;
-      font-family: inherit;
-      width:auto;
-      min-width:84px;
-    }
-    .ctrl-group input[type=number]{ min-width:70px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    .btn{
-      padding:7px 14px;
-      border:none;
-      border-radius:5px;
-      cursor:pointer;
-      font-size:12px;
-      font-weight:600;
-      transition:.2s;
-      letter-spacing:0;
-      text-transform:none;
-      font-family: inherit;
-    }
-    .btn-start{ background:#4CAF50; color:#fff; box-shadow:none; }
-    .btn-start:hover{ background:#43a047; filter:none; }
-    .btn-start.running{ background:#f44336; }
-    .btn-start.running:hover{ background:#d32f2f; }
-    .btn-start.running::before, .btn-start:not(.running)::before { content:''; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
 
-    .status-dot{ width:11px;height:11px;border-radius:50%; display:inline-block; background:#9e9e9e; }
-    .status-dot.live{ background:#4CAF50; animation:pulse 2s infinite; }
-    .status-dot.error{ background:#f44336; animation:pulse 1s infinite; }
-    @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.4} }
-    .ts-display{ font-size:12px;color:#e6edf3; white-space:nowrap; }
+  /* ─── SCAN-LINE OVERLAY ───────────────────────────────── */
+  body::before {
+    content:'';
+    position:fixed; inset:0; pointer-events:none; z-index:999;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,.08) 2px,
+      rgba(0,0,0,.08) 4px
+    );
+  }
 
-    /* main layout */
-    .main{ padding:0; display:flex; flex-direction:column; gap:12px; }
-    .kpi-bar{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  /* ─── HEADER ──────────────────────────────────────────── */
+  .masthead {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 24px;
+    background: linear-gradient(90deg, #0d1318 0%, #111f2a 50%, #0d1318 100%);
+    border-bottom: 1px solid var(--border2);
+    position:sticky; top:0; z-index:100;
+  }
+  .masthead-left { display:flex; align-items:center; gap:16px; }
+  .logo-badge {
+    width:36px; height:36px; border-radius:4px;
+    background: linear-gradient(135deg,#00e5a0,#38b6ff);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--head); font-weight:900; font-size:14px; color:#080c10;
+  }
+  .masthead h1 {
+    font-family:var(--head); font-weight:700; font-size:22px;
+    letter-spacing:.08em; color:#e8f4ff;
+  }
+  .masthead h1 span { color:var(--ok); }
+  .masthead-sub { font-size:11px; color:var(--dim); font-family:var(--mono); }
 
-    /* KPI cards match 'card' style */
-    .kpi-card{
-      background:#fff;
-      border-radius:10px;
-      box-shadow:0 4px 6px rgba(0,0,0,0.1);
-      padding:16px 18px;
-      position:relative;
-      overflow:hidden;
-      border:none;
-      transition: transform .2s;
-    }
-    .kpi-card:hover{ transform: translateY(-2px); }
-    .kpi-card::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:5px; }
-    .kpi-card.sub::before{ background:#3498db; }
-    .kpi-card.tff::before{ background:#27ae60; }
-    .kpi-card.chrom::before{ background:#9b59b6; }
-    .kpi-card.sum::before{ background:#e67e22; }
+  .controls {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .ctrl-group {
+    display:flex; align-items:center; gap:6px;
+    background:var(--surface); border:1px solid var(--border);
+    padding:4px 10px; border-radius:4px;
+  }
+  .ctrl-group label {
+    font-size:10px; font-family:var(--mono); color:var(--dim);
+    text-transform:uppercase; letter-spacing:.05em; white-space:nowrap;
+  }
+  .ctrl-group input, .ctrl-group select {
+    background:transparent; border:none; color:var(--text);
+    font-family:var(--mono); font-size:12px; width:90px; outline:none;
+  }
+  .ctrl-group input[type=number] { width:60px; }
 
-    .kpi-process{
-      font-size:11px;
-      color:#666;
-      font-weight:700;
-      text-transform:uppercase;
-      letter-spacing:.8px;
-      margin-bottom:4px;
-    }
-    .kpi-process.sub{ color:#1565C0; }
-    .kpi-process.tff{ color:#1B5E20; }
-    .kpi-process.chrom{ color:#6A1B9A; }
-    .kpi-process.sum{ color:#E65100; }
+  .btn {
+    padding:6px 18px; border-radius:4px; cursor:pointer;
+    font-family:var(--head); font-weight:700; font-size:13px;
+    letter-spacing:.06em; text-transform:uppercase;
+    border:none; transition:all .15s;
+  }
+  .btn-start {
+    background:var(--ok); color:#080c10;
+    box-shadow: var(--glow-ok);
+  }
+  .btn-start:hover { filter:brightness(1.15); }
+  .btn-start.running { background:var(--err); box-shadow:var(--glow-err); }
+  .btn-start.running::before { content:'⏹ '; }
+  .btn-start:not(.running)::before { content:'▶ '; }
 
-    .kpi-oee{
-      font-size:42px;
-      font-weight:800;
-      line-height:1;
-      font-family: inherit;
-      letter-spacing:-.02em;
-      color:#2c3e50;
-    }
-    /* effectiveness coloring */
-    .kpi-oee.excellent{ color:#4CAF50; }
-    .kpi-oee.good{ color:#2e7d32; }
-    .kpi-oee.warn{ color:#FF9800; }
-    .kpi-oee.bad{ color:#f44336; }
-    .kpi-oee.idle{ color:#bdbdbd; }
+  .status-dot {
+    width:8px; height:8px; border-radius:50%;
+    background:var(--dim); display:inline-block;
+    transition:background .3s, box-shadow .3s;
+  }
+  .status-dot.live { background:var(--ok); box-shadow:var(--glow-ok); animation:pulse 2s infinite; }
+  .status-dot.error { background:var(--err); box-shadow:var(--glow-err); }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
 
-    .kpi-components{ display:flex; gap:14px; margin-top:10px; }
-    .kpi-comp-label{ font-size:10px; color:#999; text-transform:uppercase; letter-spacing:.5px; }
-    .kpi-comp-val{ font-size:14px; font-weight:700; color:#333; margin-top:2px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  .ts-display {
+    font-family:var(--mono); font-size:11px; color:var(--dim);
+    white-space:nowrap;
+  }
 
-    .kpi-status{
-      position:absolute; top:12px; right:12px;
-      font-size:10px; padding:2px 7px; border-radius:12px; font-weight:700;
-      border:none;
-    }
-    .kpi-status.running{ background:#e8f5e9; color:#388E3C; }
-    .kpi-status.idle{ background:#eeeeee; color:#9e9e9e; }
-    .kpi-status.fault{ background:#ffebee; color:#D32F2F; }
+  /* ─── MAIN LAYOUT ─────────────────────────────────────── */
+  .main { padding:16px 24px; display:flex; flex-direction:column; gap:16px; }
 
-    .oee-bar{ height:5px; border-radius:3px; background:#eee; margin-top:10px; overflow:hidden; }
-    .oee-bar-fill{ height:100%; border-radius:3px; transition:width .5s ease; }
+  /* ─── PLANT KPI BAR ───────────────────────────────────── */
+  .kpi-bar {
+    display:grid; grid-template-columns:repeat(4,1fr); gap:12px;
+  }
+  .kpi-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:6px; padding:14px 18px;
+    position:relative; overflow:hidden;
+    transition:border-color .3s;
+  }
+  .kpi-card::before {
+    content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
+  }
+  .kpi-card.sub::before  { background:var(--sub); }
+  .kpi-card.tff::before  { background:var(--tff); }
+  .kpi-card.chrom::before{ background:var(--chrom); }
+  .kpi-card.sum::before  { background:var(--sum); }
 
-    /* Process panels */
-    .process-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
-    .proc-panel{
-      background:#fff;
-      border-radius:10px;
-      box-shadow:0 4px 6px rgba(0,0,0,0.1);
-      overflow:hidden;
-      border:none;
-    }
-    .proc-header{
-      padding:14px 18px;
-      background:#fff;
-      border-bottom:1px solid #eee;
-    }
-    .proc-title{
-      font-size:15px; font-weight:700; color:#2c3e50;
-      letter-spacing:.4px; text-transform:none; font-family:inherit;
-    }
-    .proc-subtitle{ font-size:11px; color:#888; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    .proc-body{ padding:16px 18px; }
+  .kpi-process {
+    font-family:var(--head); font-size:10px; font-weight:700;
+    letter-spacing:.15em; text-transform:uppercase; color:var(--dim);
+    margin-bottom:4px;
+  }
+  .kpi-process.sub   { color:var(--sub); }
+  .kpi-process.tff   { color:var(--tff); }
+  .kpi-process.chrom { color:var(--chrom); }
+  .kpi-process.sum   { color:var(--sum); }
 
-    .gauge-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
-    .gauge{
-      background:#f7f7f7;
-      border-radius:10px;
-      padding:12px 12px;
-      border:none;
-    }
-    .gauge-label{ font-size:10px; color:#999; text-transform:uppercase; letter-spacing:.5px; }
-    .gauge-value{ font-size:22px; font-weight:800; margin-top:4px; color:#2c3e50; font-family:inherit; }
+  .kpi-oee {
+    font-family:var(--head); font-size:42px; font-weight:900;
+    line-height:1; letter-spacing:-.01em;
+  }
+  .kpi-oee.good   { color:var(--ok); text-shadow:var(--glow-ok); }
+  .kpi-oee.warn   { color:var(--warn); text-shadow:var(--glow-warn); }
+  .kpi-oee.bad    { color:var(--err); text-shadow:var(--glow-err); }
+  .kpi-oee.idle   { color:var(--idle); }
 
-    .pv-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
-    .pv-item{
-      background:#f7f7f7;
-      border-radius:10px;
-      padding:10px 12px;
-      border-left:4px solid #3498db;
-      border-top:none; border-right:none; border-bottom:none;
-    }
-    .pv-item.alarm{ border-left-color:#f44336; background:#ffebee; }
-    .pv-item.warn{ border-left-color:#FF9800; background:#fff8e1; }
-    .pv-item.ok{ border-left-color:#4CAF50; background:#e8f5e9; }
-    .pv-name{ font-size:10px; color:#777; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
-    .pv-val{ font-size:14px; font-weight:700; color:#333; margin-top:3px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    .pv-unit{ font-size:10px; color:#999; font-weight:500; }
+  .kpi-components {
+    display:flex; gap:12px; margin-top:8px;
+  }
+  .kpi-comp {
+    display:flex; flex-direction:column; align-items:center;
+  }
+  .kpi-comp-label {
+    font-size:9px; font-family:var(--mono);
+    color:var(--dim); letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+  .kpi-comp-val {
+    font-family:var(--mono); font-size:15px; color:var(--text);
+    margin-top:1px;
+  }
+  .kpi-status {
+    position:absolute; top:12px; right:12px;
+    font-family:var(--mono); font-size:10px;
+    padding:2px 7px; border-radius:3px;
+  }
+  .kpi-status.running  { background:rgba(0,229,160,.15); color:var(--ok); border:1px solid rgba(0,229,160,.3); }
+  .kpi-status.idle     { background:rgba(96,112,128,.15); color:var(--idle); border:1px solid rgba(96,112,128,.3); }
+  .kpi-status.fault    { background:rgba(255,69,96,.15); color:var(--err); border:1px solid rgba(255,69,96,.3); }
 
-    .sparkline-area{
-      background:#fff;
-      border-radius:10px;
-      box-shadow: inset 0 0 0 1px #eee;
-      padding:12px 12px;
-      margin-bottom:12px;
-    }
-    .spark-label{ font-size:10px; color:#888; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; display:flex; justify-content:space-between; font-weight:700; }
-    canvas.spark{ width:100%; height:40px; display:block; }
+  /* progress bar */
+  .oee-bar {
+    height:4px; border-radius:2px;
+    background:var(--border); margin-top:8px; overflow:hidden;
+  }
+  .oee-bar-fill {
+    height:100%; border-radius:2px;
+    transition:width .8s ease;
+  }
 
-    .events-panel{
-      background:#0d1117;
-      border-radius:10px;
-      overflow:hidden;
-      box-shadow:0 4px 6px rgba(0,0,0,0.18);
-    }
-    .events-header{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:10px 12px;
-      background:#161b22;
-      border-bottom:1px solid #30363d;
-      font-size:10px; color:#8b949e; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    }
-    .events-list{ max-height:140px; overflow-y:auto; }
-    .event-row{
-      display:grid; grid-template-columns:90px 60px 1fr;
-      gap:8px;
-      padding:7px 12px;
-      border-bottom:1px solid #161b22;
-      font-size:11px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      color:#e6edf3;
-    }
-    .event-time{ color:#8b949e; }
-    .event-sev{ text-align:center; border-radius:10px; padding:2px 6px; font-size:10px; font-weight:800; }
-    .sev-ERR{ background:#3a1a1a; color:#f85149; }
-    .sev-WARN{ background:#3a2a1a; color:#e3b341; }
-    .sev-INFO{ background:#1a2a3a; color:#58a6ff; }
-    .sev-OK{ background:#1a3a1a; color:#3fb950; }
-    .event-msg{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* ─── PROCESS PANELS ──────────────────────────────────── */
+  .process-grid {
+    display:grid; grid-template-columns:repeat(2,1fr); gap:16px;
+  }
+  .proc-panel {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:6px; overflow:hidden;
+  }
+  .proc-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 16px;
+    border-bottom:1px solid var(--border);
+  }
+  .proc-header-left { display:flex; align-items:center; gap:10px; }
+  .proc-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
 
-    /* Logging panel (reuse Enterprise dashboard log look) */
-    .log-panel{
-      background:#0d1117;
-      border-radius:10px;
-      overflow:hidden;
-      box-shadow:0 4px 6px rgba(0,0,0,0.3);
-      margin-bottom:12px;
-    }
-    .log-header{
-      display:flex; align-items:center; gap:12px;
-      padding:10px 16px;
-      cursor:pointer;
-      background:#161b22;
-      border-bottom:1px solid #30363d;
-      user-select:none;
-    }
-    .log-header:hover{ background:#1c2128; }
-    .log-title{ color:#e6edf3; font-size:13px; font-weight:600; flex:1; }
-    .log-stats{ display:flex; gap:10px; }
-    .log-stat{ font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; }
-    .ls-total{ background:#21262d; color:#8b949e; }
-    .ls-ok{ background:#1a3a1a; color:#3fb950; }
-    .ls-err{ background:#3a1a1a; color:#f85149; }
-    .ls-rows{ background:#1a2a3a; color:#58a6ff; }
-    .log-caret{ color:#8b949e; font-size:12px; transition:transform .2s; }
-    .log-caret.open{ transform:rotate(180deg); }
+  .proc-title {
+    font-family:var(--head); font-size:16px; font-weight:700;
+    letter-spacing:.1em; text-transform:uppercase;
+  }
+  .proc-subtitle { font-size:11px; color:var(--dim); font-family:var(--mono); }
 
-    .log-toolbar{
-      display:none;
-      gap:8px; align-items:center;
-      padding:8px 16px;
-      background:#161b22;
-      border-bottom:1px solid #30363d;
-    }
-    .log-toolbar.open{ display:flex; }
-    .log-toolbar input{
-      flex:1; padding:4px 8px; border-radius:4px;
-      border:1px solid #30363d; background:#0d1117;
-      color:#e6edf3; font-size:11px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    }
-    .log-filter-btn{
-      padding:3px 9px; border:none; border-radius:4px;
-      font-size:11px; font-weight:600; cursor:pointer;
-      background:#21262d; color:#8b949e; transition:.15s;
-    }
-    .log-filter-btn.active{ background:#1f6feb; color:#fff; }
-    .log-filter-btn:hover:not(.active){ background:#30363d; }
-    .log-clear{ padding:3px 9px; border:none; border-radius:4px; font-size:11px; cursor:pointer; background:#3a1a1a; color:#f85149; }
-    .log-clear:hover{ background:#5a2020; }
+  .proc-body { padding:14px 16px; }
 
-    .log-body{ display:none; max-height:380px; overflow-y:auto;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    }
-    .log-body.open{ display:block; }
-    .log-col-header{
-      display:grid;
-      grid-template-columns:68px 45px 55px 85px 1fr 70px 60px;
-      padding:5px 0;
-      background:#161b22;
-      font-size:10px;
-      color:#484f58;
-      border-bottom:1px solid #30363d;
-      text-transform:uppercase;
-      letter-spacing:.5px;
-    }
-    .log-col-header span:first-child{ padding-left:12px; }
-    .log-col-header span:nth-child(6){ text-align:right; padding-right:8px; }
-    .log-col-header span:last-child{ text-align:right; padding-right:14px; }
+  /* oee gauge row */
+  .gauge-row {
+    display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
+    margin-bottom:12px;
+  }
+  .gauge {
+    background:var(--panel); border-radius:5px; padding:10px 12px;
+    border:1px solid var(--border);
+  }
+  .gauge-label {
+    font-size:9px; font-family:var(--mono); color:var(--dim);
+    letter-spacing:.1em; text-transform:uppercase;
+  }
+  .gauge-value {
+    font-family:var(--head); font-size:26px; font-weight:700;
+    line-height:1.1; margin-top:2px;
+  }
 
-    .log-entry{
-      display:grid;
-      grid-template-columns:68px 45px 55px 85px 1fr 70px 60px;
-      align-items:center;
-      padding:4px 0;
-      border-bottom:1px solid #161b22;
-      font-size:11px;
-      transition:background .1s;
-    }
-    .log-entry:hover{ background:#161b22; }
-    .log-entry.hidden{ display:none; }
-    .log-entry.log-err{ border-left:3px solid #f85149; }
-    .log-entry.log-ok{ border-left:3px solid transparent; }
-    .le-time{ color:#8b949e; padding-left:12px; white-space:nowrap; }
-    .le-method{ font-weight:800; text-align:center; }
-    .le-method.m-post{ color:#58a6ff; }
-    .le-method.m-get{ color:#3fb950; }
-    .le-status{ text-align:center; }
-    .le-status.s-ok{ color:#3fb950; }
-    .le-status.s-err{ color:#f85149; font-weight:800; }
-    .le-dur{ color:#e3b341; text-align:right; padding-right:8px; }
-    .le-path{ color:#79c0ff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 6px; }
-    .le-detail{ color:#8b949e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:10px; }
-    .le-rows{ color:#a5d6ff; text-align:right; padding-right:14px; white-space:nowrap; font-size:10px; }
+  /* sparkline area */
+  .sparkline-area {
+    background:var(--panel); border-radius:5px;
+    border:1px solid var(--border); padding:8px 10px;
+    margin-bottom:12px;
+  }
+  .spark-label {
+    font-size:9px; font-family:var(--mono); color:var(--dim);
+    letter-spacing:.1em; text-transform:uppercase; margin-bottom:4px;
+    display:flex; justify-content:space-between;
+  }
+  canvas.spark { width:100%; height:40px; display:block; }
 
-    .log-entry.type-trend  .le-path{ color:#ffa657; }
-    .log-entry.type-latest .le-path{ color:#58a6ff; }
-    .log-entry.type-schema .le-path{ color:#d2a8ff; }
-    .log-entry.type-health .le-path{ color:#8b949e; }
+  /* process variables table */
+  .pv-grid {
+    display:grid; grid-template-columns:repeat(3,1fr); gap:6px;
+    margin-bottom:12px;
+  }
+  .pv-item {
+    background:var(--panel); border-radius:4px;
+    padding:6px 10px; border:1px solid var(--border);
+    border-left:2px solid transparent; transition:border-color .3s;
+  }
+  .pv-item.alarm { border-left-color:var(--err); }
+  .pv-item.warn  { border-left-color:var(--warn); }
+  .pv-item.ok    { border-left-color:var(--ok); }
+  .pv-name  { font-size:9px; color:var(--dim); font-family:var(--mono); letter-spacing:.05em; text-transform:uppercase; }
+  .pv-val   { font-family:var(--mono); font-size:14px; color:var(--text); margin-top:1px; }
+  .pv-unit  { font-size:9px; color:var(--dim); }
 
-    .row-summary{
-      display:none;
-      border-top:1px solid #30363d;
-      padding:10px 16px;
-      gap:20px;
-      flex-wrap:wrap;
-      align-items:center;
-      background:#0d1117;
-    }
-    .row-summary.open{ display:flex; }
-    .row-summary-title{ color:#484f58; font-size:10px; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
-    .row-tbl{ display:flex; align-items:center; gap:6px; font-size:11px; }
-    .row-tbl-name{ color:#79c0ff; }
-    .row-tbl-cnt{ color:#3fb950; font-weight:800; }
-    .row-tbl-sep{ color:#30363d; }
+  /* events feed */
+  .events-panel {
+    background:var(--panel); border-radius:5px;
+    border:1px solid var(--border); overflow:hidden;
+  }
+  .events-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:6px 12px;
+    border-bottom:1px solid var(--border);
+    font-size:9px; font-family:var(--mono); color:var(--dim);
+    letter-spacing:.1em; text-transform:uppercase;
+  }
+  .events-list {
+    max-height:120px; overflow-y:auto;
+    scrollbar-width:thin; scrollbar-color:var(--border) transparent;
+  }
+  .event-row {
+    display:grid; grid-template-columns:90px 60px 1fr;
+    gap:8px; padding:5px 12px;
+    border-bottom:1px solid rgba(30,45,58,.5);
+    font-family:var(--mono); font-size:10px;
+    transition:background .15s;
+    animation:slideIn .3s ease;
+  }
+  @keyframes slideIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:none} }
+  .event-row:hover { background:rgba(255,255,255,.02); }
+  .event-time  { color:var(--dim); }
+  .event-sev {
+    text-align:center; border-radius:3px; padding:0 4px; font-size:9px;
+    font-weight:bold; letter-spacing:.05em;
+  }
+  .sev-ERR    { background:rgba(255,69,96,.2);  color:var(--err); }
+  .sev-WARN   { background:rgba(240,192,64,.2); color:var(--warn); }
+  .sev-INFO   { background:rgba(56,182,255,.2); color:var(--info); }
+  .sev-OK     { background:rgba(0,229,160,.2);  color:var(--ok); }
+  .event-msg  { color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-    .footer{
-      text-align:center;
-      color: rgba(255,255,255,.85);
-      margin-top: 18px;
-      font-size: 12px;
-    }
+  /* ─── API LOG TABLE ───────────────────────────────────── */
+  .log-section {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:6px; overflow:hidden;
+  }
+  .log-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 16px; border-bottom:1px solid var(--border);
+  }
+  .log-header h2 {
+    font-family:var(--head); font-size:14px; font-weight:700;
+    letter-spacing:.12em; text-transform:uppercase; color:#e8f4ff;
+  }
+  .log-stats {
+    display:flex; gap:16px;
+  }
+  .log-stat {
+    font-family:var(--mono); font-size:11px;
+    display:flex; gap:6px; align-items:center;
+  }
+  .log-stat-label { color:var(--dim); }
+  .log-stat-val   { color:var(--text); }
 
-    /* responsive */
-    @media(max-width:900px){
-      .kpi-bar{ grid-template-columns:repeat(2,1fr); }
-      .process-grid{ grid-template-columns:1fr; }
-      .masthead{ flex-direction:column; align-items:flex-start; gap:12px; }
-      .controls{ margin-left:0; width:100%; }
-    }
-    @media(max-width:600px){
-      .kpi-bar{ grid-template-columns:1fr; }
-      .pv-grid{ grid-template-columns:1fr; }
-      .gauge-row{ grid-template-columns:1fr; }
-    }
+  .log-scroll {
+    max-height:280px; overflow-y:auto;
+    scrollbar-width:thin; scrollbar-color:var(--border) transparent;
+  }
+  table.log-table {
+    width:100%; border-collapse:collapse;
+    font-family:var(--mono); font-size:10px;
+  }
+  .log-table thead th {
+    position:sticky; top:0;
+    background:var(--panel); padding:6px 12px;
+    text-align:left; font-size:9px;
+    letter-spacing:.1em; text-transform:uppercase;
+    color:var(--dim); border-bottom:1px solid var(--border);
+    white-space:nowrap;
+  }
+  .log-table tbody tr {
+    border-bottom:1px solid rgba(30,45,58,.4);
+    transition:background .1s;
+    animation:slideIn .25s ease;
+  }
+  .log-table tbody tr:hover { background:rgba(255,255,255,.02); }
+  .log-table td { padding:5px 12px; vertical-align:top; }
 
+  .log-table .col-ts   { color:var(--dim); white-space:nowrap; }
+  .log-table .col-type {
+    white-space:nowrap; font-weight:bold; font-size:9px; letter-spacing:.06em;
+  }
+  .col-type.api    { color:var(--info); }
+  .col-type.sql    { color:var(--ok); }
+  .col-type.anylog { color:var(--chrom); }
 
-/* Log table pills */
-.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.02em}
-.pill-blue{background:rgba(59,130,246,.14);color:#2563eb;border:1px solid rgba(59,130,246,.25)}
-.pill-green{background:rgba(16,185,129,.14);color:#059669;border:1px solid rgba(16,185,129,.25)}
-.pill-gray{background:rgba(107,114,128,.14);color:#6b7280;border:1px solid rgba(107,114,128,.25)}
-.cell-err{color:var(--err);font-weight:800}
+  .log-table .col-cmd  { color:var(--text); }
+  .log-table .col-rows { text-align:right; color:var(--text); white-space:nowrap; }
+  .log-table .col-ms   { text-align:right; color:var(--dim); white-space:nowrap; }
+  .log-table .col-status { text-align:center; }
+  .http-ok  { color:var(--ok); }
+  .http-err { color:var(--err); }
+  .http-warn{ color:var(--warn); }
 
-.log-select{
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-size: 10px;
-  border-radius: 8px;
-  padding: 3px 8px;
-  outline: none;
-}
-.log-select:focus{ box-shadow: 0 0 0 3px rgba(52,152,219,.18); }
-/* Log toggle + filter buttons */
-.log-filter-btn{
-  padding:6px 10px;
-  border:1px solid rgba(0,0,0,.12);
-  background:#fff;
-  border-radius:10px;
-  cursor:pointer;
-  font-weight:700;
-}
-.log-filter-btn.active{
-  border-color: rgba(0,0,0,.22);
-  box-shadow: 0 1px 10px rgba(0,0,0,.08);
-}
+  .log-table .col-err { color:var(--err); font-size:9px; }
+
+  /* ─── FOOTER ──────────────────────────────────────────── */
+  .footer {
+    text-align:center; padding:12px;
+    font-family:var(--mono); font-size:10px; color:var(--dim);
+    border-top:1px solid var(--border);
+    margin-top:4px;
+  }
+
+  /* ─── SCROLLBAR ───────────────────────────────────────── */
+  ::-webkit-scrollbar { width:5px; height:5px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+
+  /* ─── RESPONSIVE ──────────────────────────────────────── */
+  @media(max-width:900px) {
+    .kpi-bar { grid-template-columns:repeat(2,1fr); }
+    .process-grid { grid-template-columns:1fr; }
+  }
+  @media(max-width:600px) {
+    .kpi-bar { grid-template-columns:1fr; }
+    .controls { flex-direction:column; align-items:flex-start; }
+  }
+
+  .no-data {
+    text-align:center; padding:20px;
+    color:var(--dim); font-family:var(--mono); font-size:11px;
+  }
+
+  /* chart tooltip */
+  .spark-container { position:relative; }
 </style>
 </head>
 <body>
-<script>
-/* Boot diagnostics: shows JS load/errors in the header timestamp area */
-(function(){
-  function set(msg){
-    var el = document.getElementById('lastUpdate');
-    if (el) el.textContent = msg;
-  }
-  window.addEventListener('DOMContentLoaded', function(){
-    set('ready (click Start)');
-  });
-  window.addEventListener('error', function(e){
-    try{
-      set('JS error: ' + (e && e.message ? e.message : 'unknown'));
-      var dot = document.getElementById('statusDot');
-      if (dot) dot.className = 'status-dot error';
-    }catch(_){}
-  });
-})();
-</script>
-
 
 <!-- ══════════════════════════════════════════════════════════════ HEADER -->
 <div class="masthead">
@@ -483,7 +442,7 @@
         <option value="300">5 min</option>
       </select>
     </div>
-    <button class="btn btn-start" id="btnStart">Start</button>
+    <button class="btn btn-start" id="btnStart" onclick="toggleMonitor()">Start</button>
     <div style="display:flex;align-items:center;gap:6px;">
       <div class="status-dot" id="statusDot"></div>
       <span class="ts-display" id="lastUpdate">not started</span>
@@ -836,12 +795,7 @@
   </div><!-- /process-grid -->
 
   <!-- API / QUERY LOG -->
-  <div class="log-toggle-wrap" style="display:flex;justify-content:flex-end;margin:10px 0;">
-  <button type="button" id="log-toggle-btn" style="padding:8px 12px;border:1px solid rgba(0,0,0,.14);background:#fff;border-radius:12px;cursor:pointer;font-weight:700;">
-    Hide Logs
-  </button>
-</div>
-<div class="log-section">
+  <div class="log-section">
     <div class="log-header">
       <h2>⬡ API &amp; Query Call Log</h2>
       <div class="log-stats">
@@ -869,14 +823,6 @@
           <span class="log-stat-label">Avg ms</span>
           <span class="log-stat-val" id="log-avgms">—</span>
         </div>
-        <span style="display:flex;align-items:center;gap:6px;"><span style="font-size:10px;color:var(--dim);">Sort</span><select id="log-sort" class="log-select" title="Sort log rows"><option value="newest">Newest</option><option value="errors">Errors first</option><option value="anylog">AnyLog first</option><option value="sql">SQL first</option></select>
-<div class="log-filters" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0 6px 0;">
-  <span style="font-weight:600;opacity:.85;">Filter:</span>
-  <button type="button" class="log-filter-btn" data-filter="all">All</button>
-  <button type="button" class="log-filter-btn" data-filter="errors">Errors</button>
-  <button type="button" class="log-filter-btn" data-filter="sql">SQL</button>
-  <button type="button" class="log-filter-btn" data-filter="api">API Calls</button>
-</div></span>
         <button class="btn" style="background:var(--panel);border:1px solid var(--border);color:var(--dim);font-size:10px;padding:3px 10px;" onclick="clearLog()">Clear</button>
       </div>
     </div>
@@ -927,227 +873,136 @@ let running = false;
 // Spark data stores: last 30 readings per process
 const sparkData = { sub:[], tff:[], chrom:[], sum:[] };
 
-// Call log (see LOG ENGINE)
+// Call log
+let callLog = [];
+let logStats = { total:0, sql:0, anylog:0, rows:0, errors:0, totalMs:0 };
+
 // ══════════════════════════════════════════════════
-// API CALL WRAPPER — logs every call (matches Enterprise C dashboard)
+// API CALL WRAPPER — logs every call
 // ══════════════════════════════════════════════════
 async function anylogQuery(dbms, sql, tableHint='') {
+  const base  = cfg().base();
+  const url   = `${base}/api/query`;
+  const body  = { dbms, sql };
+  const t0    = performance.now();
+  const ts    = new Date().toISOString().replace('T',' ').slice(0,23);
+  let rows=0, http=200, errMsg='';
+
   try {
-    const data = await POST('/api/query', { dbms, sql, table: tableHint || '' });
-    return rows(data);
-  } catch (e) {
+    const resp  = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    http = resp.status;
+    const data  = await resp.json();
+    const ms    = Math.round(performance.now()-t0);
+
+    // extract rows array
+    let results = [];
+    if (Array.isArray(data))            results = data;
+    else if (Array.isArray(data?.data)) results = data.data;
+    else if (Array.isArray(data?.rows)) results = data.rows;
+    else if (data?.result)              results = Array.isArray(data.result) ? data.result : [data.result];
+    rows = results.length;
+
+    appendLog(ts, 'SQL', sql, tableHint||dbms, rows, ms, http, '');
+    return results;
+  } catch(e) {
+    const ms = Math.round(performance.now()-t0);
+    errMsg = e.message || 'fetch error';
+    appendLog(ts, 'SQL', sql, tableHint||dbms, 0, ms, http||0, errMsg);
     return [];
   }
 }
 
 async function anylogCommand(cmd, label='') {
+  const base = cfg().base();
+  const url  = `${base}/api/command`;
+  const t0   = performance.now();
+  const ts   = new Date().toISOString().replace('T',' ').slice(0,23);
+  let http=200, errMsg='';
+
   try {
-    // label kept for compatibility (shown in log detail via command string)
-    const data = await POST('/api/command', { command: cmd, label });
+    const resp = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ command: cmd })
+    });
+    http = resp.status;
+    const data = await resp.json();
+    const ms   = Math.round(performance.now()-t0);
+    appendLog(ts, 'ANYLOG', cmd, label||'—', '—', ms, http, '');
     return data;
-  } catch (e) {
+  } catch(e) {
+    const ms = Math.round(performance.now()-t0);
+    errMsg = e.message||'fetch error';
+    appendLog(ts, 'ANYLOG', cmd, label||'—', '—', ms, http||0, errMsg);
     return null;
   }
 }
 
+// ══════════════════════════════════════════════════
+// LOG APPEND
+// ══════════════════════════════════════════════════
+function appendLog(ts, type, cmd, table, rows, ms, http, errMsg) {
+  logStats.total++;
+  if(type==='SQL')    logStats.sql++;
+  if(type==='ANYLOG') logStats.anylog++;
+  if(typeof rows==='number') { logStats.rows += rows; }
+  if(http < 200 || http >= 400 || errMsg) logStats.errors++;
+  logStats.totalMs += ms;
 
-// ── LOG ENGINE (table-based, matches this dashboard's DOM) ────────────────
-/*
-  Writes to:
-    - tbody#log-body
-    - stats: #log-total #log-sql #log-anylog #log-rows #log-errors #log-avgms
-    - empty state: #log-empty
-*/
-const callLog = []; // newest first: {id, ts, kind, cmd, table, rowCnt, ms, status, error}
-let logSortMode = "newest";
-let logFilterMode = 'all';
-let nextLogId = 0;
+  callLog.unshift({ ts, type, cmd, table, rows, ms, http, errMsg });
+  if(callLog.length > 500) callLog.pop();
+
+  refreshLogTable();
+  refreshLogStats();
+}
+
+function refreshLogStats() {
+  document.getElementById('log-total').textContent  = logStats.total;
+  document.getElementById('log-sql').textContent    = logStats.sql;
+  document.getElementById('log-anylog').textContent = logStats.anylog;
+  document.getElementById('log-rows').textContent   = logStats.rows.toLocaleString();
+  document.getElementById('log-errors').textContent = logStats.errors;
+  document.getElementById('log-avgms').textContent  =
+    logStats.total ? Math.round(logStats.totalMs/logStats.total)+'ms' : '—';
+}
+
+function refreshLogTable() {
+  const tbody = document.getElementById('log-body');
+  const empty = document.getElementById('log-empty');
+  if(callLog.length===0){ empty.style.display='block'; return; }
+  empty.style.display='none';
+
+  // only re-render top 200 for performance
+  const rows = callLog.slice(0,200);
+  tbody.innerHTML = rows.map(r => {
+    const httpCls = r.http>=200&&r.http<300?'http-ok':r.http>=400?'http-err':'http-warn';
+    const httpTxt = r.http||'—';
+    const typeCls = r.type.toLowerCase();
+    const shortCmd = r.cmd.length>70 ? r.cmd.slice(0,70)+'…' : r.cmd;
+    return `<tr>
+      <td class="col-ts">${r.ts}</td>
+      <td class="col-type ${typeCls}">${r.type}</td>
+      <td class="col-cmd" title="${escHtml(r.cmd)}">${escHtml(shortCmd)}</td>
+      <td class="col-cmd" style="color:var(--dim)">${escHtml(r.table)}</td>
+      <td class="col-rows">${r.rows}</td>
+      <td class="col-ms">${r.ms}ms</td>
+      <td class="col-status"><span class="${httpCls}">${httpTxt}</span></td>
+      <td class="col-err">${escHtml(r.errMsg||'')}</td>
+    </tr>`;
+  }).join('');
+}
 
 function clearLog() {
-  callLog.length = 0;
-  nextLogId = 0;
-  renderLog();
-  updateLogStats();
+  callLog=[];
+  logStats={total:0,sql:0,anylog:0,rows:0,errors:0,totalMs:0};
+  document.getElementById('log-body').innerHTML='';
+  document.getElementById('log-empty').style.display='block';
+  refreshLogStats();
 }
-
-function logCall({ kind, cmd, table, rowCnt, ms, status, error }) {
-  const rec = {
-    id: nextLogId++,
-    ts: new Date(),
-    kind: kind || 'other',
-    cmd: cmd || '',
-    table: table || '',
-    rowCnt: Number.isFinite(rowCnt) ? rowCnt : 0,
-    ms: Number.isFinite(ms) ? ms : 0,
-    status: status || 0,
-    error: error ? String(error?.message || error) : ''
-  };
-  callLog.unshift(rec);
-  if (callLog.length > 500) callLog.pop();
-
-  // Fast path: prepend row
-  prependLogRow(rec);
-  updateLogStats();
-}
-
-function updateLogStats() {
-  const total = callLog.length;
-  const sql   = callLog.filter(r => r.kind === 'sql').length;
-  const anylg = callLog.filter(r => r.kind === 'anylog').length;
-  const errs  = callLog.filter(r => r.error || (r.status && (r.status < 200 || r.status >= 300))).length;
-  const rows  = callLog.reduce((a,r)=>a+(r.rowCnt||0),0);
-  const avgms = total ? Math.round(callLog.reduce((a,r)=>a+(r.ms||0),0)/total) : 0;
-
-  setText2('log-total', total.toLocaleString());
-  setText2('log-sql', sql.toLocaleString());
-  setText2('log-anylog', anylg.toLocaleString());
-  setText2('log-rows', rows.toLocaleString());
-  setText2('log-errors', errs.toLocaleString());
-  setText2('log-avgms', total ? avgms.toLocaleString() : '—');
-
-  const empty = document.getElementById('log-empty');
-  if (empty) empty.style.display = total ? 'none' : 'block';
-}
-
-function renderLog() {
-  const body = document.getElementById('log-body');
-  if (!body) return;
-
-  // base set (newest-first)
-  let view = callLog.slice(0, 500);
-
-  const isErr = (r) =>
-    !!(r && ((r.error && String(r.error).length > 0) ||
-      (typeof r.status === 'number' && (r.status < 200 || r.status >= 300))));
-
-  // Apply filter (matches actual callLog record shape)
-  const fm = (typeof logFilterMode === 'string') ? logFilterMode : 'all';
-  if (fm === 'errors') {
-    view = view.filter(isErr);
-  } else if (fm === 'sql') {
-    view = view.filter(r => r && r.kind === 'sql');
-  } else if (fm === 'api') {
-    // "API Calls" = SQL + AnyLog (i.e., calls to the proxy)
-    view = view.filter(r => r && (r.kind === 'sql' || r.kind === 'anylog'));
-  }
-  // Apply sort (stable relative to newest-first order)
-  const mode = (typeof logSortMode === 'string') ? logSortMode : 'newest';
-  const pri = (r) => {
-    if (mode === 'errors') return isErr(r) ? 0 : 1;
-    if (mode === 'anylog') return (r && r.kind === 'anylog') ? 0 : 1;
-    if (mode === 'sql') return (r && r.kind === 'sql') ? 0 : 1;
-    return 0;
-  };
-
-  if (mode !== 'newest') {
-    view = view
-      .map((r, i) => ({ r, i }))
-      .sort((a, b) => {
-        const pa = pri(a.r), pb = pri(b.r);
-        if (pa !== pb) return pa - pb;
-        return a.i - b.i; // preserve newest-first within same priority
-      })
-      .map(x => x.r);
-  }
-
-  // Render using the same row builder as the fast path, so filters don't change layout
-  body.innerHTML = '';
-  for (const r of view) body.appendChild(buildLogTr(r));
-
-  // Empty state + stats
-  const empty = document.getElementById('log-empty');
-  if (empty) empty.style.display = callLog.length ? 'none' : 'block';
-  if (typeof updateLogStats === 'function') updateLogStats();
-}
-
-function prependLogRow(rec) {
-  const body = document.getElementById('log-body');
-  if (!body) return;
-  // remove placeholder rows quickly if any
-  if (body.children.length === 1 && body.firstElementChild?.dataset?.placeholder === '1') {
-    body.innerHTML = '';
-  }
-  body.prepend(buildLogTr(rec));
-  while (body.children.length > 200) body.removeChild(body.lastChild);
-}
-
-function buildLogTr(r) {
-  const tr = document.createElement('tr');
-
-  const t = r.ts;
-  const ts = t.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  const http = r.status ? String(r.status) : (r.error ? 'ERR' : '—');
-  const errTxt = r.error ? r.error : '—';
-
-  tr.innerHTML = `
-    <td style="font-family:monospace;font-size:11px;">${escHtml(ts)}</td>
-    <td><span class="pill ${r.kind==='sql'?'pill-blue':r.kind==='anylog'?'pill-green':'pill-gray'}">${escHtml(r.kind.toUpperCase())}</span></td>
-    <td style="font-family:monospace;font-size:11px;" title="${escHtml(r.cmd)}">${escHtml(r.cmd.length>160 ? r.cmd.slice(0,160)+'…' : r.cmd)}</td>
-    <td style="font-family:monospace;font-size:11px;">${escHtml(r.table||'—')}</td>
-    <td style="text-align:right;font-family:monospace;">${(r.rowCnt||0).toLocaleString()}</td>
-    <td style="text-align:right;font-family:monospace;">${Math.round(r.ms||0).toLocaleString()}</td>
-    <td style="text-align:center;font-family:monospace;" class="${r.error ? 'cell-err' : ''}">${escHtml(http)}</td>
-    <td style="font-family:monospace;font-size:11px;color:var(--err);">${escHtml(errTxt)}</td>
-  `;
-  return tr;
-}
-
-// Helper to set text safely
-function setText2(id, val) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = val;
-}
-
-// ── HTTP wrappers (so logging is consistent with Enterprise dashboard) ──
-function base() { return cfg().base(); }
-
-function rows(data){
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.data)) return data.data;
-  if (Array.isArray(data?.rows)) return data.rows;
-  if (data?.result) return Array.isArray(data.result) ? data.result : [data.result];
-  return [];
-}
-
-function extractTableFromSQL(sql='') {
-  const s = sql.toLowerCase();
-  const m = s.match(/from\s+([a-z0-9_\.]+)/i);
-  return m ? m[1] : '';
-}
-
-function buildAnyLogCmd(path, body) {
-  if (path.includes('/api/query')) return body?.sql || '';
-  if (path.includes('/api/command')) return body?.command || '';
-  return '';
-}
-
-async function POST(path, body) {
-  const t0 = performance.now();
-  let status = 0, data = null, err = null;
-  try {
-    const r = await fetch(base()+path, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(body),
-      signal: (()=>{const c=new AbortController(); setTimeout(()=>c.abort(),20000); return c.signal;})()
-    });
-    status = r.status;
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    data = await r.json();
-    return data;
-  } catch(e) {
-    err = e; throw e;
-  } finally {
-    const dur = performance.now() - t0;
-    const rowCnt = data ? rows(data).length : 0;
-    const sql = body?.sql || '';
-    const tbl = body?.table || extractTableFromSQL(sql) || body?.dbms || '';
-    const type = path.includes('/api/query') ? 'latest' : 'other';
-    const detail = buildAnyLogCmd(path, body) || sql || path;
-    logCall({ kind: path.includes('/api/query') ? 'sql' : path.includes('/api/command') ? 'anylog' : 'other', cmd: detail, table: tbl, rowCnt, ms: dur, status: err ? (status||0) : status, error: err });
-  }
-}
-
 
 function escHtml(s){ return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
@@ -1166,12 +1021,9 @@ function calcOEE(proc, data) {
 }
 
 function oeeColor(v) {
-  // Effectiveness tiers (common OEE interpretation)
-  // ≥85% = excellent (world class), 75–84.9 = good, 60–74.9 = fair, <60 = poor
-  if (v === null || v === undefined || isNaN(v)) return 'idle';
-  if (v >= 85) return 'excellent';
-  if (v >= 75) return 'good';
-  if (v >= 60) return 'warn';
+  if(v === null || v === undefined || isNaN(v)) return 'idle';
+  if(v >= 85) return 'good';
+  if(v >= 65) return 'warn';
   return 'bad';
 }
 
@@ -1870,37 +1722,21 @@ async function runScan() {
 
 function toggleMonitor() {
   const btn = document.getElementById('btnStart');
-  try {
-    // visible feedback immediately
-    document.getElementById('lastUpdate').textContent = running ? 'stopping…' : 'starting…';
-
-    if (!running) {
-      // ensure no orphan timer
-      if (monitorTimer) { clearInterval(monitorTimer); monitorTimer = null; }
-
-      running = true;
-      btn.textContent = 'Stop';
-      btn.classList.add('running');
-
-      // first scan immediately
-      runScan();
-
-      const iv = Math.max(5, cfg().interval) * 1000;
-      monitorTimer = setInterval(runScan, iv);
-    } else {
-      running = false;
-      btn.innerHTML = '▶ Start';
-      btn.classList.remove('running');
-      if (monitorTimer) clearInterval(monitorTimer);
-      monitorTimer = null;
-      document.getElementById('statusDot').className = 'status-dot';
-      document.getElementById('lastUpdate').textContent = 'stopped';
-    }
-  } catch (e) {
-    // make failures obvious
-    document.getElementById('statusDot').className = 'status-dot error';
-    document.getElementById('lastUpdate').textContent = 'Start failed: ' + (e && e.message ? e.message : e);
-    console.error(e);
+  if(!running) {
+    running = true;
+    btn.textContent = 'Stop';
+    btn.classList.add('running');
+    runScan();
+    const iv = cfg().interval * 1000;
+    monitorTimer = setInterval(runScan, iv);
+  } else {
+    running = false;
+    btn.innerHTML = '▶ Start';
+    btn.classList.remove('running');
+    clearInterval(monitorTimer);
+    monitorTimer = null;
+    document.getElementById('statusDot').className = 'status-dot';
+    document.getElementById('lastUpdate').textContent = 'stopped';
   }
 }
 
@@ -1911,110 +1747,6 @@ window.addEventListener('resize', ()=>{
   drawSpark('spark-chrom', sparkData.chrom, '#c060ff');
   drawSpark('spark-sum',   sparkData.sum,   '#f0c040');
 });
-
-
-// log sort selector
-(function(){
-  const sel = document.getElementById('log-sort');
-  if (sel) {
-    sel.value = logSortMode;
-    sel.addEventListener('change', () => {
-      logSortMode = sel.value || 'newest';
-      renderLog();
-    });
-  }
-})();
-(() => {
-  const b = document.getElementById('log-close-btn');
-  if (!b) return;
-  b.onclick = () => {
-    const panel = document.getElementById('log-panel') || document.querySelector('.log-panel') || document.querySelector('.log-section');
-    if (panel) panel.style.display = 'none';
-  };
-})();
-
-/* Hard bind Start button + expose functions globally (avoids scope issues) */
-window.toggleMonitor = toggleMonitor;
-window.runScan = runScan;
-window.addEventListener('DOMContentLoaded', () => {
-  const b = document.getElementById('btnStart');
-  if (b) b.addEventListener('click', (ev) => { ev.preventDefault(); toggleMonitor(); });
-});
-/* Init log toggle + filter buttons */
-(function(){
-  const getLogPanel = () =>
-    document.getElementById('log-panel') ||
-    document.querySelector('.log-panel') ||
-    document.querySelector('.log-section');
-
-  const syncLogToggleLabel = () => {
-    const btn = document.getElementById('log-toggle-btn');
-    const panel = getLogPanel();
-    if (!btn || !panel) return;
-    const hidden = (panel.style.display === 'none');
-    btn.textContent = hidden ? 'Show Logs' : 'Hide Logs';
-  };
-
-  const wireLogToggle = () => {
-    const btn = document.getElementById('log-toggle-btn');
-    const panel = getLogPanel();
-    if (!btn || !panel) return;
-    // show by default
-    if (panel.style.display === 'none') panel.style.display = '';
-    btn.addEventListener('click', () => {
-      panel.style.display = (panel.style.display === 'none') ? '' : 'none';
-      syncLogToggleLabel();
-    });
-    const closeBtn = document.getElementById('log-close-btn');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        panel.style.display = 'none';
-        syncLogToggleLabel();
-      });
-    }
-    syncLogToggleLabel();
-  };
-
-  const wireLogFilters = () => {
-    const btns = Array.from(document.querySelectorAll('.log-filter-btn'));
-    if (!btns.length) return;
-    const setActive = () => btns.forEach(b => b.classList.toggle('active', (b.dataset.filter||'all') === (logFilterMode||'all')));
-    btns.forEach(b => b.addEventListener('click', () => {
-      logFilterMode = b.dataset.filter || 'all';
-      setActive();
-      if (typeof renderLog === 'function') renderLog();
-    }));
-    setActive();
-  };
-
-  window.addEventListener('DOMContentLoaded', () => {
-    wireLogToggle();
-  });
-})();
-/* Robust log filter wiring (overrides earlier handlers) */
-function applyLogFilter(mode) {
-  logFilterMode = mode || 'all';
-  const btns = Array.from(document.querySelectorAll('.log-filter-btn'));
-  btns.forEach(b => b.classList.toggle('active', (b.dataset.filter||'all') === logFilterMode));
-  if (typeof renderLog === 'function') renderLog();
-}
-
-function wireLogFilterButtons() {
-  const btns = Array.from(document.querySelectorAll('.log-filter-btn'));
-  if (!btns.length) return;
-  btns.forEach(b => {
-    b.onclick = (ev) => {
-      ev.preventDefault();
-      applyLogFilter(b.dataset.filter || 'all');
-      return false;
-    };
-  });
-  // default state
-  if (typeof logFilterMode !== 'string') logFilterMode = 'all';
-  applyLogFilter(logFilterMode);
-}
-
 </script>
-<script>window.addEventListener('DOMContentLoaded', wireLogFilterButtons);</script>
 </body>
 </html>

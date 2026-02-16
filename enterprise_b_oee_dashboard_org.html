@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enterprise B — OEE Live Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #080b10;
+    --panel:   #0d1220;
+    --border:  #172030;
+    --border2: #1e2e48;
+    --accent:  #00d4ff;
+    --accent2: #0090b8;
+    --green:   #00e676;
+    --amber:   #ffab00;
+    --red:     #ff4040;
+    --muted:   #2a3850;
+    --text:    #c0d4f0;
+    --dim:     #4a6080;
+    --mono:    'Share Tech Mono', monospace;
+    --cond:    'Barlow Condensed', sans-serif;
+    --body:    'Barlow', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+  body { background: var(--bg); color: var(--text); font-family: var(--body); font-size: 13px; min-height: 100vh; }
+
+  /* scanlines */
+  body::after {
+    content: '';
+    position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+    background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px);
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: linear-gradient(135deg, #060911 0%, #0c1525 100%);
+    border-bottom: 2px solid var(--accent2);
+    padding: 0 20px;
+    height: 54px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 200;
+    box-shadow: 0 2px 24px rgba(0,212,255,0.12);
+  }
+  .hdr-left { display: flex; align-items: center; gap: 12px; }
+  .diamond {
+    width: 30px; height: 30px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    clip-path: polygon(50% 0%,100% 50%,50% 100%,0% 50%);
+    animation: glow 3s ease-in-out infinite;
+  }
+  @keyframes glow { 0%,100% { filter: drop-shadow(0 0 4px var(--accent)); } 50% { filter: drop-shadow(0 0 14px var(--accent)); } }
+  .hdr-title { font-family: var(--cond); font-weight: 900; font-size: 21px; letter-spacing: .08em; text-transform: uppercase; color: #fff; }
+  .hdr-title span { color: var(--accent); }
+  .hdr-sub { font-family: var(--mono); font-size: 9px; color: var(--dim); letter-spacing: .12em; margin-top: 2px; }
+  .hdr-right { display: flex; align-items: center; gap: 14px; }
+  .status-chip { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--dim); background: rgba(255,255,255,.04); border: 1px solid var(--border2); border-radius: 4px; padding: 4px 10px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); animation: blink 2s step-end infinite; }
+  .dot.err  { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+  #ts { font-family: var(--mono); font-size: 10px; color: var(--dim); }
+
+  /* ── CONTROL BAR ── */
+  .ctrl-bar {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 8px 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .cg { display: flex; align-items: center; gap: 6px; }
+  .cl { font-family: var(--mono); font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: .1em; white-space: nowrap; }
+  .ci {
+    background: var(--bg); border: 1px solid var(--border2); color: var(--text);
+    font-family: var(--mono); font-size: 11px; padding: 4px 8px; border-radius: 4px; outline: none;
+    transition: border-color .2s;
+  }
+  .ci:focus { border-color: var(--accent); }
+  .ci-url   { width: 220px; }
+  .ci-num   { width: 68px; }
+  .ci-sel   { width: 110px; }
+  .btn { font-family: var(--cond); font-weight: 700; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; padding: 5px 16px; border-radius: 4px; border: 1px solid; cursor: pointer; transition: all .15s; line-height: 1; }
+  .btn-apply { background: linear-gradient(135deg,var(--accent),var(--accent2)); border-color: var(--accent); color: #000; }
+  .btn-apply:hover { filter: brightness(1.2); box-shadow: 0 0 12px rgba(0,212,255,.4); }
+  .btn-pause { background: transparent; border-color: var(--amber); color: var(--amber); }
+  .btn-pause:hover, .btn-pause.paused { background: rgba(255,171,0,.1); }
+  .btn-pause.paused { color: #fff; border-color: #ccc; }
+  .countdown { font-family: var(--mono); font-size: 11px; color: var(--accent); background: rgba(0,212,255,.07); border: 1px solid rgba(0,212,255,.18); border-radius: 4px; padding: 4px 10px; min-width: 80px; text-align: center; }
+
+  /* ── STAT STRIP ── */
+  .stat-strip { display: flex; gap: 10px; flex-wrap: wrap; padding: 8px 20px; max-width: 1800px; margin: 0 auto; }
+  .stat-chip { font-family: var(--mono); font-size: 10px; color: var(--dim); background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; display: flex; gap: 8px; align-items: center; }
+  .stat-chip strong { color: var(--accent); font-size: 12px; }
+  .stat-chip.err strong { color: var(--red); }
+
+  /* ── MAIN ── */
+  main { padding: 14px 20px; display: flex; flex-direction: column; gap: 14px; max-width: 1800px; margin: 0 auto; }
+
+  /* section headers */
+  .sh { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .sh-title { font-family: var(--cond); font-weight: 700; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: #fff; white-space: nowrap; }
+  .sh-line { flex: 1; height: 1px; background: linear-gradient(90deg,var(--border2),transparent); }
+  .sh-tag { font-family: var(--mono); font-size: 9px; color: var(--dim); background: var(--border); border: 1px solid var(--border2); border-radius: 3px; padding: 2px 7px; letter-spacing: .1em; text-transform: uppercase; }
+
+  /* ── ENTERPRISE ROW ── */
+  .ent-row { display: grid; grid-template-columns: 360px 1fr; gap: 14px; }
+
+  /* big hero gauge */
+  .hero {
+    background: var(--panel); border: 1px solid var(--border2); border-radius: 8px;
+    padding: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: ''; position: absolute; top: -50px; left: 50%; transform: translateX(-50%);
+    width: 300px; height: 120px; border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(0,212,255,.07), transparent 70%);
+    pointer-events: none;
+  }
+  .hero-lbl { font-family: var(--mono); font-size: 10px; color: var(--dim); letter-spacing: .15em; text-transform: uppercase; }
+  .hero-val { font-family: var(--cond); font-weight: 900; font-size: 72px; line-height: 1; letter-spacing: -.02em; transition: color .5s; }
+  .hero-sub { display: flex; gap: 22px; margin-top: 8px; }
+  .hm { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .hm-val { font-family: var(--cond); font-weight: 700; font-size: 22px; }
+  .hm-lbl { font-family: var(--mono); font-size: 9px; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; }
+
+  /* site cards */
+  .site-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+  .site-card { background: var(--panel); border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; }
+  .sc-head { background: linear-gradient(135deg,rgba(0,144,184,.18),rgba(0,144,184,.04)); border-bottom: 1px solid var(--border2); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; }
+  .sc-name { font-family: var(--cond); font-weight: 700; font-size: 16px; letter-spacing: .06em; text-transform: uppercase; color: #fff; }
+  .sc-oee  { font-family: var(--cond); font-weight: 900; font-size: 32px; line-height: 1; transition: color .4s; }
+  .sc-body { padding: 10px 14px; }
+  .ape-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
+  .ape-cell { display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,.025); border: 1px solid var(--border); border-radius: 4px; padding: 6px 4px; gap: 2px; }
+  .ape-v { font-family: var(--mono); font-size: 14px; }
+  .ape-l { font-family: var(--mono); font-size: 8px; color: var(--dim); text-transform: uppercase; letter-spacing: .1em; }
+
+  /* ── PROCESS GRIDS ── */
+  .proc-wrap { background: var(--panel); border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; margin-bottom: 0; }
+  .proc-site-hdr { background: rgba(255,255,255,.025); border-bottom: 1px solid var(--border); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; }
+  .psh-name { font-family: var(--cond); font-weight: 700; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent2); }
+  .proc-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: var(--border); }
+  .pc { background: var(--panel); padding: 12px; transition: background .2s; }
+  .pc:hover { background: rgba(0,212,255,.035); }
+  .pc-name { font-family: var(--mono); font-size: 9px; color: var(--dim); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+  .pc-name::before { content:''; width:4px; height:4px; border-radius:50%; background: var(--accent2); display:inline-block; flex-shrink:0; }
+  .pc-oee { font-family: var(--cond); font-weight: 900; font-size: 28px; line-height: 1; margin-bottom: 6px; transition: color .4s; }
+  .pc-bar-wrap { height: 3px; background: var(--bg); border-radius: 2px; overflow: hidden; margin-bottom: 8px; }
+  .pc-bar { height: 100%; border-radius: 2px; transition: width .8s ease, background .4s; }
+  .pc-ape { display: flex; gap: 6px; }
+  .pcm { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+  .pcm-v { font-family: var(--mono); font-size: 10px; }
+  .pcm-l { font-family: var(--mono); font-size: 8px; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
+
+  /* ── OEE color classes ── */
+  .c-ex { color: var(--green); }
+  .c-gd { color: #69e080; }
+  .c-ok { color: var(--amber); }
+  .c-po { color: var(--red); }
+  .c-na { color: var(--muted); }
+
+  /* ── skeleton ── */
+  .sk {
+    background: linear-gradient(90deg, var(--border) 25%, var(--border2) 50%, var(--border) 75%);
+    background-size: 200% 100%;
+    animation: shim 1.5s infinite;
+    border-radius: 3px; color: transparent !important;
+  }
+  @keyframes shim { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  /* ── LOG ── */
+  .log-wrap { background: var(--panel); border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; }
+  .log-hdr { background: rgba(255,255,255,.02); border-bottom: 1px solid var(--border); padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; }
+  .log-title { font-family: var(--cond); font-weight: 700; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+  .log-meta { display: flex; gap: 14px; align-items: center; }
+  .log-stat { font-family: var(--mono); font-size: 10px; color: var(--dim); }
+  .log-stat span { color: var(--accent); }
+  .log-body { height: 220px; overflow-y: auto; font-family: var(--mono); font-size: 11px; }
+  .log-body::-webkit-scrollbar { width: 4px; }
+  .log-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .le { display: grid; grid-template-columns: 90px 80px 1fr; gap: 8px; padding: 3px 14px; border-bottom: 1px solid rgba(255,255,255,.025); animation: fadein .25s ease; }
+  @keyframes fadein { from{opacity:0;transform:translateY(-3px)} to{opacity:1} }
+  .le:hover { background: rgba(255,255,255,.025); }
+  .le-ts  { color: var(--dim); }
+  .le-tag { font-size: 9px; letter-spacing: .07em; text-transform: uppercase; padding: 1px 5px; border-radius: 2px; align-self: center; white-space: nowrap; text-align: center; }
+  .t-proxy  { color: var(--accent);  background: rgba(0,212,255,.1);   border: 1px solid rgba(0,212,255,.25); }
+  .t-anylog { color: #b06eff;         background: rgba(176,110,255,.1); border: 1px solid rgba(176,110,255,.25); }
+  .t-ok     { color: var(--green);   background: rgba(0,230,118,.08);   border: 1px solid rgba(0,230,118,.2); }
+  .t-err    { color: var(--red);     background: rgba(255,64,64,.1);    border: 1px solid rgba(255,64,64,.25); }
+  .t-warn   { color: var(--amber);   background: rgba(255,171,0,.1);    border: 1px solid rgba(255,171,0,.25); }
+  .t-info   { color: var(--dim);     background: rgba(255,255,255,.04); border: 1px solid var(--border); }
+  .le-msg { color: var(--text); word-break: break-all; }
+
+  /* ── Issues Panel ───────────────────────────────────────────────────── */
+  .issues-panel { background: var(--panel); border: 1px solid var(--border2); border-radius: 8px; overflow: hidden; margin-bottom: 0; }
+  .issues-hdr { display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background: rgba(255,255,255,0.03); border-bottom:1px solid var(--border2); }
+  .issues-title { font-size:13px; font-weight:600; color:var(--fg); letter-spacing:.03em; }
+  .issues-body { padding: 12px 16px; display:flex; flex-direction:column; gap:8px; }
+  .issue-row { display:flex; gap:10px; align-items:flex-start; font-size:12px; padding: 8px 12px; border-radius:6px; }
+  .issue-row.issue-err  { background: rgba(239,68,68,0.08);  border-left: 3px solid #ef4444; }
+  .issue-row.issue-warn { background: rgba(245,158,11,0.08); border-left: 3px solid #f59e0b; }
+  .issue-row.issue-info { background: rgba(99,102,241,0.08); border-left: 3px solid #6366f1; }
+  .issue-row.issue-ok   { background: rgba(34,197,94,0.08);  border-left: 3px solid #22c55e; }
+  .issue-icon { font-size:15px; flex-shrink:0; margin-top:1px; }
+  .issue-content { display:flex; flex-direction:column; gap:2px; }
+  .issue-heading { font-weight:600; color:var(--fg); }
+  .issue-detail  { color:var(--dim); line-height:1.5; }
+  .issue-badge { display:inline-block; font-size:10px; font-weight:700; padding:1px 6px; border-radius:3px; font-family:var(--mono); }
+  .issue-badge.badge-err  { background:rgba(239,68,68,0.2);  color:#ef4444; }
+  .issue-badge.badge-warn { background:rgba(245,158,11,0.2); color:#f59e0b; }
+  .issue-badge.badge-fix  { background:rgba(34,197,94,0.2);  color:#22c55e; }
+  .issues-legend { display:flex; gap:14px; font-size:11px; color:var(--dim); }
+  .issues-legend span { display:flex; align-items:center; gap:4px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ HEADER ═══════════ -->
+<header>
+  <div class="hdr-left">
+    <div class="diamond"></div>
+    <div>
+      <div class="hdr-title"><span>Enterprise B</span> — OEE Live</div>
+      <div class="hdr-sub">BOTTLE FACTORY · ANYLOG DISTRIBUTED HISTORIAN · UNS-AWARE</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="status-chip"><div class="dot" id="dot"></div><span id="conn-lbl">CONNECTING</span></div>
+    <span id="ts">—</span>
+  </div>
+</header>
+
+<!-- ═══════════ CONTROL BAR ═══════════ -->
+<div class="ctrl-bar">
+  <div class="cg">
+    <span class="cl">Proxy URL</span>
+    <input id="proxy-url" class="ci ci-url" type="text" value="http://localhost:8080"
+           placeholder="http://host:port">
+    <button class="btn btn-apply" onclick="applyConfig()">Apply</button>
+  </div>
+  <div class="cg">
+    <span class="cl">Interval (s)</span>
+    <input id="interval" class="ci ci-num" type="number" value="30" min="5" max="600">
+  </div>
+  <div class="cg">
+    <span class="cl">Lookback</span>
+    <select id="lookback" class="ci ci-sel">
+      <option value="1 hour">1 Hour</option>
+      <option value="4 hours" selected>4 Hours</option>
+      <option value="8 hours">8 Hours</option>
+      <option value="1 day">1 Day</option>
+    </select>
+  </div>
+  <button class="btn btn-pause" id="pause-btn" onclick="togglePause()">⏸ Pause</button>
+  <div class="countdown" id="cd">—</div>
+</div>
+
+<!-- ═══════════ STAT STRIP ═══════════ -->
+<div class="stat-strip">
+  <div class="stat-chip">Proxy calls <strong id="s-proxy">0</strong></div>
+  <div class="stat-chip">AnyLog SQL calls <strong id="s-anylog">0</strong></div>
+  <div class="stat-chip">Rows fetched <strong id="s-rows">0</strong></div>
+  <div class="stat-chip err">Errors <strong id="s-err">0</strong></div>
+  <div class="stat-chip">Avg latency <strong id="s-lat">—</strong></div>
+</div>
+
+<!-- ═══════════ MAIN ═══════════ -->
+<main>
+
+  <!-- Enterprise overview -->
+  <section>
+    <div class="sh">
+      <span class="sh-title">Enterprise Overall OEE</span>
+      <div class="sh-line"></div>
+      <span class="sh-tag">Enterprise_B · bottle_factory</span>
+    </div>
+    <div class="ent-row">
+      <div class="hero">
+        <div class="hero-lbl">Enterprise OEE</div>
+        <div class="hero-val sk c-na" id="e-oee">— —</div>
+        <div class="hero-sub">
+          <div class="hm"><div class="hm-val sk" id="e-avail">—</div><div class="hm-lbl">Availability</div></div>
+          <div class="hm"><div class="hm-val sk" id="e-perf">—</div><div class="hm-lbl">Performance</div></div>
+          <div class="hm"><div class="hm-val sk" id="e-qual">—</div><div class="hm-lbl">Quality</div></div>
+        </div>
+      </div>
+      <div class="site-grid" id="site-grid"></div>
+    </div>
+  </section>
+
+  <!-- Process OEE per site -->
+  <section>
+    <div class="sh">
+      <span class="sh-title">Process OEE by Site</span>
+      <div class="sh-line"></div>
+      <span class="sh-tag">UNS-derived · 4 processes × 3 sites</span>
+    </div>
+    <div id="proc-container" style="display:flex;flex-direction:column;gap:12px;"></div>
+  </section>
+
+  <!-- Issues & Data Status Panel -->
+  <section>
+    <div class="issues-panel">
+      <div class="issues-hdr">
+        <span class="issues-title">⚠ Known Issues &amp; Data Status</span>
+        <div class="issues-legend">
+          <span><span class="issue-badge badge-err">ERROR</span> Data absent</span>
+          <span><span class="issue-badge badge-warn">STALE</span> Feed stopped</span>
+          <span><span class="issue-badge badge-fix">FIXED</span> Table remapped</span>
+        </div>
+      </div>
+      <div class="issues-body">
+
+        <div class="issue-row issue-warn">
+          <span class="issue-icon">⏱</span>
+          <div class="issue-content">
+            <span class="issue-heading">Site1 — All 4 processes: stale data feed &nbsp;<span class="issue-badge badge-warn">STALE</span></span>
+            <span class="issue-detail">
+              <b>Affected:</b> Filler Production, Liquid Processing, Packaging, Palletizing<br>
+              <b>Tables:</b> metric_52, metric_9, metric_27, metric_20<br>
+              <b>Last data:</b> metric_9 &amp; metric_20 stopped ~06:35 UTC · metric_52 &amp; metric_27 stopped ~09:28 UTC (6–9 hrs ago)<br>
+              <b>OEE impact:</b> All Site1 process cards show blank — 4-hour lookback window finds no rows<br>
+              <b>Action:</b> Investigate Site1 data publisher / sensor feed at <code>50.116.13.109:32148</code>
+            </span>
+          </div>
+        </div>
+
+        <div class="issue-row issue-err">
+          <span class="issue-icon">✗</span>
+          <div class="issue-content">
+            <span class="issue-heading">Site2 — Filler Production: wrong table mapping &nbsp;<span class="issue-badge badge-fix">FIXED</span></span>
+            <span class="issue-detail">
+              <b>Was:</b> <code>metric_76</code> (0 rows — table registered but never populated)<br>
+              <b>Now:</b> <code>metric_70</code> (live, ~3,200 rows, latest 19:21 UTC)<br>
+              <b>OEE impact:</b> Site2 Filler Production card was always blank; now showing live data
+            </span>
+          </div>
+        </div>
+
+        <div class="issue-row issue-err">
+          <span class="issue-icon">✗</span>
+          <div class="issue-content">
+            <span class="issue-heading">Site2 — Site-level metric: wrong table mapping &nbsp;<span class="issue-badge badge-fix">FIXED</span></span>
+            <span class="issue-detail">
+              <b>Was:</b> <code>metric_77</code> (0 rows — empty table)<br>
+              <b>Now:</b> <code>metric_69</code> (live, ~45,000 rows, latest 19:16 UTC)<br>
+              <b>OEE impact:</b> Site2 site-summary card OEE was blank; now populated
+            </span>
+          </div>
+        </div>
+
+        <div class="issue-row issue-err">
+          <span class="issue-icon">✗</span>
+          <div class="issue-content">
+            <span class="issue-heading">Site3 — Filler Production: wrong table mapping &nbsp;<span class="issue-badge badge-fix">FIXED</span></span>
+            <span class="issue-detail">
+              <b>Was:</b> <code>metric_115</code> (0 rows — empty table)<br>
+              <b>Now:</b> <code>metric_107</code> (live, ~4,966 rows, latest 19:22 UTC)<br>
+              <b>OEE impact:</b> Site3 Filler Production card was always blank; now showing live data
+            </span>
+          </div>
+        </div>
+
+        <div class="issue-row issue-err">
+          <span class="issue-icon">✗</span>
+          <div class="issue-content">
+            <span class="issue-heading">Site3 — Packaging: wrong table mapping &nbsp;<span class="issue-badge badge-fix">FIXED</span></span>
+            <span class="issue-detail">
+              <b>Was:</b> <code>metric_106</code> (0 rows — empty table)<br>
+              <b>Now:</b> <code>metric_109</code> (live, ~4,754 rows, latest 19:22 UTC)<br>
+              <b>OEE impact:</b> Site3 Packaging card was always blank; now showing live data
+            </span>
+          </div>
+        </div>
+
+        <div class="issue-row issue-err">
+          <span class="issue-icon">✗</span>
+          <div class="issue-content">
+            <span class="issue-heading">Site3 — Site-level metric: wrong table mapping &nbsp;<span class="issue-badge badge-fix">FIXED</span></span>
+            <span class="issue-detail">
+              <b>Was:</b> <code>metric_104</code> (0 rows — empty table)<br>
+              <b>Now:</b> <code>metric_116</code> (live, ~4,979 rows, latest 19:23 UTC)<br>
+              <b>OEE impact:</b> Site3 site-summary card OEE was blank; now populated
+            </span>
+          </div>
+        </div>
+
+        <div class="issue-row issue-info">
+          <span class="issue-icon">ℹ</span>
+          <div class="issue-content">
+            <span class="issue-heading">Root cause: empty metric tables vs. live data tables</span>
+            <span class="issue-detail">
+              The UNS blockchain policies registered several <code>metric_N</code> tables (76, 77, 104, 106, 115) that were created
+              but never populated by a data publisher. Live OEE data for those processes flows into adjacent table numbers
+              (70, 69, 116, 109, 107). The dashboard table map has been corrected to point to the live tables.
+              Site1 tables (9, 20, 27, 52) are correct but their data feed has stalled and needs investigation at the publisher level.
+            </span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Log -->
+  <section>
+    <div class="log-wrap">
+      <div class="log-hdr">
+        <span class="log-title">API Activity Log</span>
+        <div class="log-meta">
+          <span class="log-stat">Entries: <span id="log-cnt">0</span></span>
+          <button class="btn btn-pause" style="padding:2px 10px;font-size:11px;" onclick="clearLog()">Clear</button>
+        </div>
+      </div>
+      <div class="log-body" id="log-body"></div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+"use strict";
+
+// ═══════════════════════════════════════════════════════════
+// UNS MAP  — sourced from dynics-proveit MCP blockchain query
+// Namespace → bottle_factory table mapping
+// ═══════════════════════════════════════════════════════════
+const UNS = {
+  // Enterprise_B/Metric
+  enterprise: { dbms: 'bottle_factory', table: 'metric_64' },
+
+  sites: {
+    Site1: {
+      // Enterprise_B/Site1/metric
+      metric: { dbms: 'bottle_factory', table: 'metric_11' },
+      processes: {
+        fillerproduction: { dbms: 'bottle_factory', table: 'metric_52' },  // Enterprise_B/Site1/fillerproduction/metric
+        liquidprocessing: { dbms: 'bottle_factory', table: 'metric_9'  },  // Enterprise_B/Site1/liquidprocessing/metric
+        packaging:        { dbms: 'bottle_factory', table: 'metric_27' },  // Enterprise_B/Site1/packaging/metric
+        palletizing:      { dbms: 'bottle_factory', table: 'metric_20' },  // Enterprise_B/Site1/palletizing/metric
+      }
+    },
+    Site2: {
+      // Enterprise_B/Site2/metric
+      metric: { dbms: 'bottle_factory', table: 'metric_69' },
+      processes: {
+        fillerproduction: { dbms: 'bottle_factory', table: 'metric_70' },  // was metric_76 (empty)
+        liquidprocessing: { dbms: 'bottle_factory', table: 'metric_82' },
+        packaging:        { dbms: 'bottle_factory', table: 'metric_80' },
+        palletizing:      { dbms: 'bottle_factory', table: 'metric_83' },
+      }
+    },
+    Site3: {
+      // Enterprise_B/Site3/metric
+      metric: { dbms: 'bottle_factory', table: 'metric_116' },
+      processes: {
+        fillerproduction: { dbms: 'bottle_factory', table: 'metric_107' },  // was metric_115 (empty)
+        liquidprocessing: { dbms: 'bottle_factory', table: 'metric_121' },
+        packaging:        { dbms: 'bottle_factory', table: 'metric_109' },  // was metric_106 (empty)
+        palletizing:      { dbms: 'bottle_factory', table: 'metric_102' },
+      }
+    }
+  }
+};
+
+const PROC_LABEL = {
+  fillerproduction: 'Filler Production',
+  liquidprocessing: 'Liquid Processing',
+  packaging:        'Packaging',
+  palletizing:      'Palletizing',
+};
+
+const SITES = ['Site1', 'Site2', 'Site3'];
+
+// ═══════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════
+let proxyBase  = 'http://localhost:8080';
+let refreshSec = 30;
+let paused     = false;
+let timerR     = null;   // refresh setInterval
+let timerC     = null;   // countdown setInterval
+let cdVal      = 0;
+
+const ST = { proxy: 0, anylog: 0, rows: 0, errors: 0, lats: [] };
+let logLines = [];
+
+// ═══════════════════════════════════════════════════════════
+// Formatting helpers
+// ═══════════════════════════════════════════════════════════
+const pct  = v => (v == null || isNaN(+v)) ? '—' : (+v * 100).toFixed(1) + '%';
+const pctS = v => (v == null || isNaN(+v)) ? '—%': (+v * 100).toFixed(1) + '%';
+
+function oeeClass(v) {
+  if (v == null || isNaN(+v)) return 'c-na';
+  const p = +v * 100;
+  if (p >= 85) return 'c-ex';
+  if (p >= 70) return 'c-gd';
+  if (p >= 50) return 'c-ok';
+  return 'c-po';
+}
+
+function oeeBarCol(v) {
+  if (v == null || isNaN(+v)) return 'var(--muted)';
+  const p = +v * 100;
+  if (p >= 85) return 'var(--green)';
+  if (p >= 70) return '#69e080';
+  if (p >= 50) return 'var(--amber)';
+  return 'var(--red)';
+}
+
+const nowTs = () => new Date().toLocaleTimeString('en-US', { hour12: false });
+
+// ═══════════════════════════════════════════════════════════
+// Logging
+// ═══════════════════════════════════════════════════════════
+const TAG_CLS = { proxy: 't-proxy', anylog: 't-anylog', ok: 't-ok', err: 't-err', warn: 't-warn', info: 't-info' };
+const TAG_LBL = { proxy: 'REST PROXY', anylog: 'ANYLOG SQL', ok: 'OK', err: 'ERROR', warn: 'WARN', info: 'INFO' };
+
+function addLog(type, msg) {
+  const e = { ts: nowTs(), type, msg };
+  logLines.unshift(e);
+  if (logLines.length > 300) logLines.pop();
+  const body = document.getElementById('log-body');
+  const div  = document.createElement('div');
+  div.className = 'le';
+  div.innerHTML =
+    `<span class="le-ts">${e.ts}</span>` +
+    `<span class="le-tag ${TAG_CLS[type]||'t-info'}">${TAG_LBL[type]||type}</span>` +
+    `<span class="le-msg">${e.msg}</span>`;
+  body.prepend(div);
+  document.getElementById('log-cnt').textContent = logLines.length;
+}
+
+function clearLog() {
+  logLines = [];
+  document.getElementById('log-body').innerHTML = '';
+  document.getElementById('log-cnt').textContent = '0';
+}
+
+function updateStats() {
+  document.getElementById('s-proxy').textContent  = ST.proxy;
+  document.getElementById('s-anylog').textContent = ST.anylog;
+  document.getElementById('s-rows').textContent   = ST.rows.toLocaleString();
+  document.getElementById('s-err').textContent    = ST.errors;
+  document.getElementById('s-lat').textContent    =
+    ST.lats.length ? Math.round(ST.lats.reduce((a,b)=>a+b,0)/ST.lats.length) + 'ms' : '—';
+}
+
+// ═══════════════════════════════════════════════════════════
+// Proxy HTTP call  →  POST /api/query
+// Per README_REST.md the proxy endpoint is /api/query
+// ═══════════════════════════════════════════════════════════
+async function queryProxy(dbms, table, lookback) {
+  const sql  = `SELECT avg(oee) as oee, avg(availability) as availability, avg(performance) as performance, avg(quality) as quality FROM ${table} WHERE insert_timestamp >= NOW() - ${lookback}`;
+  const url  = `${proxyBase}/api/query`;
+  const body = { dbms, sql };
+
+  ST.proxy++;
+  ST.anylog++;
+  addLog('proxy', `POST ${url}  →  sql ${dbms} SELECT avg(oee,avail,perf,qual) FROM ${table} WHERE … ${lookback}`);
+  addLog('anylog', `command: sql ${dbms} ${sql.slice(0, 90)}…`);
+
+  const t0 = performance.now();
+  try {
+    const resp = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(20000),
+    });
+
+    const ms = Math.round(performance.now() - t0);
+    ST.lats.push(ms);
+    if (ST.lats.length > 50) ST.lats.shift();
+
+    if (!resp.ok) {
+      const txt = await resp.text();
+      ST.errors++;
+      addLog('err', `HTTP ${resp.status} from proxy for ${table} — ${txt.slice(0, 120)}`);
+      updateStats();
+      return null;
+    }
+
+    const data = await resp.json();
+    // Proxy returns rows array directly, or {error:...} on AnyLog-level errors
+    if (data && data.error) {
+      // AnyLog returned a structured error (timeout, SQL failure, etc.)
+      ST.errors++;
+      addLog('err', `${table}: ${data.error}${data.details ? ' — ' + data.details.slice(0,100) : ''}`);
+      updateStats();
+      return null;
+    }
+    const rows = Array.isArray(data) ? data : (data.rows || data.Query || []);
+    ST.rows += rows.length;
+
+    addLog('ok', `${table}: ${rows.length} row(s) | OEE=${pctS(rows[0]?.oee)} | ${ms}ms`);
+    updateStats();
+    return rows[0] || null;
+
+  } catch (err) {
+    ST.errors++;
+    addLog('err', `${table}: ${err.message}`);
+    updateStats();
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// DOM helpers
+// ═══════════════════════════════════════════════════════════
+function unsk(el) { if (el) el.classList.remove('sk'); }
+
+function setOee(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  unsk(el);
+  el.className = el.className.replace(/\bc-\w+/g, '') + ' ' + oeeClass(val);
+  el.textContent = pct(val);
+}
+
+function setTxt(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  unsk(el);
+  el.textContent = pct(val);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Static DOM build
+// ═══════════════════════════════════════════════════════════
+function buildDOM() {
+  // Site cards
+  const sg = document.getElementById('site-grid');
+  sg.innerHTML = SITES.map(s => `
+    <div class="site-card">
+      <div class="sc-head">
+        <span class="sc-name">${s}</span>
+        <span class="sc-oee sk c-na" id="s-oee-${s}">—%</span>
+      </div>
+      <div class="sc-body">
+        <div class="ape-row">
+          <div class="ape-cell"><span class="ape-v sk" id="s-a-${s}">—</span><span class="ape-l">Avail</span></div>
+          <div class="ape-cell"><span class="ape-v sk" id="s-p-${s}">—</span><span class="ape-l">Perf</span></div>
+          <div class="ape-cell"><span class="ape-v sk" id="s-q-${s}">—</span><span class="ape-l">Qual</span></div>
+        </div>
+      </div>
+    </div>`).join('');
+
+  // Process grids
+  const pc = document.getElementById('proc-container');
+  pc.innerHTML = SITES.map(s => {
+    const cells = Object.keys(UNS.sites[s].processes).map(p => {
+      const id = `${s}-${p}`;
+      return `
+        <div class="pc">
+          <div class="pc-name">${PROC_LABEL[p]}</div>
+          <div class="pc-oee sk c-na" id="po-${id}">—%</div>
+          <div class="pc-bar-wrap"><div class="pc-bar" id="pb-${id}" style="width:0;background:var(--muted)"></div></div>
+          <div class="pc-ape">
+            <div class="pcm"><span class="pcm-v sk" id="pa-${id}">—</span><span class="pcm-l">Avail</span></div>
+            <div class="pcm"><span class="pcm-v sk" id="pp-${id}">—</span><span class="pcm-l">Perf</span></div>
+            <div class="pcm"><span class="pcm-v sk" id="pq-${id}">—</span><span class="pcm-l">Qual</span></div>
+          </div>
+        </div>`;
+    }).join('');
+    return `
+      <div class="proc-wrap">
+        <div class="proc-site-hdr">
+          <span class="psh-name">${s} — Process Breakdown</span>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--dim)">${Object.keys(UNS.sites[s].processes).length} processes</span>
+        </div>
+        <div class="proc-grid">${cells}</div>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// Main fetch cycle
+// ═══════════════════════════════════════════════════════════
+async function fetchAll() {
+  const lb = document.getElementById('lookback').value;
+  addLog('info', `── Refresh START  lookback=${lb} ──`);
+
+  // 1. Enterprise level
+  let entData = await queryProxy(UNS.enterprise.dbms, UNS.enterprise.table, lb);
+
+  // 2. Sites
+  const siteResults = {};
+  for (const s of SITES) {
+    const d = await queryProxy(UNS.sites[s].metric.dbms, UNS.sites[s].metric.table, lb);
+    siteResults[s] = d;
+    if (d) {
+      setOee(`s-oee-${s}`, d.oee);
+      setTxt(`s-a-${s}`,   d.availability);
+      setTxt(`s-p-${s}`,   d.performance);
+      setTxt(`s-q-${s}`,   d.quality);
+    }
+  }
+
+  // Derive enterprise from sites if enterprise table empty
+  if (!entData) {
+    const filled = Object.values(siteResults).filter(Boolean);
+    if (filled.length) {
+      const avg = k => filled.reduce((s, d) => s + (+d[k] || 0), 0) / filled.length;
+      entData = { oee: avg('oee'), availability: avg('availability'), performance: avg('performance'), quality: avg('quality') };
+      addLog('warn', `Enterprise table empty — derived OEE from ${filled.length} sites`);
+    }
+  }
+  if (entData) {
+    setOee('e-oee',   entData.oee);
+    setTxt('e-avail', entData.availability);
+    setTxt('e-perf',  entData.performance);
+    setTxt('e-qual',  entData.quality);
+  }
+
+  // 3. Process level
+  for (const s of SITES) {
+    for (const [proc, { dbms, table }] of Object.entries(UNS.sites[s].processes)) {
+      const d  = await queryProxy(dbms, table, lb);
+      const id = `${s}-${proc}`;
+      if (d) {
+        const el = document.getElementById(`po-${id}`);
+        if (el) { unsk(el); el.className = el.className.replace(/\bc-\w+/g,'') + ' ' + oeeClass(d.oee); el.textContent = pct(d.oee); }
+        const bar = document.getElementById(`pb-${id}`);
+        if (bar) { bar.style.width = Math.min((+d.oee||0)*100,100).toFixed(1)+'%'; bar.style.background = oeeBarCol(d.oee); }
+        const fa = document.getElementById(`pa-${id}`); if(fa){unsk(fa);fa.textContent=pct(d.availability);}
+        const fp = document.getElementById(`pp-${id}`); if(fp){unsk(fp);fp.textContent=pct(d.performance);}
+        const fq = document.getElementById(`pq-${id}`); if(fq){unsk(fq);fq.textContent=pct(d.quality);}
+      }
+    }
+  }
+
+  // Connection indicator
+  const hasErr = ST.errors > 0 && ST.proxy > 0 && ST.rows === 0;
+  document.getElementById('dot').className     = 'dot ' + (hasErr ? 'err' : 'live');
+  document.getElementById('conn-lbl').textContent = hasErr ? 'ERROR' : 'LIVE';
+  document.getElementById('ts').textContent    = 'Updated ' + nowTs();
+
+  addLog('info', `── Refresh DONE  proxy=${ST.proxy}  rows=${ST.rows}  errors=${ST.errors} ──`);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Controls
+// ═══════════════════════════════════════════════════════════
+function applyConfig() {
+  proxyBase  = (document.getElementById('proxy-url').value || '').trim().replace(/\/$/, '');
+  refreshSec = Math.max(5, parseInt(document.getElementById('interval').value) || 30);
+  addLog('warn', `Config applied — proxy: ${proxyBase}  interval: ${refreshSec}s`);
+  restart();
+}
+
+function togglePause() {
+  paused = !paused;
+  const btn = document.getElementById('pause-btn');
+  if (paused) {
+    btn.textContent = '▶ Resume';
+    btn.classList.add('paused');
+    clearInterval(timerR);
+    clearInterval(timerC);
+    document.getElementById('cd').textContent = 'PAUSED';
+    addLog('warn', 'Dashboard PAUSED');
+  } else {
+    btn.textContent = '⏸ Pause';
+    btn.classList.remove('paused');
+    addLog('warn', 'Dashboard RESUMED');
+    restart();
+  }
+}
+
+function startCountdown() {
+  clearInterval(timerC);
+  cdVal = refreshSec;
+  document.getElementById('cd').textContent = `Next: ${cdVal}s`;
+  timerC = setInterval(() => {
+    cdVal--;
+    if (cdVal <= 0) { clearInterval(timerC); document.getElementById('cd').textContent = 'Fetching…'; }
+    else document.getElementById('cd').textContent = `Next: ${cdVal}s`;
+  }, 1000);
+}
+
+function restart() {
+  clearInterval(timerR);
+  clearInterval(timerC);
+  refreshSec = Math.max(5, parseInt(document.getElementById('interval').value) || 30);
+  fetchAll();
+  startCountdown();
+  timerR = setInterval(() => { fetchAll(); startCountdown(); }, refreshSec * 1000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════════
+buildDOM();
+addLog('info', `Dashboard init — AnyLog UNS loaded (${SITES.length} sites, 4 processes/site)`);
+addLog('info', 'Proxy endpoint: POST /api/query  {dbms, sql}');
+addLog('info', 'AnyLog command: sql <dbms> <sql>  +  destination: network');
+restart();
+</script>
+</body>
+</html>
