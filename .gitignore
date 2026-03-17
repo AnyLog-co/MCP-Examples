@@ -1,6 +1,6 @@
 # Python virtual environment
 myenv/
-
+.idea/
 # Bytecode + cache
 __pycache__/
 *.pyc
