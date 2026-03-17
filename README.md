@@ -1,608 +1,776 @@
-# AnyLog REST Proxy
+# MCP Web Bridge
 
-A Python-based REST proxy that provides a standardized HTTP API interface to AnyLog networks using AnyLog's native REST API. All requests include the required `User-Agent: AnyLog/1.23` header.
+**Version 4.1** | Python 3.9+ | Flask · flask-cors
 
-## Features
+Bridges HTTP REST requests from browser dashboards to the AnyLog MCP SSE
+protocol.  A single long-lived `mcp-proxy` subprocess handles the MCP
+connection; a single worker thread serialises every call to it.  Browser
+dashboards speak plain JSON over HTTP — no MCP SDK required on the
+client side.
 
-- **Native AnyLog REST API**: Direct communication with AnyLog nodes via their REST interface
-- **Standard HTTP Endpoints**: Clean REST API for querying and managing AnyLog networks
-- **Required Headers**: Automatically includes proper headers on all requests:
-  - `User-Agent: AnyLog/1.23` - Required for all requests
-  - `command: <command>` - The AnyLog command being executed
-  - `destination: network` - Added for SQL queries to route across network
-- **Full Query Support**: SQL queries and time-series increment queries
-- **Metadata Discovery**: List databases, tables, columns, and nodes
-- **Node Management**: Query status and cluster information
-- **Arbitrary Commands**: Execute any AnyLog command via REST
-- **Connection Testing**: Built-in connection health checks
-- **CORS Enabled**: Ready for browser-based applications
+---
+
+## Contents
+
+- [How it works](#how-it-works)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [CLI reference](#cli-reference)
+- [start_bridge.sh](#start_bridgesh)
+- [API reference](#api-reference)
+- [UNS database discovery](#uns-database-discovery)
+- [Caching](#caching)
+- [Calling from JavaScript](#calling-from-javascript)
+- [Running multiple connectors](#running-multiple-connectors)
+- [HTTPS / TLS](#https--tls)
+- [Logging](#logging)
+- [Troubleshooting](#troubleshooting)
+- [Version history](#version-history)
+
+---
+
+## How it works
+
+```
+Browser dashboard
+      │  HTTP POST /api/query  {dbms, sql}
+      ▼
+┌─────────────────────────────────────────────┐
+│  Flask  (threaded, any number of requests)  │
+│                                             │
+│  HTTP handler ──► _enqueue(job) ──► wait   │
+│                        │          (≤60 s)  │
+│              ┌─────────▼──────────┐         │
+│              │  Job Queue (FIFO)  │         │
+│              └─────────┬──────────┘         │
+│                        │  one at a time     │
+│              ┌─────────▼──────────┐         │
+│              │   Worker thread    │         │
+│              │  _call_mcp(tool)   │         │
+│              └─────────┬──────────┘         │
+└────────────────────────┼────────────────────┘
+                         │  JSON-RPC over stdio
+                         ▼
+                   mcp-proxy binary
+                         │  HTTPS SSE
+                         ▼
+               AnyLog MCP SSE server
+               (e.g. :32049/mcp/sse)
+                         │
+                         ▼
+              AnyLog distributed network
+```
+
+Key design rules:
+- **HTTP threads never call MCP directly.** They post a `Job` and block on a
+  `threading.Event` until the worker signals completion.
+- **One worker, one call at a time.** `CALL_DELAY_S` (default 1.5 s) is
+  observed between every MCP call, preventing SSE server overload regardless
+  of how many browser tabs are open.
+- **Duplicate-request deduplication.** If 10 tabs ask for the same table list
+  simultaneously, only one MCP call is made; all 10 waiters share the result.
+- **TTL cache.** Metadata results (UNS, tables, status) are cached for 5 min;
+  query results for 30 s.  Cache-hit responses are returned immediately without
+  touching the queue.
+
+---
+
+## Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| Python 3.9+ | Tested on 3.10 / 3.11 |
+| `mcp-proxy` binary | Installed in your AnyLog venv via `pip install mcp-proxy` |
+| AnyLog MCP SSE server | Running and reachable, e.g. `https://172.79.89.206:32049/mcp/sse` |
+| `flask` | `pip install flask` |
+| `flask-cors` | `pip install flask-cors` |
+| `cryptography` _(optional)_ | `pip install cryptography` — only needed for `--ssl` auto-cert generation when the `openssl` CLI is unavailable |
+
+---
 
 ## Installation
 
-### Prerequisites
+```bash
+# 1. Activate your AnyLog virtual environment (must contain mcp-proxy)
+source /path/to/venv/bin/activate
 
-- Python 3.8+
-- pip
+# 2. Install Python dependencies
+pip install flask flask-cors
 
-### Setup
+# 3a. (Optional) Install cryptography for --ssl auto-cert generation
+#     Skip if your system already has the openssl CLI (macOS / most Linux distros)
+pip install cryptography
+
+# 3b. Make start_bridge.sh executable
+chmod +x start_bridge.sh
+```
+
+---
+
+## Quick start
 
 ```bash
-# Install dependencies
-pip install flask flask-cors requests
+# Timbergrove connector
+./start_bridge.sh --mcp-url https://172.79.89.206:32049/mcp/sse
 
-# Make scripts executable
-chmod +x anylog_rest_proxy.py start_rest_proxy.sh
+# AnyLog Prove-IT connector on a different port
+./start_bridge.sh --mcp-url https://50.116.13.109:32049/mcp/sse --port 8081
+
+# Test it
+curl http://localhost:8080/api/status
+curl http://localhost:8080/api/uns/databases
+
+# HTTPS with auto-generated self-signed certificate
+./start_bridge.sh --mcp-url https://50.116.13.109:32049/mcp/sse --ssl
+curl -k https://localhost:8080/api/status
+
+# Quiet mode — warnings and errors only (no per-request log lines)
+./start_bridge.sh --mcp-url https://172.79.89.206:32049/mcp/sse --quiet
+
+# Log everything to a file as well as stderr
+./start_bridge.sh --mcp-url https://172.79.89.206:32049/mcp/sse --log-file bridge.log
 ```
 
-## Usage
+The bridge starts, spawns `mcp-proxy`, performs the MCP initialise handshake,
+and then listens on `http://0.0.0.0:8080` (or your chosen port).  When `--ssl`
+is active, the scheme changes to `https://`.
 
-### Quick Start
+---
+
+## CLI reference
+
+```
+python3 mcp_web_bridge.py [OPTIONS]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--mcp-url URL` | `https://172.79.89.206:32049/mcp/sse` | MCP SSE server to connect to |
+| `--mcp-proxy PATH` | `…/venv/bin/mcp-proxy` | Path to the `mcp-proxy` binary |
+| `--port INT` | `8080` | HTTP/HTTPS port to listen on |
+| `--host ADDR` | `0.0.0.0` | Interface to bind to |
+| `--call-delay FLOAT` | `1.5` | Seconds between MCP calls |
+| `--debug` | off | Enable Flask debug mode + verbose logging (overrides `--quiet`) |
+| `--quiet`, `-q` | off | Suppress INFO log chatter; show warnings and errors only |
+| `--log-file PATH` | _(none)_ | Append all log output to this file **in addition to** stderr |
+| `--ssl` | off | Serve the Flask frontend over HTTPS |
+| `--ssl-cert CERT.pem` | _(auto)_ | Path to an existing PEM certificate (implies `--ssl`) |
+| `--ssl-key KEY.pem` | _(auto)_ | Path to an existing PEM private key (implies `--ssl`) |
+| `-h, --help` | | Show help and exit |
+
+**`--mcp-url`** is the key argument.  It selects which AnyLog network the
+bridge talks to.  Every endpoint response includes the active `mcp_url` so
+dashboards can confirm they are hitting the right connector.
+
+**Logging options** (`--quiet`, `--debug`, `--log-file`) are independent and
+composable.  `--debug` overrides `--quiet` when both are given.  `--log-file`
+always appends (never truncates) and writes the same lines that go to stderr.
+
+**TLS options** — see [HTTPS / TLS](#https--tls) for full details.
+
+---
+
+## start_bridge.sh
+
+A convenience launcher that merges environment-variable defaults with CLI
+arguments.  Explicit CLI flags always win over environment variables.
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `BRIDGE_MCP_URL` | `https://172.79.89.206:32049/mcp/sse` | MCP SSE server URL |
+| `BRIDGE_MCP_PROXY` | `…/venv/bin/mcp-proxy` | Path to `mcp-proxy` |
+| `BRIDGE_PORT` | `8080` | HTTP listen port |
+| `BRIDGE_HOST` | `0.0.0.0` | Bind interface |
+| `BRIDGE_CALL_DELAY` | `1.5` | Seconds between MCP calls |
+| `BRIDGE_VENV` | _(empty)_ | Virtualenv path to auto-activate |
+
+### Usage examples
 
 ```bash
-# Start with default settings (connects to 172.79.89.206:32049)
-./start_rest_proxy.sh
+# Basic — Timbergrove connector
+./start_bridge.sh --mcp-url https://172.79.89.206:32049/mcp/sse
 
-# Specify custom AnyLog node
-./start_rest_proxy.sh --anylog-ip 50.116.13.109 --anylog-port 32049
+# Dynics Prove-IT connector, port 8081
+./start_bridge.sh \
+  --mcp-url https://172.79.89.206:32049/mcp/sse \
+  --port 8081
 
-# Run on different port with debug mode
-./start_rest_proxy.sh --port 5000 --debug
+# AnyLog Prove-IT connector via env var
+BRIDGE_MCP_URL=https://50.116.13.109:32049/mcp/sse ./start_bridge.sh
+
+# Auto-activate a specific venv
+BRIDGE_VENV=/home/mark/anylog/venv ./start_bridge.sh \
+  --mcp-url https://172.79.89.206:32049/mcp/sse
+
+# Slow down calls (useful for busy servers)
+./start_bridge.sh --mcp-url https://... --call-delay 3.0
+
+# Debug mode
+./start_bridge.sh --mcp-url https://... --debug
+
+# Quiet logging — warnings and errors only
+./start_bridge.sh --mcp-url https://... --quiet
+
+# Log to file and suppress console chatter
+./start_bridge.sh --mcp-url https://... --quiet --log-file /var/log/bridge.log
+
+# HTTPS with auto-generated self-signed certificate
+./start_bridge.sh --mcp-url https://... --ssl
+
+# HTTPS with your own certificate
+./start_bridge.sh --mcp-url https://... \
+  --ssl-cert /etc/ssl/bridge.crt \
+  --ssl-key  /etc/ssl/bridge.key
 ```
 
-### Manual Start
+---
 
-```bash
-python3 anylog_rest_proxy.py --host 0.0.0.0 --port 8080 --anylog-ip 172.79.89.206 --anylog-port 32049
-```
+## API reference
 
-### Command-Line Options
+All responses are JSON.  Errors return `{"error": "message"}` with an
+appropriate HTTP status code.
 
-```
---host HOST           Host to bind to (default: 0.0.0.0)
---port PORT           Proxy port (default: 8080)
---anylog-ip IP        AnyLog node IP (default: 172.79.89.206)
---anylog-port PORT    AnyLog node port (default: 32049)
---debug               Enable debug mode
-```
+---
 
-## Connection Details
+### `GET /api/status`
 
-The proxy connects to AnyLog using:
-- **Protocol**: HTTP (not HTTPS)
-- **Method**: GET
-- **URL**: `http://{IP}:{PORT}`
-- **Headers**: 
-  - `User-Agent: AnyLog/1.23` (all requests)
-  - `Content-Type: application/json` (all requests)
-  - `command: <anylog_command>` (all requests - the command is in the header)
-  - `destination: network` (SQL queries only)
-- **Body**: Empty (command is passed in header)
+Check MCP connectivity.
 
-### Header Examples
-
-**Non-SQL Command** (e.g., `get status`):
-```
-GET http://172.79.89.206:32049
-User-Agent: AnyLog/1.23
-Content-Type: application/json
-command: get status
-```
-
-**SQL Query** (with `destination: network` for distributed query):
-```
-GET http://172.79.89.206:32049
-User-Agent: AnyLog/1.23
-Content-Type: application/json
-command: sql litsanleandro SELECT * FROM ping_sensor LIMIT 10
-destination: network
-```
-
-### When is `destination: network` Used?
-
-The `destination: network` header is automatically added for **SQL queries only**. This tells AnyLog to distribute the query across the network to all relevant nodes.
-
-- ✓ **SQL queries**: `destination: network` header is added
-- ✗ **Non-SQL commands**: No `destination` header (commands like `get status`, `get databases`, etc.)
-
-This ensures SQL queries are properly distributed while administrative commands run locally on the target node.
-
-## API Endpoints
-
-### Health & Connection
-
-#### Health Check
-```bash
-GET /health
-```
-
-Returns proxy health and AnyLog connection status.
-
-Example:
-```bash
-curl http://localhost:8080/health
-```
-
-Response:
+**Response**
 ```json
 {
-  "status": "healthy",
-  "service": "anylog-rest-proxy",
-  "anylog_node": "172.79.89.206:32049",
-  "connection": "established",
-  "user_agent": "AnyLog/1.23"
+  "status": "ok",
+  "mcp_url": "https://172.79.89.206:32049/mcp/sse",
+  "result": { ... }
 }
 ```
 
-#### Connection Status
-```bash
-GET /api/connection/status
-```
+**Error** → HTTP 503 with `{"status": "error", "error": "...", "mcp_url": "..."}`
 
-Get detailed connection information.
+---
 
-Example:
-```bash
-curl http://localhost:8080/api/connection/status
-```
+### `GET /api/uns/databases`
 
-#### Test Connection
-```bash
-POST /api/connection/test
-```
+**UNS-aware database discovery.** Scans all UNS policies for the active
+connector and returns every unique `dbms` value found.  Falls back to
+`listNetworkDatabases` if UNS policies have no `dbms` fields.  Result cached
+for 5 minutes.
 
-Test connection to AnyLog node.
+Use this endpoint at dashboard startup to automatically determine which
+databases to query, rather than hardcoding database names.
 
-Example:
-```bash
-curl -X POST http://localhost:8080/api/connection/test
-```
-
-### Query Execution
-
-#### Execute SQL Query
-```bash
-POST /api/query
-Content-Type: application/json
-
+**Response**
+```json
 {
-  "dbms": "database_name",
-  "sql": "SELECT * FROM table WHERE condition",
-  "destination": "optional_destination"
+  "databases": ["timbergrove", "lsl_demo"],
+  "source": "uns",
+  "mcp_url": "https://172.79.89.206:32049/mcp/sse"
 }
 ```
 
-Example:
-```bash
-curl -X POST http://localhost:8080/api/query \
-  -H "Content-Type: application/json" \
-  -d '{
-    "dbms": "litsanleandro",
-    "sql": "SELECT * FROM ping_sensor WHERE timestamp >= NOW() - 1 hour LIMIT 10"
-  }'
+`source` is `"uns"` when databases came from UNS policies, `"network"` when
+they came from the fallback `listNetworkDatabases` call, `"cache"` when the
+cached result was returned.
+
+---
+
+### `GET /api/uns/discover`
+
+Return all UNS policies for the active connector (raw list).
+
+**Response**
+```json
+{
+  "policies": [ { "uns": { ... } }, ... ],
+  "count": 84,
+  "mcp_url": "..."
+}
 ```
 
-#### Execute Time-Series Query with Increments
-```bash
-POST /api/query/increment
-Content-Type: application/json
+---
 
+### `GET /api/uns/policies?type=<type>[&where=<condition>]`
+
+Return policies of any type with optional WHERE filter.
+
+| Parameter | Required | Description |
+|---|---|---|
+| `type` | no (default `uns`) | Policy type: `uns`, `operator`, `table`, `rig`, etc. |
+| `where` | no | Filter condition, e.g. `rig_id='RIG-TX-001'` |
+
+**Response**
+```json
 {
-  "dbms": "database_name",
-  "table": "table_name",
-  "timeColumn": "timestamp",
-  "startTime": "2024-01-01 00:00:00",
-  "endTime": "2024-01-02 00:00:00",
-  "timeUnit": "hour",
+  "policies": [ ... ],
+  "count": 4
+}
+```
+
+---
+
+### `GET /api/tables?dbms=<database>`
+
+List all tables in a database.
+
+**Response**
+```json
+{
+  "dbms": "timbergrove",
+  "tables": ["rig_data"]
+}
+```
+
+---
+
+### `GET /api/columns?dbms=<database>&table=<table>`
+
+List column definitions for a table.
+
+**Response**
+```json
+{
+  "dbms": "timbergrove",
+  "table": "rig_data",
+  "columns": [
+    { "name": "timestamp", "type": "timestamp" },
+    { "name": "rig_id",    "type": "varchar" },
+    { "name": "rop",       "type": "float" },
+    ...
+  ]
+}
+```
+
+---
+
+### `GET /api/databases`
+
+List all databases visible in the network via `listNetworkDatabases`.
+
+**Response**
+```json
+{ "databases": ["timbergrove", "lsl_demo", "system"] }
+```
+
+---
+
+### `POST /api/query`
+
+Execute a SQL query distributed across the network.
+
+**Request body**
+```json
+{
+  "dbms":  "timbergrove",
+  "sql":   "SELECT * FROM rig_data WHERE rig_id='RIG-TX-001' AND timestamp >= NOW() - 1 hour LIMIT 50",
+  "nodes": "172.79.89.206:32049"
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `dbms` | yes | Target database name |
+| `sql` | yes | SQL query string. Use `NOW() - N hours/minutes/days` for time ranges. No nested queries or JOINs. |
+| `nodes` | no | Comma-separated `IP:Port` list to target specific nodes; omit to query all nodes |
+
+**Time filter syntax**
+```sql
+WHERE timestamp >= NOW() - 24 hours
+WHERE timestamp >= NOW() - 30 minutes
+WHERE timestamp >= NOW() - 7 days
+```
+
+**Response**
+```json
+{
+  "results": [ { "timestamp": "...", "rig_id": "RIG-TX-001", "rop": 42.1, ... }, ... ],
+  "row_count": 50,
+  "dbms": "timbergrove"
+}
+```
+
+---
+
+### `POST /api/query/increment`
+
+Execute a time-bucketed aggregation query (calls `queryWithIncrement` on the
+MCP server).
+
+**Request body**
+```json
+{
+  "dbms":           "timbergrove",
+  "table":          "rig_data",
+  "timeColumn":     "timestamp",
+  "startTime":      "NOW() - 24 hours",
+  "endTime":        "NOW()",
   "intervalLength": 1,
-  "projections": ["avg(value)", "max(value)"],
-  "destination": "optional_destination"
+  "timeUnit":       "hour",
+  "projections":    ["avg(rop)", "max(wob)", "min(rpm)", "count(rop)"],
+  "nodes":          "172.79.89.206:32049"
 }
 ```
 
-Example:
-```bash
-curl -X POST http://localhost:8080/api/query/increment \
-  -H "Content-Type: application/json" \
-  -d '{
-    "dbms": "litsanleandro",
-    "table": "ping_sensor",
-    "timeColumn": "timestamp",
-    "startTime": "NOW() - 24 hours",
-    "endTime": "NOW()",
-    "timeUnit": "hour",
-    "intervalLength": 1,
-    "projections": ["min(value)", "avg(value)", "max(value)"]
-  }'
-```
+| Field | Required | Description |
+|---|---|---|
+| `dbms` | yes | Database name |
+| `table` | yes | Table name |
+| `timeColumn` | yes | Name of the timestamp column |
+| `startTime` | yes | Start of range — ISO 8601 or `NOW() - N unit` |
+| `endTime` | yes | End of range — ISO 8601 or `NOW()` |
+| `intervalLength` | yes | Integer — number of time units per bucket |
+| `timeUnit` | yes | `minute` · `hour` · `day` · `week` · `month` · `year` |
+| `projections` | yes | Array of aggregate expressions, e.g. `["avg(rop)", "max(wob)"]` |
+| `nodes` | no | Comma-separated `IP:Port` to target specific nodes |
 
-### Metadata Discovery
-
-#### List Databases
-```bash
-GET /api/databases
-```
-
-Example:
-```bash
-curl http://localhost:8080/api/databases
-```
-
-#### List Tables
-```bash
-GET /api/databases/{dbms}/tables
-```
-
-Example:
-```bash
-curl http://localhost:8080/api/databases/litsanleandro/tables
-```
-
-#### List Columns
-```bash
-GET /api/databases/{dbms}/tables/{table}/columns
-```
-
-Example:
-```bash
-curl http://localhost:8080/api/databases/litsanleandro/tables/ping_sensor/columns
-```
-
-### Node Management
-
-#### Get Cluster Nodes
-```bash
-GET /api/nodes
-```
-
-Example:
-```bash
-curl http://localhost:8080/api/nodes
-```
-
-#### Get Node Status
-```bash
-GET /api/nodes/status?node=<optional_node>
-```
-
-Or:
-```bash
-POST /api/nodes/status
-Content-Type: application/json
-
-{
-  "node": "optional_node_address"
-}
-```
-
-Example:
-```bash
-# Get status of current node
-curl http://localhost:8080/api/nodes/status
-
-# Get status of specific node
-curl http://localhost:8080/api/nodes/status?node=172.105.60.50:32148
-```
-
-#### Get Data Location
-```bash
-GET /api/data/location?dbms=<dbms>&table=<table>
-```
-
-Example:
-```bash
-curl "http://localhost:8080/api/data/location?dbms=litsanleandro&table=ping_sensor"
-```
-
-
-### UNS Policies (Blockchain Root Policies)
-
-#### Get UNS Root Policies
-```bash
-GET /api/uns
-```
-
-This endpoint proxies the native AnyLog command:
-
-- `blockchain get uns`
-
-Example:
-```bash
-curl http://localhost:8080/api/uns
-```
-
-Response:
+**Response**
 ```json
 {
-  "command": "blockchain get uns",
-  "policies": [],
-  "raw": "..."
+  "results": [
+    { "timestamp": "2026-02-23T00:00:00Z", "avg_rop": 38.4, "max_wob": 22.1, ... },
+    ...
+  ],
+  "row_count": 24
 }
 ```
 
+---
 
-### Execute Arbitrary Command
+### `GET /api/nodes`
 
-```bash
-POST /api/command
-Content-Type: application/json
+List all nodes registered in the network.
 
-{
-  "command": "get status",
-  "timeout": 30
-}
-```
-
-Example:
-```bash
-curl -X POST http://localhost:8080/api/command \
-  -H "Content-Type: application/json" \
-  -d '{
-    "command": "get cluster info"
-  }'
-```
-
-## Python Client Examples
-
-### Basic Query
-
-```python
-import requests
-
-# Execute a simple query
-response = requests.post(
-    'http://localhost:8080/api/query',
-    json={
-        'dbms': 'litsanleandro',
-        'sql': 'SELECT * FROM ping_sensor WHERE timestamp >= NOW() - 1 hour'
-    }
-)
-
-result = response.json()
-print(result)
-```
-
-### Time-Series Query
-
-```python
-import requests
-
-# Execute time-series query with hourly aggregations
-response = requests.post(
-    'http://localhost:8080/api/query/increment',
-    json={
-        'dbms': 'litsanleandro',
-        'table': 'ping_sensor',
-        'timeColumn': 'timestamp',
-        'startTime': 'NOW() - 24 hours',
-        'endTime': 'NOW()',
-        'timeUnit': 'hour',
-        'intervalLength': 1,
-        'projections': [
-            'min(value)',
-            'avg(value)',
-            'max(value)'
-        ]
-    }
-)
-
-result = response.json()
-print(result)
-```
-
-### Execute Custom Command
-
-```python
-import requests
-
-# Execute any AnyLog command
-response = requests.post(
-    'http://localhost:8080/api/command',
-    json={
-        'command': 'get virtual tables',
-        'timeout': 30
-    }
-)
-
-result = response.json()
-print(result)
-```
-
-### Discover Database Schema
-
-```python
-import requests
-
-base_url = 'http://localhost:8080'
-
-# List all databases
-databases = requests.get(f'{base_url}/api/databases').json()
-print("Databases:", databases)
-
-# List tables in a database
-tables = requests.get(
-    f'{base_url}/api/databases/litsanleandro/tables'
-).json()
-print("Tables:", tables)
-
-# List columns in a table
-columns = requests.get(
-    f'{base_url}/api/databases/litsanleandro/tables/ping_sensor/columns'
-).json()
-print("Columns:", columns)
-```
-
-## Bash Script Examples
-
-### Query Wrapper Script
-
-```bash
-#!/bin/bash
-# query_anylog.sh - Simple wrapper for querying AnyLog
-
-PROXY_URL="http://localhost:8080"
-
-query_data() {
-    local dbms="$1"
-    local sql="$2"
-    
-    curl -s -X POST "$PROXY_URL/api/query" \
-        -H "Content-Type: application/json" \
-        -d "{\"dbms\":\"$dbms\",\"sql\":\"$sql\"}"
-}
-
-# Usage
-query_data "litsanleandro" "SELECT * FROM ping_sensor LIMIT 5"
-```
-
-### Command Execution Script
-
-```bash
-#!/bin/bash
-# anylog_command.sh - Execute AnyLog commands
-
-PROXY_URL="http://localhost:8080"
-
-execute_command() {
-    local command="$1"
-    
-    curl -s -X POST "$PROXY_URL/api/command" \
-        -H "Content-Type: application/json" \
-        -d "{\"command\":\"$command\"}"
-}
-
-# Usage
-execute_command "get status"
-execute_command "get cluster info"
-```
-
-## How It Works
-
-The proxy translates REST API calls into native AnyLog REST commands:
-
-```
-┌─────────────┐      HTTP REST      ┌──────────────┐  AnyLog REST (HTTP) ┌─────────────┐
-│   Client    │ ──────────────────> │    Proxy     │ ──────────────────> │   AnyLog    │
-│ Application │ <────────────────── │    Server    │ <────────────────── │    Node     │
-└─────────────┘      JSON           └──────────────┘    JSON/Text        └─────────────┘
-                                           ↓
-                                   GET http://IP:PORT
-                                   Headers:
-                                   - User-Agent: AnyLog/1.23
-                                   - command: <anylog_command>
-                                   - destination: network (SQL only)
-```
-
-The proxy:
-1. Receives REST requests on standard HTTP endpoints
-2. Translates requests into AnyLog commands
-3. Adds commands and metadata as HTTP headers:
-   - `User-Agent: AnyLog/1.23`
-   - `command: <anylog_command>` (the actual command)
-   - `destination: network` (for SQL queries)
-4. Sends GET request to `http://IP:PORT`
-5. Returns JSON responses to client
-
-**Important**: The command is passed entirely in the `command:` header using HTTP GET method.
-
-## AnyLog Command Mapping
-
-| REST Endpoint | AnyLog Command |
-|--------------|----------------|
-| `GET /api/databases` | `get databases` |
-| `GET /api/databases/{dbms}/tables` | `get tables where dbms = {dbms}` |
-| `GET /api/databases/{dbms}/tables/{table}/columns` | `get columns where dbms = {dbms} and table = {table}` |
-| `GET /api/nodes` | `get cluster info` |
-| `GET /api/nodes/status` | `get status` |
-| `POST /api/query` | `sql {dbms} {sql}` |
-| `POST /api/query/increment` | `sql {dbms} SELECT increment(...) ...` |
-| `GET /api/data/location` | `get data nodes` |
-| `GET /api/uns` | `blockchain get uns` |
-
-## Configuration
-
-### Environment Variables
-
-You can configure via environment variables:
-
-```bash
-export ANYLOG_IP="172.79.89.206"
-export ANYLOG_PORT="32049"
-export PROXY_HOST="0.0.0.0"
-export PROXY_PORT="8080"
-
-python3 anylog_rest_proxy.py
-```
-
-### Timeout Configuration
-
-Modify the `TIMEOUT` constant in the script for longer queries:
-
-```python
-TIMEOUT = 300.0  # 5 minutes (default)
-```
-
-## Error Handling
-
-All endpoints return standard HTTP status codes:
-
-- `200 OK`: Successful request
-- `400 Bad Request`: Missing or invalid parameters
-- `404 Not Found`: Endpoint doesn't exist
-- `500 Internal Server Error`: AnyLog node error or internal error
-- `503 Service Unavailable`: Connection to AnyLog node failed
-
-Error responses include details:
-
+**Response**
 ```json
 {
-  "error": "Error description",
-  "details": "Additional error information"
+  "nodes": [
+    { "type": "operator", "name": "timbergrove-op1", "ip": "172.79.89.206", "port": 32048 },
+    ...
+  ]
 }
 ```
+
+---
+
+### `GET /api/nodes/monitor?type=<status_type>[&nodes=<ip:port,...>]`
+
+Get runtime status for one or more nodes.
+
+| Parameter | Default | Options |
+|---|---|---|
+| `type` | `status` | `status` · `resources` · `version` · `cpu` |
+| `nodes` | _(all)_ | Comma-separated `IP:Port` list |
+
+**Response**
+```json
+{ "result": { ... } }
+```
+
+---
+
+### `POST /api/cache/clear`
+
+Flush the entire TTL cache, forcing fresh MCP calls on the next request.
+
+**Response**
+```json
+{ "status": "cleared" }
+```
+
+---
+
+### `GET /api/worker/status`
+
+Inspect the internal job queue.
+
+**Response**
+```json
+{
+  "queue_depth":  2,
+  "in_flight":    ["executeQuery:{...}", "listTables:{...}"],
+  "call_delay_s": 1.5,
+  "mcp_url":      "https://172.79.89.206:32049/mcp/sse"
+}
+```
+
+---
+
+### `GET /`
+
+Serves a local HTML dashboard file if one is found alongside the script.
+Checks for these filenames in order:
+
+1. `timbergrove_dashboard.html`
+2. `enterprise_c_spc_mcp_dashboard.html`
+3. `dashboard.html`
+
+If none is found, returns a plain-text endpoint listing.
+
+---
+
+## UNS database discovery
+
+Dashboards should call `GET /api/uns/databases` at startup instead of
+hardcoding database names.  The endpoint traverses UNS policies in this order:
+
+1. Calls `listPolicyTypes` to check that a `uns` policy type exists.
+2. Calls `listPolicies(policyType="uns")` and collects every `dbms` field from
+   the returned policies.
+3. If step 2 yields no databases (UNS policies have no `dbms` fields), falls
+   back to `listNetworkDatabases`.
+4. Returns a deduplicated, sorted list of database names.
+
+This means the same dashboard HTML file can be used against different MCP
+connectors (Timbergrove, Dynics, AnyLog Prove-IT) without code changes —
+just point the bridge at a different `--mcp-url` and the dashboard discovers
+its databases automatically.
+
+**JavaScript example**
+```javascript
+const { databases } = await fetch('/api/uns/databases').then(r => r.json());
+// databases = ["timbergrove"]   (for Timbergrove connector)
+// databases = ["lsl_demo", "manufacturing_historian"]  (for Dynics / AnyLog)
+```
+
+---
+
+## Caching
+
+| Data type | TTL | Affected endpoints |
+|---|---|---|
+| Metadata | 300 s (5 min) | `/api/status`, `/api/tables`, `/api/columns`, `/api/databases`, `/api/uns/*`, `/api/nodes` |
+| Query results | 30 s | `/api/query`, `/api/query/increment` |
+
+Cache keys are `"<tool_name>:<sorted-json-params>"`.  Identical requests from
+concurrent tabs share a single MCP call and a single cache entry.
+
+To force fresh data: `POST /api/cache/clear`.
+
+---
+
+## Calling from JavaScript
+
+```javascript
+// ── Status check ───────────────────────────────────────────
+const status = await fetch('/api/status').then(r => r.json());
+console.log(status.mcp_url, status.status);
+
+// ── Database discovery via UNS ──────────────────────────────
+const { databases } = await fetch('/api/uns/databases').then(r => r.json());
+
+// ── List tables ─────────────────────────────────────────────
+const { tables } = await fetch('/api/tables?dbms=timbergrove').then(r => r.json());
+
+// ── Execute a query ─────────────────────────────────────────
+const { results, row_count } = await fetch('/api/query', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    dbms: 'timbergrove',
+    sql: "SELECT timestamp, rig_id, rop, wob FROM rig_data WHERE rig_id='RIG-TX-001' AND timestamp >= NOW() - 1 hour LIMIT 100"
+  })
+}).then(r => r.json());
+
+// ── Incremental (time-bucketed) query ───────────────────────
+const { results: hourly } = await fetch('/api/query/increment', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    dbms: 'timbergrove',
+    table: 'rig_data',
+    timeColumn: 'timestamp',
+    startTime: 'NOW() - 24 hours',
+    endTime: 'NOW()',
+    intervalLength: 1,
+    timeUnit: 'hour',
+    projections: ['avg(rop)', 'max(wob)', 'min(rpm)']
+  })
+}).then(r => r.json());
+
+// ── Clear cache ─────────────────────────────────────────────
+await fetch('/api/cache/clear', { method: 'POST' });
+```
+
+---
+
+## Running multiple connectors
+
+Each connector needs its own bridge instance on a different port.
+
+```bash
+# Terminal 1 — Timbergrove on port 8080
+./start_bridge.sh \
+  --mcp-url https://172.79.89.206:32049/mcp/sse \
+  --port 8080
+
+# Terminal 2 — AnyLog Prove-IT on port 8081
+./start_bridge.sh \
+  --mcp-url https://50.116.13.109:32049/mcp/sse \
+  --port 8081
+
+# Terminal 3 — Dynics Prove-IT on port 8082
+./start_bridge.sh \
+  --mcp-url https://172.79.89.206:32049/mcp/sse \
+  --port 8082
+```
+
+Dashboards can let the user enter an `IP:port` and will hit whichever bridge
+instance is running there.
+
+---
+
+## HTTPS / TLS
+
+The bridge can serve its HTTP frontend over TLS so that dashboards hosted on
+`https://` pages can call it without mixed-content browser errors.
+
+> **Note:** TLS here applies only to the **browser ↔ bridge** leg.  The
+> **bridge ↔ AnyLog MCP SSE** leg is always HTTPS via `mcp-proxy` and is
+> unaffected by these options.
+
+### Quickstart — self-signed certificate
+
+```bash
+# Auto-generates mcp_bridge_cert.pem + mcp_bridge_key.pem in the working directory
+python3 mcp_web_bridge.py --mcp-url https://... --ssl
+
+# Then test (skip cert verification for self-signed)
+curl -k https://localhost:8080/api/status
+```
+
+The certificate is generated once and reused on subsequent starts.  It is
+valid for 365 days.  Generation uses the `openssl` CLI if available, otherwise
+falls back to the `cryptography` package.
+
+### Using an existing certificate
+
+Supply paths to your own PEM files (e.g. from Let's Encrypt or an internal CA):
+
+```bash
+python3 mcp_web_bridge.py --mcp-url https://... \
+  --ssl-cert /etc/ssl/certs/bridge.crt \
+  --ssl-key  /etc/ssl/private/bridge.key
+```
+
+Providing `--ssl-cert` or `--ssl-key` automatically enables TLS — you do not
+need `--ssl` as well.
+
+### Certificate trust
+
+| Scenario | Action |
+|---|---|
+| Self-signed, development | Use `curl -k` or accept the browser security exception once |
+| Self-signed, shared team | Import `mcp_bridge_cert.pem` into your OS / browser trust store |
+| CA-signed (Let's Encrypt) | Browsers trust automatically; no exceptions needed |
+
+### Dashboard `fetch` URL
+
+When the bridge is running over HTTPS, update dashboard base URLs:
+
+```javascript
+const BRIDGE = 'https://localhost:8080';   // was http://
+const status = await fetch(`${BRIDGE}/api/status`).then(r => r.json());
+```
+
+---
+
+## Logging
+
+| Flag | Log level | Use case |
+|---|---|---|
+| _(default)_ | `INFO` | Normal operation — one line per HTTP request and MCP call |
+| `--quiet` / `-q` | `WARNING` | Production / low-noise — warnings and errors only |
+| `--debug` | `DEBUG` | Diagnosis — full JSON-RPC traffic, overrides `--quiet` |
+
+`--log-file PATH` appends all log output to the named file **in addition to**
+stderr.  The file is opened in UTF-8 append mode, so restarts accumulate rather
+than overwrite.
+
+```bash
+# Minimal console noise, full log preserved on disk
+python3 mcp_web_bridge.py --mcp-url https://... --quiet --log-file bridge.log
+
+# Debug everything, also save to file
+python3 mcp_web_bridge.py --mcp-url https://... --debug --log-file debug.log
+```
+
+---
 
 ## Troubleshooting
 
-### Connection Issues
+**Bridge starts but `/api/status` returns 503**
 
+The `mcp-proxy` binary cannot reach the SSE server.
+- Confirm the AnyLog node is running: `curl -k https://<ip>:<port>/`
+- Confirm `mcp-proxy` is on PATH or `--mcp-proxy` points to the right binary.
+- Check firewall / VPN connectivity.
+
+**Responses take > 30 seconds**
+
+The MCP server is under load or the SSE connection is slow.
+- Increase `--call-delay` (e.g. `--call-delay 3.0`) to reduce call rate.
+- Increase `JOB_TIMEOUT_S` in the source if your queries are legitimately slow.
+
+**Stale data returned**
+
+The cache may be serving old results.
 ```bash
-# Test AnyLog node connectivity with proper headers
-curl http://172.79.89.206:32049 \
-  -H "User-Agent: AnyLog/1.23" \
-  -H "command: get status"
-
-# Check proxy health
-curl http://localhost:8080/health
-
-# Test proxy connection to AnyLog
-curl -X POST http://localhost:8080/api/connection/test
+curl -X POST http://localhost:8080/api/cache/clear
 ```
 
-### Timeout Issues
+**`/api/uns/databases` returns an empty list**
 
-For long-running queries, increase timeout:
+- The active connector has no UNS policies or its UNS policies have no `dbms`
+  fields, and `listNetworkDatabases` returned nothing.
+- Verify with: `curl http://localhost:8080/api/uns/discover | python3 -m json.tool`
+- Check `GET /api/databases` as a raw fallback.
 
-```python
-TIMEOUT = 600.0  # 10 minutes
+**`mcp-proxy` crashes and calls hang**
+
+The worker detects a dead process (`poll() is not None`) and automatically
+respawns it on the next call.  Check `stderr` output for error details.
+Use `--debug` to see full JSON-RPC traffic.
+
+**Browser shows "mixed content" error when calling the bridge**
+
+Your dashboard is served over `https://` but the bridge is running on plain
+`http://`.  Enable TLS on the bridge:
+```bash
+./start_bridge.sh --mcp-url https://... --ssl
+```
+Then update the dashboard base URL to `https://localhost:<port>`.
+
+**`--ssl` fails: "Cannot generate a self-signed certificate"**
+
+Neither the `openssl` CLI nor the `cryptography` package was found.
+```bash
+pip install cryptography
+```
+Or generate a cert manually and supply the paths:
+```bash
+openssl req -x509 -newkey rsa:2048 -keyout bridge.key -out bridge.crt -days 365 -nodes -subj "/CN=mcp-web-bridge"
+./start_bridge.sh --ssl-cert bridge.crt --ssl-key bridge.key ...
 ```
 
-## Differences from MCP Proxy
+**Log file is not being written**
 
-This REST proxy differs from the MCP-based proxy:
+Verify the path is writable by the user running the bridge.  The bridge logs
+an error to stderr and continues without file logging if the file cannot be
+opened.  Use an absolute path to avoid working-directory surprises:
+```bash
+./start_bridge.sh --log-file /var/log/mcp_bridge.log ...
+```
 
-| Feature | REST Proxy | MCP Proxy |
-|---------|-----------|-----------|
-| Protocol | AnyLog native REST | MCP over SSE |
-| Headers | User-Agent: AnyLog/1.23 | Standard MCP headers |
-| Connection | Direct HTTP POST | SSE event stream |
-| Commands | Native AnyLog syntax | MCP tool calls |
-| Response | JSON/Text | SSE events |
+---
 
-## License
+## Version history
 
-This proxy is provided as-is for use with AnyLog distributed networks.
-
-## Support
-
-For issues specific to:
-- AnyLog networks: Contact AnyLog Co
-- This proxy: Submit issues to your internal repository
+| Version | Date | Changes |
+|---|---|---|
+| **4.1** | 2026-03-05 | `--quiet` / `-q` flag (WARNING-level logging); `--log-file` (append log to file); `--ssl` / `--ssl-cert` / `--ssl-key` (HTTPS frontend with auto self-signed cert generation via `openssl` CLI or `cryptography` package) |
+| **4.0** | 2026-02-23 | `--mcp-url` CLI arg; UNS-aware `/api/uns/databases` endpoint; `--mcp-proxy`, `--port`, `--host`, `--call-delay`, `--debug` args; `start_bridge.sh` env-var + CLI merge; runtime `CFG` dict replaces hardcoded constants |
+| 3.0 | 2026-02-18 | Single-worker job queue; TTL cache; duplicate-request dedup; `/api/uns/policies`, `/api/cache/clear`, `/api/worker/status` endpoints; fixed concurrent-request MCP corruption |
+| 2.0 | 2026-02-13 | Per-request `_pending` dict routing; `call_lock` serialisation; fixed MCP response parsing (`content[0].text`) |
+| 1.0 | 2026-02-10 | Initial release |

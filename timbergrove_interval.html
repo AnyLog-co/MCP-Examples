@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Timbergrove · Interval Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ─── TOKENS ─────────────────────────────────────────── */
+:root{
+  --bg:#03070e; --bg2:#060c17; --bg3:#09111f; --surf:#0d1829; --surf2:#111f34;
+  --bdr:#1b2e4a; --bdr2:#223661;
+  --txt:#ccdff5; --dim:#6b8db5; --muted:#2d4a6a;
+  --amber:#f59e0b; --amber-lo:#3d2700;
+  --cyan:#22d3ee; --cyan-lo:#012932;
+  --green:#22c55e; --green-lo:#052310;
+  --red:#f43f5e; --red-lo:#2a040d;
+  --orange:#fb923c; --purple:#c084fc; --sky:#38bdf8;
+  --gold:#fbbf24; --lime:#a3e635;
+  --ff-title:'Rajdhani',sans-serif;
+  --ff-mono:'Share Tech Mono',monospace;
+  --ff-body:'Barlow Condensed',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:13px}
+body{background:var(--bg);color:var(--txt);font-family:var(--ff-body);min-height:100vh;overflow-x:hidden}
+/* grain overlay */
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity:.4}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:2px}
+
+/* ─── HEADER ─────────────────────────────────────────── */
+.hdr{height:54px;background:linear-gradient(90deg,#04091500,#0a172a 20%,#0a172a 80%,#04091500);
+  border-bottom:1px solid var(--bdr);display:flex;align-items:center;padding:0 20px;gap:16px;
+  position:sticky;top:0;z-index:200;backdrop-filter:blur(8px)}
+.hdr-flame{font-size:24px;filter:drop-shadow(0 0 8px #f59e0b88)}
+.hdr-brand{font-family:var(--ff-title);font-size:24px;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--txt);text-shadow:0 0 24px #f59e0b44}
+.hdr-sub{font-family:var(--ff-mono);font-size:9px;color:var(--muted);letter-spacing:.2em;text-transform:uppercase;margin-top:1px}
+.hdr-sep{width:1px;height:30px;background:var(--bdr)}
+.hdr-live{display:flex;align-items:center;gap:6px;font-family:var(--ff-mono);font-size:10px;color:var(--dim)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:all .3s}
+.dot.live{background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 2s infinite}
+.dot.err{background:var(--red);box-shadow:0 0 8px var(--red)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.hdr-clock{margin-left:auto;font-family:var(--ff-mono);font-size:13px;color:var(--amber);letter-spacing:.06em}
+.rig-badges{display:flex;gap:5px}
+.rbadge{font-family:var(--ff-mono);font-size:8px;padding:2px 7px;border-radius:2px;
+  border:1px solid var(--bdr2);color:var(--dim);background:var(--surf);letter-spacing:.1em;
+  text-transform:uppercase;cursor:pointer;transition:all .2s}
+.rbadge.on{border-color:var(--green);color:var(--green);background:rgba(34,197,94,.08)}
+.rbadge:hover{border-color:var(--cyan);color:var(--cyan)}
+
+/* ─── CONTROL BAR ────────────────────────────────────── */
+.ctrl{height:50px;background:var(--bg2);border-bottom:1px solid var(--bdr);
+  display:flex;align-items:center;gap:12px;padding:0 20px;flex-wrap:wrap}
+.cl{font-family:var(--ff-mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.14em;white-space:nowrap}
+.ci{background:var(--surf);border:1px solid var(--bdr2);border-radius:3px;
+  color:var(--txt);font-family:var(--ff-mono);font-size:11px;padding:5px 8px;outline:none;
+  transition:border-color .2s}
+.ci:focus{border-color:var(--amber);box-shadow:0 0 0 2px rgba(245,158,11,.12)}
+.ci.w{width:170px}.ci.n{width:72px}.ci.m{width:105px}
+.csep{width:1px;height:28px;background:var(--bdr);flex-shrink:0}
+.btn{font-family:var(--ff-title);font-size:13px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;padding:6px 16px;border-radius:3px;border:none;cursor:pointer;
+  transition:all .15s;outline:none;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.btn-go{background:linear-gradient(135deg,#15803d,#16a34a);color:#fff;box-shadow:0 0 10px rgba(34,197,94,.2)}
+.btn-go:hover{box-shadow:0 0 18px rgba(34,197,94,.4);transform:translateY(-1px)}
+.btn-stop{background:linear-gradient(135deg,#9f1239,#be123c);color:#fff}
+.btn-stop:hover{box-shadow:0 0 14px rgba(244,63,94,.3)}
+.btn-ref{background:var(--surf2);color:var(--dim);border:1px solid var(--bdr2)}
+.btn-ref:hover{border-color:var(--cyan);color:var(--cyan)}
+.ctrl-r{margin-left:auto;font-family:var(--ff-mono);font-size:10px;color:var(--muted)}
+
+/* ─── LAYOUT ─────────────────────────────────────────── */
+.page{padding:18px 20px;display:flex;flex-direction:column;gap:22px;max-width:1800px;margin:0 auto}
+
+/* ─── FLEET SUMMARY ──────────────────────────────────── */
+.fleet-panel{background:var(--surf);border:1px solid var(--bdr);
+  border-top:2px solid var(--amber);border-radius:8px;padding:14px 18px}
+.sec-title{font-family:var(--ff-title);font-size:14px;font-weight:700;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--amber);display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.sec-line{flex:1;height:1px;background:linear-gradient(90deg,var(--bdr2),transparent)}
+.fleet-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:900px){.fleet-grid{grid-template-columns:repeat(2,1fr)}}
+.fcard{background:var(--bg3);border:1px solid var(--bdr);border-radius:6px;padding:12px;
+  cursor:pointer;transition:border-color .2s,box-shadow .2s}
+.fcard:hover{border-color:var(--cyan);box-shadow:0 0 14px rgba(34,211,238,.12)}
+.fcard-id{font-family:var(--ff-title);font-size:16px;font-weight:700;letter-spacing:.1em}
+.fcard-name{font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:.04em}
+.fkpi-row{display:flex;gap:10px;flex-wrap:wrap}
+.fkpi{display:flex;flex-direction:column;gap:1px;min-width:52px}
+.fkpi-lbl{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+.fkpi-val{font-family:var(--ff-mono);font-size:12px}
+.act-badge{display:inline-flex;align-items:center;gap:4px;margin-top:7px;
+  font-family:var(--ff-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  padding:2px 7px;border-radius:2px}
+.act-drilling{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.act-tripping{background:rgba(251,146,60,.1);color:var(--orange);border:1px solid rgba(251,146,60,.2)}
+.act-idle{background:rgba(107,141,181,.1);color:var(--dim);border:1px solid var(--bdr)}
+
+/* ─── RIG SECTION ────────────────────────────────────── */
+.rig-sec{background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;overflow:hidden}
+.rig-hdr{background:linear-gradient(90deg,var(--surf) 0%,var(--bg3) 100%);
+  border-bottom:1px solid var(--bdr);padding:11px 18px;
+  display:flex;align-items:center;gap:14px}
+.rig-bar{width:3px;height:34px;border-radius:2px;flex-shrink:0}
+.rig-id{font-family:var(--ff-title);font-size:22px;font-weight:700;letter-spacing:.12em}
+.rig-loc{font-size:11px;color:var(--muted);letter-spacing:.04em}
+.rig-ns{font-family:var(--ff-mono);font-size:9px;color:var(--muted);margin-top:1px}
+.rig-hdr-r{margin-left:auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.rig-ts{font-family:var(--ff-mono);font-size:10px;color:var(--muted)}
+.status-pill{font-family:var(--ff-mono);font-size:9px;letter-spacing:.1em;
+  padding:3px 9px;border-radius:3px;text-transform:uppercase;
+  background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);color:var(--green)}
+
+/* rig body: diagram | vert-charts | metrics */
+.rig-body{display:flex;gap:16px;padding:14px 18px;overflow:hidden}
+.rig-diag-col{flex-shrink:0;width:210px}
+.rig-vert-col{flex-shrink:0;width:128px;display:flex;flex-direction:column;gap:8px}
+.rig-metrics-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+
+/* ─── SVG RIG ────────────────────────────────────────── */
+.rig-svg-box{background:var(--bg3);border:1px solid var(--bdr);border-radius:8px;
+  padding:6px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.rig-svg-box svg{width:100%;height:auto;display:block}
+
+/* ─── VERTICAL CHART CARDS ───────────────────────────── */
+.vc-card{background:var(--bg3);border:1px solid var(--bdr);border-radius:6px;
+  padding:8px;display:flex;flex-direction:column;gap:4px}
+.vc-title{font-family:var(--ff-mono);font-size:8px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.1em;text-align:center}
+.vc-wrap{height:120px;position:relative}
+.vc-val{font-family:var(--ff-mono);font-size:15px;font-weight:600;text-align:center}
+.vc-unit{font-size:8px;color:var(--muted);text-align:center}
+
+/* ─── KPI CARDS ──────────────────────────────────────── */
+.grp-title{font-family:var(--ff-mono);font-size:8px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--muted);border-bottom:1px solid var(--bdr);padding-bottom:4px;margin-bottom:7px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:7px}
+.kcard{background:var(--surf);border:1px solid var(--bdr);border-radius:5px;
+  padding:9px 11px;position:relative;overflow:hidden;transition:border-color .2s}
+.kcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc,var(--cyan))}
+.kcard-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:3px}
+.kcard-val{font-family:var(--ff-mono);font-size:18px;font-weight:600;color:var(--kc,var(--txt));line-height:1}
+.kcard-unit{font-size:8px;color:var(--muted);margin-top:2px}
+.kcard-trend{font-size:9px;margin-top:2px}
+.tr-up{color:var(--green)}.tr-dn{color:var(--red)}.tr-flat{color:var(--muted)}
+
+/* time-series chart row */
+.ts-row{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.ts-card{background:var(--surf);border:1px solid var(--bdr);border-radius:5px;padding:8px}
+.ts-title{font-family:var(--ff-mono);font-size:8px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.09em;margin-bottom:5px;
+  display:flex;justify-content:space-between;align-items:center}
+.ts-wrap{height:85px;position:relative}
+
+/* ─── LOG PANEL (Dynics / Enterprise C style) ─────────── */
+.log-panel{background:#0d1117;border:1px solid #21303d;border-radius:8px;overflow:hidden;
+  font-family:var(--ff-mono)}
+.log-hdr{padding:6px 12px;background:#161b22;border-bottom:1px solid #21303d;
+  display:flex;align-items:center;gap:9px;font-size:9px;color:#3d5268;
+  text-transform:uppercase;letter-spacing:.3px}
+.log-hdr-title{color:#00d4ff;font-size:10px;font-weight:700;letter-spacing:.06em}
+.lp{background:#1a2d3e;border:1px solid #1d3850;border-radius:3px;
+  padding:1px 7px;font-size:9px;color:#4e9abe}
+.lp.ok{background:#0e2218;border-color:#163321;color:#3fb950}
+.lp.err{background:#2a0d13;border-color:#441520;color:#f85149}
+.log-col{display:grid;grid-template-columns:65px 46px 48px 66px 1fr 62px 60px;
+  padding:4px 0;background:#161b22;border-bottom:1px solid #21303d;
+  font-size:8px;color:#3d5268;text-transform:uppercase;letter-spacing:.3px}
+.log-col span:first-child{padding-left:9px}
+.log-col span:last-child{padding-right:9px;text-align:right}
+.log-body{height:190px;overflow-y:auto;background:#0d1117}
+.le{display:grid;grid-template-columns:65px 46px 48px 66px 1fr 62px 60px;
+  align-items:center;border-bottom:1px solid #131b24;
+  border-left:2px solid transparent;font-size:9px;line-height:1.85;min-height:20px;color:#c5d4e0}
+.le:hover{background:#141e2a}
+.le.lok{border-left-color:transparent}
+.le.lerr{border-left-color:#f85149}
+.le.linfo{border-left-color:#1b3352}
+.le-t{color:#496070;padding-left:9px;white-space:nowrap}
+.le-m{text-align:center;font-weight:700}
+.m-post{color:#4e9abe}.m-get{color:#3fb950}.m-info{color:#d4a017}.m-err{color:#f85149}
+.le-s{display:flex;align-items:center;justify-content:center}
+.s-ok{color:#3fb950;font-weight:700}.s-err{color:#f85149;font-weight:700}.s-na{color:#3d5268}
+.le-d{text-align:right;padding-right:5px;color:#496070}
+.le-p{color:#5aabe8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
+.le-det{color:#6a7f8e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:8px}
+.le-r{text-align:right;padding-right:9px;color:#3fb950}
+.log-foot{padding:5px 12px;background:#0d1117;border-top:1px solid #18232e;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.lstat{display:flex;align-items:center;gap:5px;font-size:9px}
+.lstat-k{color:#3d5268;text-transform:uppercase;letter-spacing:.1em}
+.lstat-v{color:#7a99ae;font-weight:600}
+.log-clear{margin-left:auto;background:#18232e;border:1px solid #21303d;border-radius:3px;
+  color:#3d5268;font-family:var(--ff-mono);font-size:9px;padding:2px 8px;
+  cursor:pointer;letter-spacing:.1em}
+.log-clear:hover{color:#7a99ae;border-color:#496070}
+
+/* empty state */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;color:var(--muted);padding:40px}
+.empty h3{font-family:var(--ff-title);font-size:16px;letter-spacing:.1em;color:var(--dim)}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <span class="hdr-flame">🔥</span>
+  <div>
+    <div class="hdr-brand">Timbergrove</div>
+    <div class="hdr-sub">Drilling Operations · Interval Monitor</div>
+  </div>
+  <div class="hdr-sep"></div>
+  <div class="hdr-live">
+    <div class="dot" id="dot"></div>
+    <span id="statusTxt">Offline</span>
+  </div>
+  <div class="rig-badges" id="rigBadges"></div>
+  <div class="hdr-clock" id="clock">--:--:--</div>
+</header>
+
+<!-- CONTROLS -->
+<div class="ctrl">
+  <div style="display:flex;align-items:center;gap:7px">
+    <span class="cl">Bridge</span>
+    <input class="ci w" id="bridgeHost" value="localhost:8080" placeholder="host:port">
+  </div>
+  <div class="csep"></div>
+  <div style="display:flex;align-items:center;gap:7px">
+    <span class="cl">Interval</span>
+    <input class="ci n" id="intervalSec" type="number" value="30" min="5" max="3600">
+    <span class="cl">sec</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:7px">
+    <span class="cl">Window</span>
+    <select class="ci m" id="windowHr">
+      <option value="1">1 hr</option>
+      <option value="6">6 hrs</option>
+      <option value="12">12 hrs</option>
+      <option value="24" selected>24 hrs</option>
+      <option value="48">48 hrs</option>
+    </select>
+  </div>
+  <div style="display:flex;align-items:center;gap:7px">
+    <span class="cl">Bucket</span>
+    <select class="ci m" id="bucketMin">
+      <option value="1">1 min</option>
+      <option value="5" selected>5 min</option>
+      <option value="15">15 min</option>
+      <option value="30">30 min</option>
+      <option value="60">1 hr</option>
+    </select>
+  </div>
+  <div class="csep"></div>
+  <button class="btn btn-go" id="btnStart" onclick="startPolling()">▶ Start</button>
+  <button class="btn btn-stop" id="btnStop" onclick="stopPolling()" style="display:none">⏹ Stop</button>
+  <button class="btn btn-ref" onclick="fetchAll()">⟳ Now</button>
+  <div class="ctrl-r">Last: <span id="lastUpd">—</span></div>
+</div>
+
+<!-- PAGE -->
+<div class="page">
+
+  <!-- Fleet Summary -->
+  <div class="fleet-panel" id="fleetPanel">
+    <div class="sec-title">◈ Fleet Summary — All Rigs<div class="sec-line"></div></div>
+    <div class="fleet-grid" id="fleetGrid">
+      <div class="empty" style="grid-column:1/-1"><p>Start polling or click ⟳ Now to load data</p></div>
+    </div>
+  </div>
+
+  <!-- Per-rig sections injected here -->
+  <div id="rigSections" style="display:flex;flex-direction:column;gap:20px"></div>
+
+  <!-- Log Panel -->
+  <div class="log-panel">
+    <div class="log-hdr">
+      <span class="log-hdr-title">◈ API CALL LOG</span>
+      <span class="lp" id="lpRest">REST 0</span>
+      <span class="lp" id="lpSQL">SQL 0</span>
+      <span class="lp ok" id="lpOK">OK 0</span>
+      <span class="lp err" id="lpERR">ERR 0</span>
+      <span style="margin-left:auto;color:#3d5268;font-size:8px" id="lpRowTot">rows: 0</span>
+    </div>
+    <div class="log-col">
+      <span>Time</span>
+      <span style="text-align:center">Method</span>
+      <span style="text-align:center">Status</span>
+      <span style="text-align:right;padding-right:5px">Duration</span>
+      <span style="padding:0 4px">Path / Query</span>
+      <span>Detail</span>
+      <span>Rows</span>
+    </div>
+    <div class="log-body" id="logBody"></div>
+    <div class="log-foot">
+      <div class="lstat"><span class="lstat-k">calls</span><span class="lstat-v" id="lsCalls">0</span></div>
+      <div class="lstat"><span class="lstat-k">rows</span><span class="lstat-v" id="lsRows">0</span></div>
+      <div class="lstat"><span class="lstat-k">avg ms</span><span class="lstat-v" id="lsAvg">—</span></div>
+      <div class="lstat" id="lsPerRig" style="gap:8px;flex-wrap:wrap"></div>
+      <button class="log-clear" onclick="clearLog()">✕ Clear</button>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+/* ═══════════════════════════════════════════════════
+   UNS — sourced directly from Timbergrove MCP
+   listPolicies(policyType='uns') 2026-02-23
+═══════════════════════════════════════════════════ */
+const UNS = {
+  dbms: 'timbergrove',
+  table: 'rig_data',
+  rigs: [
+    { id:'RIG-TX-001', name:'Permian Basin',  zone:'land',    col:'#22d3ee', ns:'Timbergrove/land/RIG-TX-001'     },
+    { id:'RIG-TX-007', name:'Eagle Ford',     zone:'land',    col:'#22c55e', ns:'Timbergrove/land/RIG-TX-007'     },
+    { id:'RIG-ND-012', name:'Bakken',         zone:'land',    col:'#f59e0b', ns:'Timbergrove/land/RIG-ND-012'     },
+    { id:'RIG-GOM-023',name:'Deepwater GOM',  zone:'offshore',col:'#c084fc', ns:'Timbergrove/offshore/RIG-GOM-023'},
+  ],
+  sensors: [
+    // col, label, unit, group, kpi, isVert, color
+    {col:'rop',               lbl:'ROP',         unit:'ft/hr',  grp:'Drilling',   kpi:1, vert:0, c:'#22d3ee'},
+    {col:'wob',               lbl:'WOB',         unit:'klbf',   grp:'Drilling',   kpi:1, vert:0, c:'#38bdf8'},
+    {col:'rpm',               lbl:'RPM',         unit:'rpm',    grp:'Rotation',   kpi:1, vert:0, c:'#4ade80'},
+    {col:'torque',            lbl:'Torque',       unit:'ft·lb',  grp:'Rotation',   kpi:1, vert:0, c:'#86efac'},
+    {col:'standpipe_pressure',lbl:'Standpipe P',  unit:'psi',    grp:'Pressure',   kpi:1, vert:1, c:'#f43f5e'},
+    {col:'choke_pressure',    lbl:'Choke P',      unit:'psi',    grp:'Pressure',   kpi:1, vert:1, c:'#fb923c'},
+    {col:'flow_rate',         lbl:'Flow Rate',    unit:'gpm',    grp:'Hydraulics', kpi:1, vert:0, c:'#22d3ee'},
+    {col:'hookload',          lbl:'Hookload',     unit:'klbf',   grp:'Mechanical', kpi:1, vert:0, c:'#c084fc'},
+    {col:'bit_depth',         lbl:'Bit Depth',    unit:'ft',     grp:'Depth',      kpi:1, vert:1, c:'#fbbf24'},
+    {col:'hole_depth',        lbl:'Hole Depth',   unit:'ft',     grp:'Depth',      kpi:0, vert:1, c:'#fde68a'},
+    {col:'measured_depth',    lbl:'Meas Depth',   unit:'ft',     grp:'Depth',      kpi:1, vert:0, c:'#fef3c7'},
+    {col:'true_vertical_depth',lbl:'TVD',         unit:'ft',     grp:'Depth',      kpi:1, vert:0, c:'#e0f2fe'},
+    {col:'mud_weight_in',     lbl:'Mud Wt In',    unit:'ppg',    grp:'Mud',        kpi:0, vert:0, c:'#64748b'},
+    {col:'mud_weight_out',    lbl:'Mud Wt Out',   unit:'ppg',    grp:'Mud',        kpi:0, vert:0, c:'#94a3b8'},
+    {col:'mud_temp_in',       lbl:'Mud Temp In',  unit:'°F',     grp:'Mud',        kpi:0, vert:0, c:'#0ea5e9'},
+    {col:'mud_temp_out',      lbl:'Mud Temp Out', unit:'°F',     grp:'Mud',        kpi:0, vert:0, c:'#38bdf8'},
+    {col:'total_gas',         lbl:'Total Gas',    unit:'units',  grp:'Gas',        kpi:1, vert:0, c:'#a3e635'},
+    {col:'block_height',      lbl:'Block Ht',     unit:'ft',     grp:'Mechanical', kpi:0, vert:0, c:'#818cf8'},
+  ],
+};
+const S = Object.fromEntries(UNS.sensors.map(s=>[s.col,s])); // sensor lookup by col
+
+/* ═══════════════════════════════════════════════════
+   LOG STATE
+═══════════════════════════════════════════════════ */
+const LOG = {rest:0,sql:0,ok:0,err:0,totalRows:0,totalMs:0,calls:0,perRig:{}};
+
+function logEntry(method, httpStatus, durationMs, path, detail, rows){
+  const body = document.getElementById('logBody');
+  if(!body) return;
+  const ts   = new Date().toTimeString().substring(0,8);
+  const isErr  = httpStatus===0||(httpStatus!=null&&httpStatus>=400);
+  const isInfo = method==='INFO'||method==='WARN';
+  const cls    = isErr?'lerr':isInfo?'linfo':'lok';
+  const mCls   = {POST:'m-post',GET:'m-get',INFO:'m-info',WARN:'m-err',ERROR:'m-err'}[method]||'m-post';
+
+  let sHtml = `<span class="le-s s-na">—</span>`;
+  if(httpStatus===200||httpStatus===201) sHtml=`<span class="le-s s-ok">${httpStatus}</span>`;
+  else if(httpStatus!=null&&httpStatus!==''&&!isInfo) sHtml=`<span class="le-s s-err">${httpStatus||'ERR'}</span>`;
+
+  const dHtml = durationMs!=null?`<span class="le-d">${durationMs}ms</span>`:`<span class="le-d" style="color:#3d5268">—</span>`;
+  const rn    = parseInt(rows,10);
+  const rHtml = !isNaN(rn)?`<span class="le-r">${rn.toLocaleString()} r</span>`:`<span class="le-r" style="color:#3d5268">—</span>`;
+
+  const el = document.createElement('div');
+  el.className=`le ${cls}`;
+  el.innerHTML=
+    `<span class="le-t">${ts}</span>`+
+    `<span class="le-m ${mCls}">${method}</span>`+
+    sHtml+dHtml+
+    `<span class="le-p" title="${escH(path||'')}">${path||'—'}</span>`+
+    `<span class="le-det" title="${escH(detail||'')}">${detail||''}</span>`+
+    rHtml;
+  body.appendChild(el);
+  while(body.children.length>400) body.removeChild(body.firstChild);
+  body.scrollTop=body.scrollHeight;
+}
+function escH(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function logInfo(msg,det){logEntry('INFO',null,null,msg,det||'',null)}
+function logWarn(msg,det){logEntry('WARN',null,null,msg,det||'',null)}
+
+function syncLogUI(){
+  const $=id=>document.getElementById(id);
+  $('lpRest').textContent=`REST ${LOG.rest}`;
+  $('lpSQL').textContent=`SQL ${LOG.sql}`;
+  $('lpOK').textContent=`OK ${LOG.ok}`;
+  $('lpERR').textContent=`ERR ${LOG.err}`;
+  $('lpRowTot').textContent=`rows: ${LOG.totalRows.toLocaleString()}`;
+  $('lsCalls').textContent=LOG.calls;
+  $('lsRows').textContent=LOG.totalRows.toLocaleString();
+  $('lsAvg').textContent=LOG.calls>0?Math.round(LOG.totalMs/LOG.calls)+'ms':'—';
+  const pr=$('lsPerRig');
+  if(pr&&Object.keys(LOG.perRig).length)
+    pr.innerHTML=Object.entries(LOG.perRig)
+      .map(([r,c])=>`<span class="lstat"><span class="lstat-k">${r}</span><span class="lstat-v">${c.toLocaleString()}r</span></span>`)
+      .join('');
+}
+function clearLog(){
+  document.getElementById('logBody').innerHTML='';
+  Object.assign(LOG,{rest:0,sql:0,ok:0,err:0,totalRows:0,totalMs:0,calls:0,perRig:{}});
+  syncLogUI();
+}
+
+/* ═══════════════════════════════════════════════════
+   BRIDGE CALLS
+═══════════════════════════════════════════════════ */
+function bridgeBase(){
+  const h=document.getElementById('bridgeHost').value.trim();
+  return h.startsWith('http')?h:`http://${h}`;
+}
+
+async function callQuery(sql, rigId){
+  const url=bridgeBase()+'/api/query';
+  const t0=Date.now(); LOG.rest++;
+  logInfo(`▶ POST /api/query`,`${rigId||'fleet'} · ${sql.substring(0,60)}…`);
+
+  let resp;
+  try{
+    resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({dbms:UNS.dbms,sql}),signal:AbortSignal.timeout(50000)});
+  }catch(e){
+    const ms=Date.now()-t0; LOG.err++;
+    logEntry('POST',0,ms,'/api/query',`${rigId||'fleet'}: ${e.message}`,null);
+    syncLogUI(); setDot('err'); return null;
+  }
+  const ms=Date.now()-t0; LOG.sql++; LOG.totalMs+=ms; LOG.calls++;
+  if(!resp.ok){
+    LOG.err++;
+    logEntry('POST',resp.status,ms,'/api/query',`${rigId||'fleet'}: HTTP ${resp.status}`,null);
+    syncLogUI(); return null;
+  }
+  const data=await resp.json();
+  const rows=data.results?.length??0;
+  LOG.ok++; LOG.totalRows+=rows;
+  if(rigId) LOG.perRig[rigId]=(LOG.perRig[rigId]||0)+rows;
+  logEntry('POST',resp.status,ms,'/api/query',sql.substring(0,75),rows);
+  syncLogUI();
+  return data.results||[];
+}
+
+async function callIncrement(rigId, hours, bucketMin){
+  const url=bridgeBase()+'/api/query/increment';
+  const t0=Date.now(); LOG.rest++;
+  const detail=`${rigId} · ${hours}h window · ${bucketMin}min bucket`;
+  logInfo(`▶ POST /api/query/increment`, detail);
+
+  const numericCols=UNS.sensors.filter(s=>!['activity','status'].includes(s.col));
+  const projs=numericCols.flatMap(s=>[`avg(${s.col})`,`min(${s.col})`,`max(${s.col})`]).slice(0,24);
+
+  const body={
+    dbms:UNS.dbms, table:UNS.table, timeColumn:'timestamp',
+    startTime:`NOW() - ${hours} hours`, endTime:'NOW()',
+    intervalLength:parseInt(bucketMin), timeUnit:'minute',
+    projections:projs,
+    where:`rig_id='${rigId}'`,
+  };
+
+  let resp;
+  try{
+    resp=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body),signal:AbortSignal.timeout(60000)});
+  }catch(e){
+    const ms=Date.now()-t0; LOG.err++;
+    logEntry('POST',0,ms,'/api/query/increment',`${rigId}: ${e.message}`,null);
+    syncLogUI(); return null;
+  }
+  const ms=Date.now()-t0; LOG.sql++; LOG.totalMs+=ms; LOG.calls++;
+  if(!resp.ok){
+    LOG.err++;
+    logEntry('POST',resp.status,ms,'/api/query/increment',`${rigId}: HTTP ${resp.status}`,null);
+    syncLogUI(); return null;
+  }
+  const data=await resp.json();
+  const rows=data.results?.length??0;
+  LOG.ok++; LOG.totalRows+=rows;
+  if(rigId) LOG.perRig[rigId]=(LOG.perRig[rigId]||0)+rows;
+  logEntry('POST',resp.status,ms,'/api/query/increment',detail,rows);
+  syncLogUI();
+  return data.results||[];
+}
+
+/* ═══════════════════════════════════════════════════
+   DATA STORE
+═══════════════════════════════════════════════════ */
+const STORE={}; // rigId → {latest:{}, series:{col→[{t,v,mn,mx}]}}
+UNS.rigs.forEach(r=>{STORE[r.id]={latest:{},series:{}}});
+
+/* ═══════════════════════════════════════════════════
+   FETCH ALL
+═══════════════════════════════════════════════════ */
+async function fetchAll(){
+  const hours=parseInt(document.getElementById('windowHr').value)||24;
+  const bucket=parseInt(document.getElementById('bucketMin').value)||5;
+  setDot('loading');
+  logInfo('═══ Fetch cycle start ═══',`window=${hours}h bucket=${bucket}min`);
+
+  // Run rigs in sequence (bridge serialises MCP anyway)
+  for(const rig of UNS.rigs){
+    await fetchRig(rig, hours, bucket);
+  }
+
+  renderFleetSummary();
+  UNS.rigs.forEach(r=>renderRigSection(r));
+  document.getElementById('lastUpd').textContent=new Date().toLocaleTimeString();
+  setDot('live');
+  logInfo('═══ Fetch cycle complete ═══');
+}
+
+async function fetchRig(rig, hours, bucket){
+  logInfo(`── ${rig.id} ──`,`${rig.name} · ${rig.zone}`);
+
+  // Latest single row
+  const latSQL=`SELECT ${UNS.sensors.map(s=>s.col).join(',')},timestamp FROM ${UNS.table} WHERE rig_id='${rig.id}' AND timestamp>=NOW()-${hours} hours ORDER BY timestamp DESC LIMIT 1`;
+  const latRows=await callQuery(latSQL, rig.id);
+  if(latRows?.length) STORE[rig.id].latest=latRows[0];
+
+  // Interval series via /increment endpoint
+  const serRows=await callIncrement(rig.id, hours, bucket);
+  if(serRows){
+    const ser={};
+    UNS.sensors.filter(s=>!['activity','status'].includes(s.col)).forEach(s=>{
+      ser[s.col]=serRows.map(r=>{
+        const t=r.timestamp||r.time||r.interval_start||'';
+        // handle both 'avg_rop' and 'avg(rop)' key formats
+        const v=r[`avg_${s.col}`]??r[`avg(${s.col})`]??null;
+        const mn=r[`min_${s.col}`]??r[`min(${s.col})`]??null;
+        const mx=r[`max_${s.col}`]??r[`max(${s.col})`]??null;
+        return {t, v:v!=null?+parseFloat(v).toFixed(2):null,
+                   mn:mn!=null?+parseFloat(mn).toFixed(2):null,
+                   mx:mx!=null?+parseFloat(mx).toFixed(2):null};
+      });
+    });
+    STORE[rig.id].series=ser;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   CHART REGISTRY
+═══════════════════════════════════════════════════ */
+const CHARTS={};
+const CHART_OPT={
+  animation:false, responsive:true, maintainAspectRatio:false,
+  plugins:{legend:{display:false},tooltip:{
+    backgroundColor:'rgba(6,9,20,.95)',borderColor:'#1b2e4a',borderWidth:1,
+    titleColor:'#ccdff5',bodyColor:'#6b8db5',
+    titleFont:{family:"'Share Tech Mono'",size:10},
+    bodyFont:{family:"'Share Tech Mono'",size:9},
+    padding:8,
+  }},
+};
+
+function chartSet(id, cfg){
+  if(CHARTS[id]){
+    const c=CHARTS[id];
+    c.data.labels=cfg.data.labels;
+    c.data.datasets=cfg.data.datasets;
+    c.options=cfg.options||c.options;
+    c.update('none');
+    return c;
+  }
+  const el=document.getElementById(id);
+  if(!el) return null;
+  CHARTS[id]=new Chart(el,cfg);
+  return CHARTS[id];
+}
+
+function lineOpts(color, y2color){
+  return {
+    ...CHART_OPT,
+    scales:{
+      x:{display:false},
+      y:{display:true,position:'left',
+        ticks:{color:color+'aa',font:{family:"'Share Tech Mono'",size:7},maxTicksLimit:4},
+        grid:{color:'#0e1a2a'}},
+      ...(y2color?{y2:{display:true,position:'right',
+        ticks:{color:y2color+'aa',font:{family:"'Share Tech Mono'",size:7},maxTicksLimit:4},
+        grid:{display:false}}}:{}),
+    },
+  };
+}
+
+function vertBarOpts(color, reverse){
+  return {
+    ...CHART_OPT,
+    scales:{
+      x:{display:false},
+      y:{display:true,reverse:!!reverse,
+        ticks:{color:color+'aa',font:{family:"'Share Tech Mono'",size:7},maxTicksLimit:5},
+        grid:{color:'#0e1a2a'}},
+    },
+  };
+}
+
+function tslabels(pts){
+  return pts.map(p=>p.t?new Date(p.t).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}):'');
+}
+
+/* ═══════════════════════════════════════════════════
+   FLEET SUMMARY RENDER
+═══════════════════════════════════════════════════ */
+function renderFleetSummary(){
+  const grid=document.getElementById('fleetGrid');
+  grid.innerHTML='';
+  UNS.rigs.forEach(r=>{
+    const d=STORE[r.id].latest;
+    const act=(d.activity||'—').toLowerCase();
+    const aCls=act==='drilling'?'act-drilling':act.includes('trip')?'act-tripping':'act-idle';
+    const card=document.createElement('div');
+    card.className='fcard';
+    card.style.borderTop=`2px solid ${r.col}`;
+    card.onclick=()=>document.getElementById(`RS-${r.id}`)?.scrollIntoView({behavior:'smooth'});
+    card.innerHTML=`
+      <div class="fcard-id" style="color:${r.col}">${r.id}</div>
+      <div class="fcard-name">${r.name} · ${r.zone}</div>
+      <div class="fkpi-row">
+        ${['rop','wob','rpm','standpipe_pressure','bit_depth','flow_rate'].map(col=>{
+          const s=S[col]; const v=d[col];
+          return `<div class="fkpi">
+            <span class="fkpi-lbl">${s.lbl}</span>
+            <span class="fkpi-val" style="color:${s.c}">${v!=null?fmtV(v,col):'—'}</span>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="act-badge ${aCls}">⬤ ${act}</div>`;
+    grid.appendChild(card);
+  });
+
+  // header badges
+  document.getElementById('rigBadges').innerHTML=UNS.rigs.map(r=>{
+    const d=STORE[r.id].latest;
+    const on=d.status==='operational';
+    return `<span class="rbadge ${on?'on':''}" style="${on?`color:${r.col};border-color:${r.col}55`:''}">
+      ${r.id.split('-').slice(-1)[0]}</span>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════
+   RIG SECTION RENDER
+═══════════════════════════════════════════════════ */
+function renderRigSection(rig){
+  let sec=document.getElementById(`RS-${rig.id}`);
+  if(!sec){
+    sec=document.createElement('div');
+    sec.id=`RS-${rig.id}`;
+    sec.className='rig-sec';
+    document.getElementById('rigSections').appendChild(sec);
+  }
+  const d=STORE[rig.id].latest;
+  const ser=STORE[rig.id].series;
+  const act=(d.activity||'—').toLowerCase();
+  const aCls=act==='drilling'?'act-drilling':act.includes('trip')?'act-tripping':'act-idle';
+
+  sec.innerHTML=`
+  <div class="rig-hdr">
+    <div class="rig-bar" style="background:${rig.col}"></div>
+    <div>
+      <div class="rig-id" style="color:${rig.col}">${rig.id}</div>
+      <div class="rig-loc">${rig.name} · ${rig.zone.toUpperCase()}</div>
+      <div class="rig-ns">${rig.ns}</div>
+    </div>
+    <div class="rig-hdr-r">
+      <span class="act-badge ${aCls}">⬤ ${act}</span>
+      <span class="status-pill" style="background:${rig.col}12;border-color:${rig.col}44;color:${rig.col}">${d.status||'—'}</span>
+      <span class="rig-ts">${d.timestamp?new Date(d.timestamp).toLocaleTimeString():'—'}</span>
+    </div>
+  </div>
+  <div class="rig-body">
+    <div class="rig-diag-col">${buildRigSVG(rig,d)}</div>
+    <div class="rig-vert-col">${buildVertCards(rig)}</div>
+    <div class="rig-metrics-col">${buildMetrics(rig,d,ser)}</div>
+  </div>`;
+
+  requestAnimationFrame(()=>{
+    renderVertCharts(rig,d,ser);
+    renderTSCharts(rig,d,ser);
+  });
+}
+
+/* ═══════════════════════════════════════════════════
+   RIG SVG DIAGRAM
+═══════════════════════════════════════════════════ */
+function buildRigSVG(rig, d){
+  const c=rig.col;
+  const isOff=rig.zone==='offshore';
+  const bd=d.bit_depth||0, hd=d.hole_depth||0;
+  const bh=Math.min(100, Math.max(20, d.block_height||60));
+  const hookY=20+bh; // travelling block y position based on block height
+
+  return `<div class="rig-svg-box">
+<svg viewBox="0 0 200 340" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <linearGradient id="gg${rig.id}" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#101e35"/>
+    <stop offset="50%" stop-color="#1a2e4a"/>
+    <stop offset="100%" stop-color="#101e35"/>
+  </linearGradient>
+  <linearGradient id="sky${rig.id}" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#03070e"/>
+    <stop offset="100%" stop-color="#060c17"/>
+  </linearGradient>
+  <radialGradient id="glow${rig.id}" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="${c}" stop-opacity="0.15"/>
+    <stop offset="100%" stop-color="${c}" stop-opacity="0"/>
+  </radialGradient>
+</defs>
+
+<!-- Sky background -->
+<rect width="200" height="340" fill="url(#sky${rig.id})"/>
+
+<!-- Atmosphere glow behind derrick -->
+<ellipse cx="100" cy="140" rx="55" ry="130" fill="url(#glow${rig.id})"/>
+
+${isOff?`
+<!-- Ocean -->
+<rect x="0" y="250" width="200" height="90" fill="#021625" opacity="0.9"/>
+<path d="M0,250 Q30,244 60,250 Q90,256 120,250 Q150,244 200,250" fill="none" stroke="${c}" stroke-width="0.8" opacity="0.35"/>
+<path d="M0,258 Q40,252 80,258 Q120,264 160,258 Q180,254 200,258" fill="none" stroke="${c}" stroke-width="0.4" opacity="0.2"/>
+<!-- Platform deck -->
+<rect x="38" y="238" width="124" height="14" rx="2" fill="url(#gg${rig.id})" stroke="${c}" stroke-width="0.6" opacity="0.9"/>
+<!-- Platform legs -->
+<line x1="55" y1="252" x2="42" y2="330" stroke="#1a2d45" stroke-width="6"/>
+<line x1="145" y1="252" x2="158" y2="330" stroke="#1a2d45" stroke-width="6"/>
+<line x1="80" y1="252" x2="73" y2="330" stroke="#1a2d45" stroke-width="4"/>
+<line x1="120" y1="252" x2="127" y2="330" stroke="#1a2d45" stroke-width="4"/>
+<!-- Cross braces under water -->
+<line x1="42" y1="280" x2="158" y2="295" stroke="#18293d" stroke-width="1.5"/>
+<line x1="158" y1="280" x2="42" y2="295" stroke="#18293d" stroke-width="1.5"/>
+<line x1="42" y1="305" x2="158" y2="318" stroke="#18293d" stroke-width="1"/>
+<!-- Water surface depth label -->
+<text x="6" y="263" fill="${c}" font-size="6" font-family="Share Tech Mono" opacity="0.5">~WD</text>
+`:`
+<!-- Ground -->
+<rect x="0" y="250" width="200" height="90" fill="#040a12" opacity="0.95"/>
+<line x1="0" y1="250" x2="200" y2="250" stroke="${c}" stroke-width="0.5" opacity="0.25"/>
+<!-- Ground texture -->
+<line x1="10" y1="256" x2="40" y2="256" stroke="#0d1f32" stroke-width="1"/>
+<line x1="60" y1="260" x2="100" y2="260" stroke="#0d1f32" stroke-width="1"/>
+<line x1="140" y1="255" x2="180" y2="255" stroke="#0d1f32" stroke-width="1"/>
+<!-- Substructure base -->
+<rect x="48" y="232" width="104" height="20" rx="2" fill="url(#gg${rig.id})" stroke="${c}" stroke-width="0.5" opacity="0.8"/>
+<!-- Concrete bases/footings -->
+<rect x="52" y="250" width="22" height="8" rx="1" fill="#0d1f32"/>
+<rect x="82" y="250" width="16" height="6" rx="1" fill="#0d1f32"/>
+<rect x="102" y="250" width="16" height="6" rx="1" fill="#0d1f32"/>
+<rect x="126" y="250" width="22" height="8" rx="1" fill="#0d1f32"/>
+`}
+
+<!-- DERRICK LEGS (main structural) -->
+<line x1="68" y1="232" x2="93" y2="18" stroke="${c}" stroke-width="2.2" opacity="0.85"/>
+<line x1="132" y1="232" x2="107" y2="18" stroke="${c}" stroke-width="2.2" opacity="0.85"/>
+
+<!-- Crown block at top -->
+<rect x="88" y="11" width="24" height="9" rx="2" fill="${c}" opacity="0.9"/>
+<rect x="91" y="9" width="18" height="4" rx="1" fill="${c}" opacity="0.7"/>
+
+<!-- HORIZONTAL BRACING LADDER -->
+${[220,200,180,160,140,120,100,80,60,40].map((y,i)=>{
+  const lx1=68+((232-y)/232)*25, lx2=132-((232-y)/232)*25;
+  return `<line x1="${lx1.toFixed(1)}" y1="${y}" x2="${lx2.toFixed(1)}" y2="${y}" stroke="${c}" stroke-width="${i<3?1:0.6}" opacity="${i<2?0.4:0.2}"/>`;
+}).join('')}
+
+<!-- DIAGONAL X BRACES -->
+${[[220,180],[180,140],[140,100],[100,60]].map(([y1,y2],i)=>{
+  const a=68+((232-y1)/232)*25, b=132-((232-y1)/232)*25;
+  const c2=68+((232-y2)/232)*25, d2=132-((232-y2)/232)*25;
+  return `<line x1="${a.toFixed(1)}" y1="${y1}" x2="${d2.toFixed(1)}" y2="${y2}" stroke="${c}" stroke-width="0.5" opacity="0.18"/>
+          <line x1="${b.toFixed(1)}" y1="${y1}" x2="${c2.toFixed(1)}" y2="${y2}" stroke="${c}" stroke-width="0.5" opacity="0.18"/>`;
+}).join('')}
+
+<!-- DRAWWORKS (right of rig floor) -->
+<rect x="150" y="198" width="38" height="32" rx="3" fill="url(#gg${rig.id})" stroke="${c}" stroke-width="0.8"/>
+<rect x="154" y="203" width="30" height="8" rx="1" fill="${c}" opacity="0.15"/>
+<text x="169" y="212" text-anchor="middle" fill="${c}" font-size="6" font-family="Share Tech Mono">DRAW</text>
+<text x="169" y="221" text-anchor="middle" fill="${c}" font-size="5.5" font-family="Share Tech Mono">WORKS</text>
+<!-- Drum symbol -->
+<ellipse cx="169" cy="223" rx="8" ry="4" fill="none" stroke="${c}" stroke-width="0.8" opacity="0.5"/>
+<!-- Fast line to crown -->
+<line x1="150" y1="203" x2="107" y2="15" stroke="${c}" stroke-width="0.7" stroke-dasharray="3,2" opacity="0.35"/>
+
+<!-- MUD PUMP SYSTEM (left) -->
+<rect x="8" y="180" width="32" height="44" rx="3" fill="url(#gg${rig.id})" stroke="#22d3ee" stroke-width="0.8"/>
+<rect x="10" y="184" width="28" height="9" rx="1" fill="#22d3ee" opacity="0.12"/>
+<text x="24" y="197" text-anchor="middle" fill="#22d3ee" font-size="6" font-family="Share Tech Mono">MUD</text>
+<text x="24" y="206" text-anchor="middle" fill="#22d3ee" font-size="5.5" font-family="Share Tech Mono">PUMP</text>
+<!-- Piston indicator -->
+<rect x="12" y="208" width="20" height="5" rx="1" fill="none" stroke="#22d3ee" stroke-width="0.6" opacity="0.4"/>
+<rect x="12" y="208" width="${8+(d.flow_rate||0)/100}" height="5" rx="1" fill="#22d3ee" opacity="0.25"/>
+<!-- Standpipe (mud delivery) -->
+<path d="M40,195 Q60,190 63,195 L63,${isOff?238:232}" fill="none" stroke="#22d3ee" stroke-width="1.8" opacity="0.55"/>
+<!-- Flow rate annotation -->
+<text x="2" y="232" fill="#22d3ee" font-size="6.5" font-family="Share Tech Mono">${fmtSVG(d.flow_rate,'flow_rate')} gpm</text>
+
+<!-- SHAKER / SOLIDS CONTROL (far left bottom) -->
+<rect x="4" y="${isOff?226:228}" width="26" height="10" rx="2" fill="url(#gg${rig.id})" stroke="#64748b" stroke-width="0.6"/>
+<text x="17" y="${isOff?234:236}" text-anchor="middle" fill="#64748b" font-size="5" font-family="Share Tech Mono">SHAKER</text>
+
+<!-- BOP STACK -->
+<rect x="83" y="${isOff?245:243}" width="34" height="12" rx="2" fill="url(#gg${rig.id})" stroke="${(d.choke_pressure||0)>1200?'#f43f5e':'#ef4444'}" stroke-width="0.9"/>
+<text x="100" y="${isOff?253:251}" text-anchor="middle" fill="#f43f5e" font-size="6" font-family="Share Tech Mono">BOP</text>
+
+<!-- TRAVELLING BLOCK + HOOK -->
+<rect x="88" y="${hookY}" width="24" height="12" rx="2" fill="url(#gg${rig.id})" stroke="${c}" stroke-width="1.2"/>
+<text x="100" y="${hookY+8}" text-anchor="middle" fill="${c}" font-size="6" font-family="Share Tech Mono">TB</text>
+<!-- Dead line -->
+<line x1="93" y1="17" x2="93" y2="${hookY}" stroke="${c}" stroke-width="0.7" stroke-dasharray="2,3" opacity="0.4"/>
+<line x1="107" y1="17" x2="107" y2="${hookY}" stroke="${c}" stroke-width="0.7" stroke-dasharray="2,3" opacity="0.4"/>
+
+<!-- TOP DRIVE -->
+<rect x="91" y="${hookY-12}" width="18" height="13" rx="2" fill="url(#gg${rig.id})" stroke="${c}" stroke-width="1"/>
+<text x="100" y="${hookY-4}" text-anchor="middle" fill="${c}" font-size="5.5" font-family="Share Tech Mono">TD</text>
+
+<!-- DRILL STRING -->
+<rect x="97" y="${hookY+12}" width="6" height="${Math.min(210-hookY, 190-hookY)}" rx="1" fill="#1a2e4a" stroke="${c}" stroke-width="0.6" opacity="0.8"/>
+
+<!-- ROTARY TABLE -->
+<ellipse cx="100" cy="${isOff?238:232}" rx="20" ry="5.5" fill="none" stroke="${c}" stroke-width="1" opacity="0.6"/>
+<ellipse cx="100" cy="${isOff?238:232}" rx="7" ry="2" fill="${c}" opacity="0.3"/>
+<line x1="80" y1="${isOff?238:232}" x2="80" y2="${isOff?238:232}" stroke="${c}" stroke-width="0"/>
+
+<!-- GAS SENSOR indicator (top right) -->
+<circle cx="176" cy="165" r="${(d.total_gas||0)>120?7:5}" fill="${(d.total_gas||0)>120?'#a3e635':'#0d1a2d'}"
+  stroke="${(d.total_gas||0)>120?'#a3e635':'#1a2d45'}" stroke-width="1" opacity="${(d.total_gas||0)>120?'0.85':'0.6'}"/>
+<text x="176" y="177" text-anchor="middle" fill="#a3e635" font-size="5.5" font-family="Share Tech Mono">GAS</text>
+<text x="176" y="184" text-anchor="middle" fill="#a3e635" font-size="6" font-family="Share Tech Mono">${fmtSVG(d.total_gas,'total_gas')}</text>
+
+<!-- HOOKLOAD annotation -->
+<line x1="112" y1="${hookY+6}" x2="128" y2="${hookY+8}" stroke="#c084fc" stroke-width="0.6" opacity="0.5"/>
+<text x="130" y="${hookY+11}" fill="#c084fc" font-size="6.5" font-family="Share Tech Mono">HL:${fmtSVG(d.hookload,'hookload')}k</text>
+
+<!-- RPM annotation at rotary table -->
+<line x1="120" y1="${isOff?238:232}" x2="136" y2="${isOff?242:236}" stroke="#4ade80" stroke-width="0.6" opacity="0.5"/>
+<text x="138" y="${isOff?245:239}" fill="#4ade80" font-size="6.5" font-family="Share Tech Mono">${fmtSVG(d.rpm,'rpm')}rpm</text>
+
+<!-- ROP annotation mid-derrick -->
+<line x1="130" y1="145" x2="146" y2="140" stroke="#22d3ee" stroke-width="0.6" opacity="0.5"/>
+<text x="148" y="143" fill="#22d3ee" font-size="6.5" font-family="Share Tech Mono">ROP:${fmtSVG(d.rop,'rop')}</text>
+
+<!-- WOB annotation drill collar area -->
+<line x1="97" y1="185" x2="80" y2="181" stroke="#38bdf8" stroke-width="0.6" opacity="0.5"/>
+<text x="3" y="178" fill="#38bdf8" font-size="6.5" font-family="Share Tech Mono">WOB:${fmtSVG(d.wob,'wob')}k</text>
+
+<!-- Bit depth at bottom -->
+<text x="100" y="331" text-anchor="middle" fill="#fbbf24" font-size="7" font-family="Share Tech Mono" font-weight="700">
+  BD:${fmtSVG(d.bit_depth,'bit_depth')} ft  TVD:${fmtSVG(d.true_vertical_depth,'tvd')} ft
+</text>
+
+<!-- Torque annotation -->
+<line x1="132" y1="${isOff?228:222}" x2="146" y2="${isOff?224:218}" stroke="#86efac" stroke-width="0.6" opacity="0.5"/>
+<text x="148" y="${isOff?227:221}" fill="#86efac" font-size="6.5" font-family="Share Tech Mono">T:${fmtSVG(d.torque,'torque')}</text>
+
+<!-- RIG ID label at top -->
+<text x="100" y="9" text-anchor="middle" fill="${c}" font-size="8" font-family="Rajdhani" font-weight="700" letter-spacing="1">${rig.id}</text>
+</svg></div>`;
+}
+
+/* ═══════════════════════════════════════════════════
+   VERTICAL CHART CARDS HTML
+═══════════════════════════════════════════════════ */
+const VERT_DEFS=[
+  {col:'standpipe_pressure',lbl:'Standpipe P', unit:'psi', c:'#f43f5e', rev:false},
+  {col:'choke_pressure',    lbl:'Choke P',     unit:'psi', c:'#fb923c', rev:false},
+  {col:'bit_depth',         lbl:'Bit Depth',   unit:'ft',  c:'#fbbf24', rev:true },
+  {col:'hole_depth',        lbl:'Hole Depth',  unit:'ft',  c:'#fde68a', rev:true },
+];
+function buildVertCards(rig){
+  return VERT_DEFS.map(v=>`
+    <div class="vc-card">
+      <div class="vc-title">${v.lbl}</div>
+      <div class="vc-wrap"><canvas id="VC-${rig.id}-${v.col}"></canvas></div>
+      <div class="vc-val" style="color:${v.c}">—</div>
+      <div class="vc-unit">${v.unit}</div>
+    </div>`).join('');
+}
+
+function renderVertCharts(rig, d, ser){
+  VERT_DEFS.forEach(v=>{
+    const cid=`VC-${rig.id}-${v.col}`;
+    const pts=ser[v.col]||[];
+    const labels=pts.length?tslabels(pts):['Now'];
+    const vals=pts.length?pts.map(p=>p.v):[d[v.col]||0];
+
+    chartSet(cid,{
+      type:'bar',
+      data:{labels,datasets:[{
+        data:vals,
+        backgroundColor:v.c+'30',
+        borderColor:v.c,
+        borderWidth:1,
+        borderRadius:1,
+      }]},
+      options:vertBarOpts(v.c, v.rev),
+    });
+
+    // Update current value label
+    const wrap=document.getElementById(cid)?.closest('.vc-card');
+    if(wrap){
+      const valEl=wrap.querySelector('.vc-val');
+      if(valEl) valEl.textContent=d[v.col]!=null?fmtV(d[v.col],v.col):'—';
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════
+   METRICS GRID HTML
+═══════════════════════════════════════════════════ */
+function buildMetrics(rig, d, ser){
+  const groups=[
+    {title:'Drilling',   cols:['rop','wob','rpm','torque']},
+    {title:'Hydraulics', cols:['flow_rate','hookload','block_height','total_gas']},
+    {title:'Depth',      cols:['measured_depth','true_vertical_depth']},
+    {title:'Mud System', cols:['mud_weight_in','mud_weight_out','mud_temp_in','mud_temp_out']},
+  ];
+
+  let html='';
+  groups.forEach(g=>{
+    html+=`<div><div class="grp-title">${g.title}</div><div class="kpi-grid">`;
+    g.cols.forEach(col=>{
+      const s=S[col]; if(!s) return;
+      const v=d[col];
+      html+=`<div class="kcard" style="--kc:${s.c}">
+        <div class="kcard-lbl">${s.lbl}</div>
+        <div class="kcard-val">${v!=null?fmtV(v,col):'—'}</div>
+        <div class="kcard-unit">${s.unit}</div>
+        <div class="kcard-trend tr-flat" id="tr-${rig.id}-${col}">—</div>
+      </div>`;
+    });
+    html+=`</div></div>`;
+  });
+
+  // Time-series chart pairs
+  html+=`
+  <div class="ts-row">
+    <div class="ts-card">
+      <div class="ts-title"><span>ROP / WOB</span><span style="font-size:7px;color:var(--dim)">ft/hr · klbf</span></div>
+      <div class="ts-wrap"><canvas id="TS-${rig.id}-rop_wob"></canvas></div>
+    </div>
+    <div class="ts-card">
+      <div class="ts-title"><span>RPM / Torque</span><span style="font-size:7px;color:var(--dim)">rpm · ft·lb×100</span></div>
+      <div class="ts-wrap"><canvas id="TS-${rig.id}-rpm_torque"></canvas></div>
+    </div>
+    <div class="ts-card">
+      <div class="ts-title"><span>Flow Rate</span><span style="font-size:7px;color:var(--dim)">gpm</span></div>
+      <div class="ts-wrap"><canvas id="TS-${rig.id}-flow_rate"></canvas></div>
+    </div>
+    <div class="ts-card">
+      <div class="ts-title"><span>Total Gas</span><span style="font-size:7px;color:var(--dim)">units</span></div>
+      <div class="ts-wrap"><canvas id="TS-${rig.id}-total_gas"></canvas></div>
+    </div>
+  </div>`;
+
+  return html;
+}
+
+function renderTSCharts(rig, d, ser){
+  const mkDual=(id,pts1,pts2,c1,c2)=>{
+    if(!pts1?.length) return;
+    const labels=tslabels(pts1);
+    chartSet(id,{type:'line',
+      data:{labels,datasets:[
+        {data:pts1.map(p=>p.v),borderColor:c1,borderWidth:1.5,backgroundColor:c1+'18',
+          pointRadius:0,fill:true,tension:0.35,yAxisID:'y',label:'A'},
+        {data:pts2?.map(p=>p.v)||[],borderColor:c2,borderWidth:1.2,backgroundColor:'transparent',
+          pointRadius:0,tension:0.35,yAxisID:'y2',label:'B'},
+      ]},
+      options:lineOpts(c1,c2),
+    });
+  };
+
+  mkDual(`TS-${rig.id}-rop_wob`, ser['rop'], ser['wob'], '#22d3ee','#38bdf8');
+  mkDual(`TS-${rig.id}-rpm_torque`, ser['rpm'],
+    // scale torque to match rpm visually (/100)
+    (ser['torque']||[]).map(p=>({...p,v:p.v!=null?p.v/100:null})),
+    '#4ade80','#86efac');
+
+  const mkSingle=(id,pts,col)=>{
+    if(!pts?.length) return;
+    chartSet(id,{type:'line',
+      data:{labels:tslabels(pts),datasets:[{
+        data:pts.map(p=>p.v),borderColor:col,borderWidth:1.5,
+        backgroundColor:col+'18',pointRadius:0,fill:true,tension:0.35,
+      }]},
+      options:lineOpts(col,null),
+    });
+  };
+  mkSingle(`TS-${rig.id}-flow_rate`, ser['flow_rate'],'#22d3ee');
+  mkSingle(`TS-${rig.id}-total_gas`, ser['total_gas'],'#a3e635');
+}
+
+/* ═══════════════════════════════════════════════════
+   FORMATTERS
+═══════════════════════════════════════════════════ */
+function fmtV(v,col){
+  if(v==null) return '—';
+  const n=+v;
+  if(isNaN(n)) return v;
+  if(['bit_depth','hole_depth','measured_depth','true_vertical_depth'].includes(col))
+    return n.toLocaleString('en',{maximumFractionDigits:0});
+  if(['standpipe_pressure','choke_pressure','torque'].includes(col))
+    return n.toLocaleString('en',{maximumFractionDigits:0});
+  if(col==='mud_weight_in'||col==='mud_weight_out') return n.toFixed(2);
+  return n.toFixed(1);
+}
+function fmtSVG(v,col){
+  if(v==null||v===undefined) return '—';
+  const n=+v; if(isNaN(n)) return '—';
+  if(col==='rop') return n.toFixed(0);
+  if(col==='wob'||col==='hookload') return (n).toFixed(0);
+  if(col==='rpm') return n.toFixed(0);
+  if(col==='torque') return (n/1000).toFixed(0)+'k';
+  if(['bit_depth','hole_depth','measured_depth','true_vertical_depth','tvd'].includes(col))
+    return n>=1000?(n/1000).toFixed(1)+'k':n.toFixed(0);
+  if(['standpipe_pressure','choke_pressure'].includes(col))
+    return n>=1000?(n/1000).toFixed(1)+'k':n.toFixed(0);
+  if(col==='flow_rate') return n.toFixed(0);
+  if(col==='total_gas') return n.toFixed(0);
+  return n.toFixed(1);
+}
+
+/* ═══════════════════════════════════════════════════
+   STATUS DOT
+═══════════════════════════════════════════════════ */
+function setDot(state){
+  const dot=document.getElementById('dot'), txt=document.getElementById('statusTxt');
+  dot.className='dot';
+  if(state==='live')   {dot.classList.add('live');  txt.textContent='Live';}
+  else if(state==='err'){dot.classList.add('err');   txt.textContent='Error';}
+  else if(state==='loading'){txt.textContent='Loading…';}
+  else{txt.textContent='Offline';}
+}
+
+/* ═══════════════════════════════════════════════════
+   POLLING
+═══════════════════════════════════════════════════ */
+let _timer=null;
+function startPolling(){
+  stopPolling();
+  fetchAll();
+  const sec=Math.max(5,+document.getElementById('intervalSec').value||30);
+  _timer=setInterval(fetchAll, sec*1000);
+  document.getElementById('btnStart').style.display='none';
+  document.getElementById('btnStop').style.display='';
+  logInfo(`Polling started — interval ${sec}s`);
+}
+function stopPolling(){
+  if(_timer){clearInterval(_timer);_timer=null;}
+  document.getElementById('btnStart').style.display='';
+  document.getElementById('btnStop').style.display='none';
+  setDot('offline');
+  if(document.getElementById('logBody').children.length)
+    logInfo('Polling stopped');
+}
+
+/* ═══════════════════════════════════════════════════
+   CLOCK + INIT
+═══════════════════════════════════════════════════ */
+setInterval(()=>{
+  const e=document.getElementById('clock');
+  if(e) e.textContent=new Date().toLocaleTimeString('en',{hour12:false});
+},1000);
+
+window.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('clock').textContent=new Date().toLocaleTimeString('en',{hour12:false});
+  logInfo('Timbergrove Interval Dashboard ready');
+  logInfo('UNS loaded from Timbergrove MCP',`${UNS.rigs.length} rigs · ${UNS.sensors.length} sensors · table: ${UNS.dbms}.${UNS.table}`);
+  UNS.rigs.forEach(r=>logInfo(`  ${r.id}`,`${r.name} · ${r.zone} · ${r.ns}`));
+  logInfo('Configure Bridge host:port above and click ▶ Start');
+  syncLogUI();
+});
+</script>
+</body>
+</html>

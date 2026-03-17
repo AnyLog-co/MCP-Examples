@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timbergrove Drilling Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #0ea5e9;
+    --accent2: #38bdf8;
+    --green: #10b981;
+    --yellow: #f59e0b;
+    --red: #ef4444;
+    --purple: #8b5cf6;
+    --orange: #f97316;
+    --text: #e2e8f0;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    background: linear-gradient(135deg, #0d1526 0%, #111f3a 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: 8px;
+  }
+  .topbar-brand svg { color: var(--accent); }
+  .topbar-brand h1 { font-size: 16px; font-weight: 700; color: var(--accent2); white-space: nowrap; }
+  .topbar-brand span { font-size: 11px; color: var(--text-muted); }
+
+  .ctrl-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px 10px;
+  }
+  .ctrl-group label { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+  .ctrl-group input, .ctrl-group select {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 12px;
+    outline: none;
+    width: auto;
+  }
+  .ctrl-group input[type=number] { width: 60px; }
+  .ctrl-group input[type=text] { width: 160px; }
+
+  .btn {
+    padding: 6px 14px;
+    border-radius: 7px;
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-success { background: var(--green); color: #fff; }
+  .btn-warning { background: var(--yellow); color: #000; }
+  .btn-danger  { background: var(--red);   color: #fff; }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-muted);
+  }
+  .status-dot.running { background: var(--green); box-shadow: 0 0 6px var(--green); animation: pulse 1.5s infinite; }
+  .status-dot.error   { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .spacer { flex: 1; }
+
+  /* ── UNS TREE ── */
+  .layout { display: flex; height: calc(100vh - 53px); }
+  .sidebar {
+    width: 240px;
+    min-width: 200px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .sidebar-header {
+    padding: 10px 14px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: var(--surface);
+  }
+  .uns-tree { padding: 6px 0; }
+  .tree-ns {
+    padding: 5px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .tree-ns:hover { background: var(--surface2); }
+  .tree-rig {
+    padding: 5px 14px 5px 26px;
+    font-size: 12px;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-left: 2px solid transparent;
+    transition: all .15s;
+  }
+  .tree-rig:hover { background: var(--surface2); color: var(--text); }
+  .tree-rig.active { color: var(--accent2); border-left-color: var(--accent); background: rgba(14,165,233,.08); }
+  .tree-sensor {
+    padding: 3px 14px 3px 42px;
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .tree-sensor:hover { color: var(--text-dim); }
+  .tree-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+  /* ── MAIN ── */
+  .main { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+
+  /* ── RIG PANELS ── */
+  .rig-section { display: flex; flex-direction: column; gap: 12px; }
+  .rig-header {
+    background: linear-gradient(135deg, var(--surface2) 0%, rgba(14,165,233,.08) 100%);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .rig-header-icon {
+    width: 36px; height: 36px;
+    background: rgba(14,165,233,.15);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent);
+  }
+  .rig-title { font-size: 15px; font-weight: 700; }
+  .rig-subtitle { font-size: 11px; color: var(--text-muted); }
+  .rig-badges { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .badge {
+    padding: 3px 8px; border-radius: 5px; font-size: 11px; font-weight: 600;
+  }
+  .badge-blue   { background: rgba(14,165,233,.18); color: var(--accent2); }
+  .badge-green  { background: rgba(16,185,129,.18); color: var(--green); }
+  .badge-yellow { background: rgba(245,158,11,.18);  color: var(--yellow); }
+  .badge-red    { background: rgba(239,68,68,.18);   color: var(--red); }
+  .badge-purple { background: rgba(139,92,246,.18);  color: var(--purple); }
+
+  .kpi-row { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 12px 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--card-color, var(--accent));
+  }
+  .kpi-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+  .kpi-value { font-size: 20px; font-weight: 700; color: var(--card-color, var(--text)); line-height: 1; }
+  .kpi-unit  { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+  .kpi-trend { font-size: 10px; margin-top: 4px; }
+  .kpi-trend.up   { color: var(--green); }
+  .kpi-trend.down { color: var(--red); }
+
+  .chart-row { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 900px) { .chart-row { grid-template-columns: 1fr; } }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .chart-title { font-size: 12px; font-weight: 600; color: var(--text-dim); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .chart-title-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .chart-wrap { position: relative; height: 160px; }
+
+  /* ── SEPARATOR ── */
+  .rig-divider { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+
+  /* ── LOG PANEL — Enterprise C SPC Dynics style ── */
+
+  .log-panel {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    overflow: hidden;
+    font-family: 'Share Tech Mono', 'Cascadia Code', monospace;
+  }
+  .log-header {
+    padding: 6px 13px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 9px;
+    font-family: 'Share Tech Mono', monospace;
+    color: #484f58;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+  }
+  .log-header-title { color: #00d4ff; font-size: 10px; font-weight: 700; letter-spacing: .06em; }
+  .log-header-pill {
+    background: #1c2d3e; border: 1px solid #1e3a52; border-radius: 4px;
+    padding: 1px 7px; font-size: 9px; color: #58a6ff;
+  }
+  .log-header-pill.pill-ok  { background: #122212; border-color: #1e4021; color: #3fb950; }
+  .log-header-pill.pill-err { background: #2d1215; border-color: #4a1d21; color: #f85149; }
+
+  .log-col-header {
+    display: grid;
+    grid-template-columns: 62px 44px 46px 64px 1fr 52px 58px;
+    padding: 4px 0;
+    background: #161b22;
+    font-size: 8px;
+    color: #484f58;
+    font-family: 'Share Tech Mono', monospace;
+    border-bottom: 1px solid #30363d;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+  }
+  .log-col-header span:first-child { padding-left: 9px; }
+  .log-col-header span:last-child  { padding-right: 9px; text-align: right; }
+
+  .log-body {
+    height: 200px;
+    overflow-y: auto;
+    background: #0d1117;
+  }
+  .log-entry {
+    display: grid;
+    grid-template-columns: 62px 44px 46px 64px 1fr 52px 58px;
+    align-items: center;
+    border-bottom: 1px solid #161b22;
+    border-left: 2px solid transparent;
+    font-size: 9px;
+    line-height: 1.8;
+    min-height: 20px;
+    color: #c9d1d9;
+  }
+  .log-entry:hover { background: #161b22; }
+  .log-entry.log-err  { border-left-color: #f85149; }
+  .log-entry.log-ok   { border-left-color: transparent; }
+  .log-entry.log-info { border-left-color: #1c3850; }
+
+  .le-time   { color: #8b949e; padding-left: 9px; white-space: nowrap; }
+  .le-method { font-weight: 700; text-align: center; }
+  .le-method.m-get  { color: #3fb950; }
+  .le-method.m-post { color: #58a6ff; }
+  .le-method.m-info { color: #e3b341; }
+  .le-method.m-err  { color: #f85149; }
+  .le-status { text-align: center; }
+  .le-status.s-ok  { color: #3fb950; }
+  .le-status.s-err { color: #f85149; font-weight: 700; }
+  .le-status.s-na  { color: #484f58; }
+  .le-dur  { color: #e3b341; text-align: right; padding-right: 5px; }
+  .le-path { color: #79c0ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
+  .le-detail { color: #8b949e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 8px; }
+  .le-rows { color: #a5d6ff; text-align: right; padding-right: 9px; white-space: nowrap; font-size: 8px; }
+
+  .log-summary {
+    border-top: 1px solid #30363d;
+    padding: 5px 13px;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+    background: #161b22;
+  }
+  .log-summary-title { color: #484f58; font-size: 8px; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
+  .log-stat { display: flex; align-items: center; gap: 4px; font-size: 9px; }
+  .log-stat-key   { color: #484f58; }
+  .log-stat-val   { color: #3fb950; font-weight: 700; }
+  .log-stat-sep   { color: #30363d; }
+  .log-tbl-name   { color: #79c0ff; }
+  .log-tbl-cnt    { color: #3fb950; font-weight: 700; }
+  .log-clear-btn  { margin-left: auto; background: none; border: 1px solid #30363d; border-radius: 4px; color: #484f58; cursor: pointer; font-size: 8px; padding: 2px 8px; font-family: inherit; }
+  .log-clear-btn:hover { color: #8b949e; border-color: #484f58; }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+  }
+  .empty-state svg { margin-bottom: 12px; opacity: .4; }
+  .empty-state h3 { font-size: 16px; margin-bottom: 6px; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════ TOP BAR ══════════════ -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+    </svg>
+    <div>
+      <h1>Timbergrove Drilling Dashboard</h1>
+      <span>UNS: Timbergrove / land &amp; offshore / Rigs</span>
+    </div>
+  </div>
+
+  <div class="ctrl-group">
+    <label>Proxy IP:Port</label>
+    <input type="text" id="proxyUrl" value="localhost:8080" placeholder="host:port">
+  </div>
+
+  <div class="ctrl-group">
+    <label>Interval (s)</label>
+    <input type="number" id="pollInterval" value="30" min="5" max="3600">
+  </div>
+
+  <div class="ctrl-group">
+    <label>Time Window</label>
+    <select id="timeWindow">
+      <option value="1">Last 1 hr</option>
+      <option value="6">Last 6 hr</option>
+      <option value="24" selected>Last 24 hr</option>
+      <option value="48">Last 48 hr</option>
+      <option value="168">Last 7 days</option>
+    </select>
+  </div>
+
+  <div class="ctrl-group">
+    <label>Rows/Rig</label>
+    <input type="number" id="rowLimit" value="50" min="5" max="500">
+  </div>
+
+  <button class="btn btn-success" id="startBtn" onclick="startPolling()">
+    ▶ Start
+  </button>
+  <button class="btn btn-warning" id="pauseBtn" onclick="pausePolling()" disabled>
+    ⏸ Pause
+  </button>
+  <button class="btn btn-primary" onclick="fetchAll()">
+    ↺ Refresh Now
+  </button>
+
+  <div class="spacer"></div>
+  <div class="status-dot" id="statusDot"></div>
+  <span id="statusLabel" style="font-size:11px;color:var(--text-muted)">Idle</span>
+  <span id="lastUpdate" style="font-size:11px;color:var(--text-muted)"></span>
+</div>
+
+<!-- ══════════════ LAYOUT ══════════════ -->
+<div class="layout">
+
+  <!-- SIDEBAR: UNS Tree -->
+  <div class="sidebar">
+    <div class="sidebar-header">UNS Structure</div>
+    <div class="uns-tree" id="unsTree">
+      <!-- built by JS -->
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main" id="mainContent">
+
+    <!-- Empty state until first fetch -->
+    <div class="empty-state" id="emptyState">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+        <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+      </svg>
+      <h3>No Data Yet</h3>
+      <p>Configure the proxy URL and interval, then click <strong>Start</strong> or <strong>Refresh Now</strong>.</p>
+    </div>
+
+    <!-- Rig sections injected here -->
+    <div id="rigSections" style="display:none; flex-direction:column; gap:20px;"></div>
+
+    <!-- API Call Log — Enterprise C SPC Dynics style -->
+    <div class="log-panel">
+      <div class="log-header">
+        <span class="log-header-title">◈ API CALL LOG</span>
+        <span class="log-header-pill" id="pillRest">REST 0</span>
+        <span class="log-header-pill" id="pillSql">SQL 0</span>
+        <span class="log-header-pill pill-ok" id="pillOk">OK 0</span>
+        <span class="log-header-pill pill-err" id="pillErr">ERR 0</span>
+        <span style="margin-left:auto;color:#484f58;font-size:8px;" id="logTotalRows">rows: 0</span>
+      </div>
+      <div class="log-col-header">
+        <span>Time</span>
+        <span style="text-align:center">Method</span>
+        <span style="text-align:center">Status</span>
+        <span style="text-align:right;padding-right:5px">Duration</span>
+        <span style="padding:0 4px">Path / Query</span>
+        <span>Detail</span>
+        <span style="text-align:right;padding-right:9px">Rows</span>
+      </div>
+      <div class="log-body" id="logBody"></div>
+      <div class="log-summary">
+        <span class="log-summary-title">Summary</span>
+        <div class="log-stat">
+          <span class="log-stat-key">calls</span>
+          <span class="log-stat-sep">·</span>
+          <span class="log-stat-val" id="summCalls">0</span>
+        </div>
+        <div class="log-stat">
+          <span class="log-stat-key">total rows</span>
+          <span class="log-stat-sep">·</span>
+          <span class="log-stat-val" id="summRows">0</span>
+        </div>
+        <div class="log-stat">
+          <span class="log-stat-key">avg ms</span>
+          <span class="log-stat-sep">·</span>
+          <span class="log-stat-val" id="summAvgMs">—</span>
+        </div>
+        <div class="log-stat" id="summRigCounts" style="gap:6px;flex-wrap:wrap;"></div>
+        <button class="log-clear-btn" onclick="clearLog()">✕ Clear</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// UNS STRUCTURE (from Timbergrove MCP)
+// ══════════════════════════════════════════════════════════
+const UNS = {
+  root: { name: "Timbergrove", namespace: "Timbergrove" },
+  namespaces: [
+    { name: "land",     ns: "timbergrove/land" },
+    { name: "offshore", ns: "timbergrove/offshore" },
+  ],
+  rigs: [
+    { id: "RIG-TX-001", name: "Permian Basin",  region: "West Texas",  ns: "land",     dbms: "timbergrove", table: "rig_data", where: "rig_id='RIG-TX-001'" },
+    { id: "RIG-TX-007", name: "Eagle Ford",     region: "South Texas", ns: "land",     dbms: "timbergrove", table: "rig_data", where: "rig_id='RIG-TX-007'" },
+    { id: "RIG-ND-012", name: "Bakken",         region: "North Dakota",ns: "land",     dbms: "timbergrove", table: "rig_data", where: "rig_id='RIG-ND-012'" },
+    { id: "RIG-GOM-023",name: "Deepwater",      region: "Gulf of Mexico",ns:"offshore",dbms: "timbergrove", table: "rig_data", where: "rig_id='RIG-GOM-023'" },
+  ],
+  sensors: [
+    "activity","measured_depth","true_vertical_depth","rop","wob","rpm",
+    "torque","standpipe_pressure","choke_pressure","flow_rate",
+    "hookload","bit_depth","hole_depth","mud_weight_in","mud_weight_out",
+    "mud_temp_in","mud_temp_out","total_gas","block_height","status"
+  ]
+};
+
+// ══════════════════════════════════════════════════════════
+// SENSOR DISPLAY CONFIG
+// ══════════════════════════════════════════════════════════
+const SENSOR_CFG = {
+  rop:               { label:"ROP",            unit:"ft/hr",   color:"#0ea5e9", kpi:true  },
+  wob:               { label:"WOB",            unit:"klbf",    color:"#8b5cf6", kpi:true  },
+  rpm:               { label:"RPM",            unit:"rpm",     color:"#10b981", kpi:true  },
+  torque:            { label:"Torque",         unit:"ft·lb",   color:"#f59e0b", kpi:true  },
+  standpipe_pressure:{ label:"Stp Press",      unit:"psi",     color:"#ef4444", kpi:true  },
+  flow_rate:         { label:"Flow Rate",      unit:"gpm",     color:"#06b6d4", kpi:true  },
+  hookload:          { label:"Hookload",       unit:"klbf",    color:"#f97316", kpi:true  },
+  measured_depth:    { label:"Meas Depth",     unit:"ft",      color:"#a78bfa", kpi:true  },
+  bit_depth:         { label:"Bit Depth",      unit:"ft",      color:"#34d399", kpi:false },
+  hole_depth:        { label:"Hole Depth",     unit:"ft",      color:"#fbbf24", kpi:false },
+  true_vertical_depth:{ label:"TVD",           unit:"ft",      color:"#60a5fa", kpi:false },
+  mud_weight_in:     { label:"MW In",          unit:"ppg",     color:"#c084fc", kpi:false },
+  mud_weight_out:    { label:"MW Out",         unit:"ppg",     color:"#fb923c", kpi:false },
+  mud_temp_in:       { label:"Mud Tmp In",     unit:"°F",      color:"#f87171", kpi:false },
+  mud_temp_out:      { label:"Mud Tmp Out",    unit:"°F",      color:"#fb923c", kpi:false },
+  total_gas:         { label:"Total Gas",      unit:"units",   color:"#4ade80", kpi:false },
+  block_height:      { label:"Block Ht",       unit:"ft",      color:"#38bdf8", kpi:false },
+  choke_pressure:    { label:"Choke Press",    unit:"psi",     color:"#f472b6", kpi:false },
+  activity:          { label:"Activity",       unit:"",        color:"#a3e635", kpi:false },
+  status:            { label:"Status",         unit:"",        color:"#22d3ee", kpi:false },
+};
+
+const CHART_PAIRS = [
+  ["rop","wob"],
+  ["rpm","torque"],
+  ["standpipe_pressure","flow_rate"],
+  ["hookload","bit_depth"],
+];
+
+// ══════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════
+let pollTimer = null;
+let running   = false;
+
+// ── Log state ──
+const _log = {
+  rest: 0, sql: 0, ok: 0, err: 0,
+  totalRows: 0, totalMs: 0, callCount: 0,
+  rigRows: {},    // rigId → row count
+};
+let _callStartMs = {}; // key → Date.now() for duration tracking
+
+// Chart.js instances keyed by rigId + sensor
+const charts = {};
+// Last values keyed by rigId + sensor
+const lastVals = {};
+
+// ══════════════════════════════════════════════════════════
+// BUILD UNS SIDEBAR
+// ══════════════════════════════════════════════════════════
+function buildUnsTree() {
+  const tree = document.getElementById('unsTree');
+  const nsGroups = {};
+  UNS.rigs.forEach(r => {
+    if (!nsGroups[r.ns]) nsGroups[r.ns] = [];
+    nsGroups[r.ns].push(r);
+  });
+
+  let html = `<div class="tree-ns">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/></svg>
+    Timbergrove
+  </div>`;
+
+  for (const [ns, rigs] of Object.entries(nsGroups)) {
+    html += `<div class="tree-ns" style="padding-left:22px;font-size:10px;">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
+      ${ns}
+    </div>`;
+    for (const rig of rigs) {
+      html += `<div class="tree-rig" id="tree-${rig.id}" onclick="scrollToRig('${rig.id}')">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V12m0 0V2m0 10h10m-10 0H2"/></svg>
+        <span>${rig.id}</span>
+      </div>`;
+      // show a few sensors
+      const keyS = Object.entries(SENSOR_CFG).filter(([_,c])=>c.kpi).slice(0,5);
+      for (const [s, cfg] of keyS) {
+        html += `<div class="tree-sensor" style="--c:${cfg.color}">
+          <span class="tree-dot" style="background:${cfg.color}"></span>
+          ${cfg.label}
+        </div>`;
+      }
+    }
+  }
+  tree.innerHTML = html;
+}
+
+function scrollToRig(rigId) {
+  document.querySelectorAll('.tree-rig').forEach(el => el.classList.remove('active'));
+  const treeEl = document.getElementById(`tree-${rigId}`);
+  if (treeEl) treeEl.classList.add('active');
+  const rigEl = document.getElementById(`rig-${rigId}`);
+  if (rigEl) rigEl.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// ══════════════════════════════════════════════════════════
+// BUILD RIG SECTION SKELETONS
+// ══════════════════════════════════════════════════════════
+function buildRigSections() {
+  const container = document.getElementById('rigSections');
+  container.innerHTML = '';
+  document.getElementById('emptyState').style.display = 'none';
+  container.style.display = 'flex';
+
+  const nsColors = { land:'#0ea5e9', offshore:'#8b5cf6' };
+
+  // Group by namespace
+  const nsGroups = {};
+  UNS.rigs.forEach(r => {
+    if (!nsGroups[r.ns]) nsGroups[r.ns] = [];
+    nsGroups[r.ns].push(r);
+  });
+
+  for (const [ns, rigs] of Object.entries(nsGroups)) {
+    const nsDiv = document.createElement('div');
+    nsDiv.className = 'rig-section';
+    nsDiv.innerHTML = `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${nsColors[ns]||'#94a3b8'};padding:2px 0 4px 2px;">
+      ◆ ${ns.toUpperCase()} RIGS
+    </div>`;
+
+    for (const rig of rigs) {
+      nsDiv.appendChild(buildRigCard(rig));
+    }
+    container.appendChild(nsDiv);
+  }
+}
+
+function buildRigCard(rig) {
+  const div = document.createElement('div');
+  div.id = `rig-${rig.id}`;
+  div.style.cssText = 'display:flex;flex-direction:column;gap:10px;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;';
+
+  // Header
+  div.innerHTML = `
+    <div class="rig-header" style="background:transparent;border:none;padding:0;margin:0;">
+      <div class="rig-header-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22V12m0-10v10m0 0h10M12 12H2"/>
+        </svg>
+      </div>
+      <div>
+        <div class="rig-title">${rig.name} <span style="color:var(--text-muted);font-size:12px;font-weight:400;">(${rig.id})</span></div>
+        <div class="rig-subtitle">📍 ${rig.region} &nbsp;·&nbsp; UNS: Timbergrove/${rig.ns}/${rig.id}</div>
+      </div>
+      <div class="rig-badges">
+        <span class="badge badge-blue" id="badge-rows-${rig.id}">— rows</span>
+        <span class="badge" id="badge-status-${rig.id}" style="background:rgba(100,116,139,.15);color:var(--text-muted)">—</span>
+      </div>
+    </div>
+
+    <!-- KPI row -->
+    <div class="kpi-row" id="kpi-${rig.id}">
+      ${Object.entries(SENSOR_CFG).filter(([_,c])=>c.kpi).map(([s,c])=>`
+        <div class="kpi-card" style="--card-color:${c.color}">
+          <div class="kpi-label">${c.label}</div>
+          <div class="kpi-value" id="kpi-val-${rig.id}-${s}">—</div>
+          <div class="kpi-unit">${c.unit}</div>
+          <div class="kpi-trend" id="kpi-trend-${rig.id}-${s}"></div>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- Charts -->
+    ${CHART_PAIRS.map(([s1,s2]) => `
+      <div class="chart-row">
+        <div class="chart-card">
+          <div class="chart-title">
+            <span class="chart-title-dot" style="background:${SENSOR_CFG[s1]?.color}"></span>
+            ${SENSOR_CFG[s1]?.label || s1} (${SENSOR_CFG[s1]?.unit || ''})
+          </div>
+          <div class="chart-wrap"><canvas id="chart-${rig.id}-${s1}"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">
+            <span class="chart-title-dot" style="background:${SENSOR_CFG[s2]?.color}"></span>
+            ${SENSOR_CFG[s2]?.label || s2} (${SENSOR_CFG[s2]?.unit || ''})
+          </div>
+          <div class="chart-wrap"><canvas id="chart-${rig.id}-${s2}"></canvas></div>
+        </div>
+      </div>
+    `).join('')}
+  `;
+
+  return div;
+}
+
+function initCharts() {
+  Chart.defaults.color = '#64748b';
+  Chart.defaults.borderColor = '#1e2d45';
+
+  for (const rig of UNS.rigs) {
+    const chartSensors = CHART_PAIRS.flat();
+    for (const s of chartSensors) {
+      const canvas = document.getElementById(`chart-${rig.id}-${s}`);
+      if (!canvas) continue;
+      const cfg = SENSOR_CFG[s] || { color: '#0ea5e9' };
+      const key = `${rig.id}-${s}`;
+      if (charts[key]) { charts[key].destroy(); delete charts[key]; }
+
+      charts[key] = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: cfg.label || s,
+            data: [],
+            borderColor: cfg.color,
+            backgroundColor: cfg.color + '18',
+            borderWidth: 1.5,
+            pointRadius: 1.5,
+            pointHoverRadius: 4,
+            tension: 0.3,
+            fill: true,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          animation: { duration: 400 },
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { maxTicksLimit: 6, font: { size: 9 } }, grid: { color:'#1e2d4580' } },
+            y: { ticks: { maxTicksLimit: 5, font: { size: 9 } }, grid: { color:'#1e2d4580' } }
+          }
+        }
+      });
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// PROXY CALL (MCP Bridge REST API)
+// ══════════════════════════════════════════════════════════
+async function callProxy(sql, dbms, rigId) {
+  const host  = document.getElementById('proxyUrl').value.trim();
+  const proto = host.startsWith('http') ? '' : 'http://';
+  const url   = `${proto}${host}/api/query`;
+  const path  = `/api/query`;
+  const body  = JSON.stringify({ dbms, sql });
+  const t0    = Date.now();
+  _log.rest++;
+
+  let resp;
+  try {
+    resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      signal: AbortSignal.timeout(30000),
+    });
+  } catch(e) {
+    const ms = Date.now() - t0;
+    _log.err++;
+    logEntry('POST', 0, ms, path, `${dbms}: ${sql.substring(0, 50)}`, `ERR: ${e.message}`, null);
+    updateLogSummary();
+    setStatus('error');
+    return null;
+  }
+
+  const ms = Date.now() - t0;
+  _log.sql++;
+  _log.totalMs += ms;
+  _log.callCount++;
+
+  if (!resp.ok) {
+    _log.err++;
+    logEntry('POST', resp.status, ms, path, `${dbms}: ${sql.substring(0, 50)}`, `HTTP ${resp.status}`, null);
+    updateLogSummary();
+    return null;
+  }
+
+  const data = await resp.json();
+  const rows = data.results?.length ?? data.row_count ?? 0;
+  _log.ok++;
+  _log.totalRows += rows;
+  if (rigId) _log.rigRows[rigId] = (_log.rigRows[rigId] || 0) + rows;
+
+  logEntry('POST', resp.status, ms, path, `${dbms}: ${sql.substring(0, 55)}${sql.length > 55 ? '…' : ''}`, rigId || dbms, rows);
+  updateLogSummary();
+  return data;
+}
+
+// ══════════════════════════════════════════════════════════
+// FETCH ALL RIGS
+// ══════════════════════════════════════════════════════════
+async function fetchAll() {
+  setStatus('running');
+  document.getElementById('lastUpdate').textContent = '';
+
+  for (const rig of UNS.rigs) {
+    await fetchRig(rig);
+  }
+
+  const now = new Date();
+  document.getElementById('lastUpdate').textContent =
+    `Updated ${now.toLocaleTimeString()}`;
+  setStatus(running ? 'running' : 'idle');
+}
+
+async function fetchRig(rig) {
+  const hours = parseInt(document.getElementById('timeWindow').value);
+  const limit = parseInt(document.getElementById('rowLimit').value);
+
+  // All numeric sensors in one query
+  const numericSensors = Object.keys(SENSOR_CFG).filter(s => !['activity','status'].includes(s));
+  const cols = numericSensors.join(', ');
+
+  const sql = `SELECT timestamp, ${cols} FROM ${rig.table} WHERE ${rig.where} AND timestamp >= NOW() - ${hours} hours ORDER BY timestamp ASC LIMIT ${limit}`;
+
+  const data = await callProxy(sql, rig.dbms, rig.id);
+  if (!data || !data.results) return;
+
+  const rows = data.results;
+  const rowCount = rows.length;
+
+  // Update badge
+  const rowBadge = document.getElementById(`badge-rows-${rig.id}`);
+  if (rowBadge) rowBadge.textContent = `${rowCount} rows`;
+
+  if (rowCount === 0) return;
+
+  // Determine activity/status from last row if available
+  const lastRow = rows[rows.length - 1];
+
+  // Parse timestamps
+  const labels = rows.map(r => {
+    const ts = r.timestamp || r.ts || '';
+    if (!ts) return '';
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  });
+
+  // Update KPI cards (use last row)
+  for (const [s, cfg] of Object.entries(SENSOR_CFG)) {
+    if (!cfg.kpi) continue;
+    const valEl = document.getElementById(`kpi-val-${rig.id}-${s}`);
+    const trendEl = document.getElementById(`kpi-trend-${rig.id}-${s}`);
+    if (!valEl) continue;
+
+    const v = lastRow[s];
+    const prevKey = `${rig.id}-${s}`;
+    const prev = lastVals[prevKey];
+    lastVals[prevKey] = v;
+
+    if (v === null || v === undefined) { valEl.textContent = '—'; continue; }
+    const num = parseFloat(v);
+    valEl.textContent = isNaN(num) ? v : num.toLocaleString(undefined, {maximumFractionDigits:1});
+
+    if (trendEl && !isNaN(num) && prev !== undefined) {
+      const pNum = parseFloat(prev);
+      if (!isNaN(pNum)) {
+        const diff = num - pNum;
+        if (Math.abs(diff) > 0.001) {
+          trendEl.textContent = (diff > 0 ? '▲ +' : '▼ ') + Math.abs(diff).toFixed(1);
+          trendEl.className = 'kpi-trend ' + (diff > 0 ? 'up' : 'down');
+        }
+      }
+    }
+  }
+
+  // Update status badge
+  const statusBadge = document.getElementById(`badge-status-${rig.id}`);
+  if (statusBadge) {
+    const act = lastRow['activity'] || lastRow['status'] || 'Unknown';
+    statusBadge.textContent = act;
+    statusBadge.className = 'badge ' + (
+      /drill/i.test(act) ? 'badge-green' :
+      /trip/i.test(act)  ? 'badge-yellow' :
+      /idle|wait/i.test(act) ? 'badge-blue' : 'badge-purple'
+    );
+  }
+
+  // Update charts
+  for (const s of CHART_PAIRS.flat()) {
+    const key = `${rig.id}-${s}`;
+    const ch = charts[key];
+    if (!ch) continue;
+
+    const vals = rows.map(r => {
+      const v = r[s];
+      return (v === null || v === undefined) ? null : parseFloat(v);
+    });
+
+    ch.data.labels = labels;
+    ch.data.datasets[0].data = vals;
+    ch.update('none');
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// POLLING
+// ══════════════════════════════════════════════════════════
+function startPolling() {
+  if (running) return;
+  running = true;
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('pauseBtn').disabled = false;
+  fetchAll();
+  const sec = parseInt(document.getElementById('pollInterval').value) || 30;
+  pollTimer = setInterval(fetchAll, sec * 1000);
+}
+
+function pausePolling() {
+  running = false;
+  clearInterval(pollTimer);
+  pollTimer = null;
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('pauseBtn').disabled = true;
+  setStatus('idle');
+}
+
+function setStatus(state) {
+  const dot = document.getElementById('statusDot');
+  const lbl = document.getElementById('statusLabel');
+  dot.className = 'status-dot ' + (state === 'running' ? 'running' : state === 'error' ? 'error' : '');
+  lbl.textContent = state === 'running' ? 'Live' : state === 'error' ? 'Error' : 'Idle';
+}
+
+// ══════════════════════════════════════════════════════════
+// LOG — Enterprise C SPC Dynics style
+// ══════════════════════════════════════════════════════════
+
+function logEntry(method, httpStatus, durationMs, path, detail, extraInfo, rows) {
+  const body = document.getElementById('logBody');
+  if (!body) return;
+
+  const ts = new Date().toTimeString().substring(0, 8);
+
+  const isErr  = httpStatus === 0 || (httpStatus !== null && httpStatus !== undefined && httpStatus >= 400);
+  const isInfo = (method === 'INFO' || method === 'WARN');
+  const entryClass = isErr ? 'log-err' : isInfo ? 'log-info' : 'log-ok';
+
+  // Method
+  let mClass = 'm-post';
+  if (method === 'GET')                        mClass = 'm-get';
+  if (method === 'INFO')                       mClass = 'm-info';
+  if (method === 'WARN' || method === 'ERROR') mClass = 'm-err';
+
+  // Status
+  let statusHtml = '<span class="le-status s-na">—</span>';
+  if      (httpStatus === 200 || httpStatus === 201)          statusHtml = `<span class="le-status s-ok">${httpStatus}</span>`;
+  else if (httpStatus !== null && httpStatus !== undefined && httpStatus !== '')
+    statusHtml = `<span class="le-status s-err">${httpStatus}</span>`;
+
+  // Duration
+  const durHtml = (durationMs !== null && durationMs !== undefined)
+    ? `<span class="le-dur">${durationMs}ms</span>`
+    : `<span class="le-dur" style="color:#484f58">—</span>`;
+
+  // Rows — only show when a real number
+  const rowNum = parseInt(rows, 10);
+  const rowsHtml = (!isNaN(rowNum))
+    ? `<span class="le-rows">${rowNum.toLocaleString()} r</span>`
+    : `<span class="le-rows" style="color:#484f58">—</span>`;
+
+  const el = document.createElement('div');
+  el.className = `log-entry ${entryClass}`;
+  el.innerHTML =
+    `<span class="le-time">${ts}</span>` +
+    `<span class="le-method ${mClass}">${method}</span>` +
+    statusHtml +
+    durHtml +
+    `<span class="le-path" title="${path||''}">${path||'—'}</span>` +
+    `<span class="le-detail" title="${detail||''}">${detail||''}</span>` +
+    rowsHtml;
+
+  body.appendChild(el);
+  while (body.children.length > 300) body.removeChild(body.firstChild);
+  body.scrollTop = body.scrollHeight;
+}
+
+function logInfo(msg, detail) {
+  logEntry('INFO', null, null, msg, detail || '', null, null);
+}
+
+function logWarn(msg, detail) {
+  logEntry('WARN', null, null, msg, detail || '', null, null);
+}
+
+function updateLogSummary() {
+  // Pills
+  const pillRest = document.getElementById('pillRest');
+  const pillSql  = document.getElementById('pillSql');
+  const pillOk   = document.getElementById('pillOk');
+  const pillErr  = document.getElementById('pillErr');
+  if (pillRest) pillRest.textContent = `REST ${_log.rest}`;
+  if (pillSql)  pillSql.textContent  = `SQL ${_log.sql}`;
+  if (pillOk)   pillOk.textContent   = `OK ${_log.ok}`;
+  if (pillErr)  pillErr.textContent  = `ERR ${_log.err}`;
+
+  const logTR = document.getElementById('logTotalRows');
+  if (logTR) logTR.textContent = `rows: ${_log.totalRows.toLocaleString()}`;
+
+  // Summary bar
+  const sC = document.getElementById('summCalls');
+  const sR = document.getElementById('summRows');
+  const sA = document.getElementById('summAvgMs');
+  if (sC) sC.textContent = _log.callCount;
+  if (sR) sR.textContent = _log.totalRows.toLocaleString();
+  if (sA) sA.textContent = _log.callCount > 0 ? Math.round(_log.totalMs / _log.callCount) + 'ms' : '—';
+
+  // Per-rig row counts
+  const rigDiv = document.getElementById('summRigCounts');
+  if (rigDiv && Object.keys(_log.rigRows).length) {
+    rigDiv.innerHTML = Object.entries(_log.rigRows).map(([id, cnt]) =>
+      `<span class="log-stat"><span class="log-tbl-name">${id}</span><span class="log-stat-sep">:</span><span class="log-tbl-cnt">${cnt.toLocaleString()}</span></span>`
+    ).join('<span class="log-stat-sep" style="color:#30363d">|</span>');
+  }
+}
+
+function clearLog() {
+  document.getElementById('logBody').innerHTML = '';
+  Object.assign(_log, { rest:0, sql:0, ok:0, err:0, totalRows:0, totalMs:0, callCount:0, rigRows:{} });
+  updateLogSummary();
+}
+
+// ══════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  buildUnsTree();
+  buildRigSections();
+  initCharts();
+  logInfo('Dashboard initialized — UNS structure loaded from Timbergrove MCP');
+  logInfo(`Rigs: ${UNS.rigs.map(r=>r.id).join(', ')}`);
+  logInfo('Configure proxy IP:Port and click Start or Refresh Now');
+  updateLogSummary();
+});
+</script>
+</body>
+</html>

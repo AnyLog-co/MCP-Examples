@@ -401,7 +401,7 @@ def list_tables(dbms):
 @app.route("/api/databases/<dbms>/tables/<table>/columns", methods=["GET"])
 def list_columns(dbms, table):
     try:
-        raw = run_command(f"get columns where dbms = {dbms} and table = {table}")
+        raw = run_command(f"get columns where dbms = {dbms} and table = {table} and format = json")
         return jsonify({"dbms": dbms, "table": table, "columns": _parse_rows(raw)})
     except Exception as exc:
         return _err(f"Failed to list columns for {dbms}.{table}", str(exc))
