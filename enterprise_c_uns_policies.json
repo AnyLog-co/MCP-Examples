@@ -1,28 +1,4 @@
-{
-  "command": "blockchain get uns",
-  "generated_for": "Enterprise_C ISA-88/ISA-95 root policy tree (device + sensor table bindings preserved from original Enterprise_C UNS)",
-  "generated_at": "2026-02-14T06:02:49.390601Z",
-  "policies": [
-    {
-      "uns": {
-        "date": "2026-02-14T06:02:49.390601Z",
-        "id": "76380522ce580e8148a6dc81667f6c57",
-        "ledger": "global",
-        "name": "Enterprise_C",
-        "namespace": "Enterprise_C",
-        "source_node": "Site1@localhost:32049",
-        "isa95": {
-          "level": "L4-L3",
-          "entity": "Enterprise",
-          "standard": "ISA-95"
-        },
-        "isa88": {
-          "entity": "ProcessCell",
-          "standard": "ISA-88"
-        },
-        "description": "Enterprise_C root namespace (ISA-95 Enterprise scope)."
-      }
-    },
+[
     {
       "uns": {
         "date": "2026-02-14T06:02:49.390601Z",
@@ -147,6 +123,1008 @@
         "description": "Measurements branch. Sensor nodes below mirror original Enterprise_C UNS sensor paths and keep original dbms/table bindings."
       }
     },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p1",
+      "ledger": "global",
+      "name": "SIC-250-005",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/SIC-250-005",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC-250-005 (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p2",
+      "ledger": "global",
+      "name": "FIC-250-003",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/FIC-250-003",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device FIC-250-003 (Flow indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p3",
+      "ledger": "global",
+      "name": "FCV-250-003",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/FCV-250-003",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device FCV-250-003 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p4",
+      "ledger": "global",
+      "name": "FCV-250-002",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/FCV-250-002",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device FCV-250-002 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p5",
+      "ledger": "global",
+      "name": "TI-250-001",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/TI-250-001",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device TI-250-001 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
+      "ledger": "global",
+      "name": "FIC-250-001",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/FIC-250-001",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device FIC-250-001 (Flow indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p7",
+      "ledger": "global",
+      "name": "UNIT-250",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/UNIT-250",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device UNIT-250 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p8",
+      "ledger": "global",
+      "name": "SIC-250-002",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/SIC-250-002",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC-250-002 (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p9",
+      "ledger": "global",
+      "name": "TIC-250-001",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/TIC-250-001",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device TIC-250-001 (Temperature indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5q0",
+      "ledger": "global",
+      "name": "SIC-250-MEDIA",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/SIC-250-MEDIA",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC-250-MEDIA (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5q1",
+      "ledger": "global",
+      "name": "SIC-250-006",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/SIC-250-006",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC-250-006 (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5q2",
+      "ledger": "global",
+      "name": "TI-250-002",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/TI-250-002",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device TI-250-002 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5q3",
+      "ledger": "global",
+      "name": "HV-250-004",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/HV-250-004",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device HV-250-004 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5q4",
+      "ledger": "global",
+      "name": "AIC-250-001",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/AIC-250-001",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device AIC-250-001 (Analyzer indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5q5",
+      "ledger": "global",
+      "name": "PIC-250-001",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/PIC-250-001",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device PIC-250-001 (Pressure indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5q6",
+      "ledger": "global",
+      "name": "WI-250-001",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/WI-250-001",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device WI-250-001 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5q7",
+      "ledger": "global",
+      "name": "SIC-250-008",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/SIC-250-008",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC-250-008 (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5q8",
+      "ledger": "global",
+      "name": "TIC-250-002",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/TIC-250-002",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device TIC-250-002 (Temperature indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5q9",
+      "ledger": "global",
+      "name": "AIC-250-003",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/AIC-250-003",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device AIC-250-003 (Analyzer indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5r0",
+      "ledger": "global",
+      "name": "SIC-250-004",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/SIC-250-004",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC-250-004 (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5r1",
+      "ledger": "global",
+      "name": "SIC-250-003",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/SIC-250-003",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC-250-003 (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5r2",
+      "ledger": "global",
+      "name": "FCV-250-001",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/FCV-250-001",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device FCV-250-001 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5r3",
+      "ledger": "global",
+      "name": "FIC-250-002",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/FIC-250-002",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device FIC-250-002 (Flow indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5r4",
+      "ledger": "global",
+      "name": "HV-250-003",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/HV-250-003",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device HV-250-003 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5r5",
+      "ledger": "global",
+      "name": "HV-250-002",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/HV-250-002",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device HV-250-002 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5r6",
+      "ledger": "global",
+      "name": "HV-250-005",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/HV-250-005",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device HV-250-005 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5r7",
+      "ledger": "global",
+      "name": "AIC-250-002",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/AIC-250-002",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device AIC-250-002 (Analyzer indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5r8",
+      "ledger": "global",
+      "name": "HV-250-001",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sub/measurements/HV-250-001",
+      "source_node": "Site1@localhost:32049",
+      "parent": "d3a0b46eef4ddf643f23498f2d793f3e",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device HV-250-001 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q1",
+      "ledger": "global",
+      "name": "XV504",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/XV504",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device XV504 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q2",
+      "ledger": "global",
+      "name": "BATCH",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/BATCH",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device BATCH (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q3",
+      "ledger": "global",
+      "name": "SIC501-SP",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/SIC501-SP",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC501-SP (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q4",
+      "ledger": "global",
+      "name": "SIC504-PV",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/SIC504-PV",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC504-PV (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q5",
+      "ledger": "global",
+      "name": "TIC501-PV",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/TIC501-PV",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device TIC501-PV (Temperature indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6",
+      "ledger": "global",
+      "name": "PRMP",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/PRMP",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device PRMP (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q7",
+      "ledger": "global",
+      "name": "SIC503-PV",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/SIC503-PV",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC503-PV (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q8",
+      "ledger": "global",
+      "name": "XV503",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/XV503",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device XV503 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q9",
+      "ledger": "global",
+      "name": "AI501-PV",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/AI501-PV",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device AI501-PV (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5r0",
+      "ledger": "global",
+      "name": "OPR",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/OPR",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device OPR (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5r1",
+      "ledger": "global",
+      "name": "PHASE",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/PHASE",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device PHASE (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5r2",
+      "ledger": "global",
+      "name": "SIC504-SP",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/SIC504-SP",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC504-SP (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5r3",
+      "ledger": "global",
+      "name": "SIC502-PV",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/SIC502-PV",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC502-PV (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5r4",
+      "ledger": "global",
+      "name": "SIC501A-SP",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/SIC501A-SP",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC501A-SP (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5r5",
+      "ledger": "global",
+      "name": "SIC501-PV",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/SIC501-PV",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC501-PV (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5r6",
+      "ledger": "global",
+      "name": "RECIPE",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/RECIPE",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device RECIPE (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5r7",
+      "ledger": "global",
+      "name": "SUM500",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/SUM500",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SUM500 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5r8",
+      "ledger": "global",
+      "name": "TIC501-SP",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/TIC501-SP",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device TIC501-SP (Temperature indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5r9",
+      "ledger": "global",
+      "name": "SIC502-SP",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/SIC502-SP",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC502-SP (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5s0",
+      "ledger": "global",
+      "name": "WI501-PV",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/WI501-PV",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device WI501-PV (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5s1",
+      "ledger": "global",
+      "name": "XV502",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/XV502",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device XV502 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5s2",
+      "ledger": "global",
+      "name": "UNIT",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/UNIT",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device UNIT (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5s3",
+      "ledger": "global",
+      "name": "SIC501A-PV",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/SIC501A-PV",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC501A-PV (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5s4",
+      "ledger": "global",
+      "name": "XV501",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/XV501",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device XV501 (Equipment device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5s5",
+      "ledger": "global",
+      "name": "SIC503-SP",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/sum/measurements/SIC503-SP",
+      "source_node": "Site1@localhost:32049",
+      "parent": "93ea2383bfc32084a88a5548498a0f10",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SIC503-SP (Speed indicating controller). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5r1",
+      "ledger": "global",
+      "name": "P5R5",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/P5R5",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device P5R5 (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5r2",
+      "ledger": "global",
+      "name": "PI5R8",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/PI5R8",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device PI5R8 (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5r3",
+      "ledger": "global",
+      "name": "P9A2",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/P9A2",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device P9A2 (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5r4",
+      "ledger": "global",
+      "name": "TFF300",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/TFF300",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device TFF300 (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5r5",
+      "ledger": "global",
+      "name": "P8P7",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/P8P7",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device P8P7 (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5r6",
+      "ledger": "global",
+      "name": "DPI7M",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/DPI7M",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device DPI7M (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5r7",
+      "ledger": "global",
+      "name": "TI8R",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/TI8R",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device TI8R (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5r8",
+      "ledger": "global",
+      "name": "PCV7X",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/PCV7X",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device PCV7X (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5r9",
+      "ledger": "global",
+      "name": "OPR",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/OPR",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device OPR (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5s0",
+      "ledger": "global",
+      "name": "WI17K",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/WI17K",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device WI17K (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5s1",
+      "ledger": "global",
+      "name": "P9A1",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/P9A1",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device P9A1 (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5s2",
+      "ledger": "global",
+      "name": "SR8R",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/SR8R",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device SR8R (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5s3",
+      "ledger": "global",
+      "name": "FI7F",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/FI7F",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device FI7F (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5s4",
+      "ledger": "global",
+      "name": "FI8P",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/FI8P",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device FI8P (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5s5",
+      "ledger": "global",
+      "name": "PI7F",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/PI7F",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device PI7F (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5s6",
+      "ledger": "global",
+      "name": "PI8R",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/PI8R",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device PI8R (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5s7",
+      "ledger": "global",
+      "name": "TMP7M",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/TMP7M",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device TMP7M (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5s8",
+      "ledger": "global",
+      "name": "CI8R_mS",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/CI8R_mS",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device CI8R_mS (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5s9",
+      "ledger": "global",
+      "name": "PRMP",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/PRMP",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device PRMP (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5t0",
+      "ledger": "global",
+      "name": "FX8P",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/FX8P",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device FX8P (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5t1",
+      "ledger": "global",
+      "name": "UV8R",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/UV8R",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device UV8R (Inline UV detector device). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5t2",
+      "ledger": "global",
+      "name": "FX7F",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/FX7F",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device FX7F (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5t3",
+      "ledger": "global",
+      "name": "CM",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/tff/measurements/CM",
+      "source_node": "Site1@localhost:32049",
+      "parent": "176740af9eed922646156e712e8ce1dd",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device CM (TFF equipment). Contains all measurement signals from this device."
+    }
+  },
+  {
+    "uns": {
+      "date": "2026-02-14T06:02:49.390601Z",
+      "id": "d1e2f3g4h5i6j7k8l9m0n1o2p3q4r5s1",
+      "ledger": "global",
+      "name": "CHR01",
+      "namespace": "Enterprise_C/Site1/Bioprocessing/DSP_ProcessCell/chrom/measurements/CHR01",
+      "source_node": "Site1@localhost:32049",
+      "parent": "c9d65fd7de3b2e4d66e29d0bb672a40c",
+      "uns_level": "device_sensor_group",
+      "description": "Sensor grouping for device CHR01 (Chromatography equipment). Contains all measurement signals from this device."
+    }
+  },
+
     {
       "uns": {
         "date": "2026-02-14T06:02:49.390601Z",
@@ -6879,5 +7857,4 @@
         "isa88_phase_relevance_confidence": 0.4
       }
     }
-  ]
-}
+]
