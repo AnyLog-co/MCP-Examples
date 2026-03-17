@@ -2,16 +2,17 @@
 
 ## Overview
 
-This guide explains how to use an LLM (Claude) connected to the AnyLog MCP server to generate a production-quality HTML dashboard that queries live data from an AnyLog network. Four connection modes are supported:
+This guide explains how to use an LLM (Claude) connected to the AnyLog MCP server to generate a production-quality HTML dashboard that queries live data from an AnyLog network. Three connection modes are supported:
 
 | Mode | Description | Use When |
 |---|---|---|
-| **Direct HTTP** | Command embedded in the URL, called directly from the browser | Node is accessible over HTTP on the local network and has CORS enabled |
-| **Direct POST** | AnyLog command delivered as JSON in the POST body, called directly from the browser | Node is accessible over HTTP and POST — CORS still applies |
-| **Flask Proxy** | Browser POSTs to a local Flask proxy which forwards to AnyLog using mTLS | Node requires HTTPS / mTLS certificates, or browser CORS is not allowed |
-| **nginx** | nginx terminates TLS and reverse-proxies to the Flask proxy | Production deployments, shared access, or domain-based serving |
+| **Direct POST** | AnyLog command delivered as JSON in the POST body, called directly from the browser | Node is accessible over HTTP and has CORS enabled, or browser launched with `--disable-web-security` |
+| **Flask Proxy** | Browser POSTs to `anylog_proxy.py` which holds the user's mTLS certs and forwards to AnyLog server-side | Node requires HTTPS / mTLS, or browser CORS is not allowed — developer or single-user setup |
+| **nginx** | Browser POSTs to nginx which proxies directly to the AnyLog node — TLS and mTLS configured server-side by the admin at deploy time | Production deployments, shared/multi-user access, or domain-based serving |
 
-> **Important on CORS:** Browsers block cross-origin requests that use custom headers unless the server explicitly permits them via CORS. Direct modes only work when the AnyLog node has CORS configured, or the browser is launched with `--disable-web-security`. For all other cases, use the Flask or nginx proxy — they make requests server-side where CORS does not apply.
+> **Important on CORS:** Browsers block cross-origin requests that use custom headers unless the server explicitly permits them via CORS. Direct mode only works when the AnyLog node has CORS configured, or the browser is launched with `--disable-web-security`. For all other cases, use the Flask proxy or nginx — they make requests server-side where CORS does not apply.
+
+> **Flask proxy vs nginx:** These are independent alternatives — use one or the other, not both. The Flask proxy is a Python process each user runs locally. nginx is a system-level service the admin deploys once for all users.
 
 Details on using the MCP to generate dashboards and applications can be found in the [documentation](https://github.com/AnyLog-co/documentation/blob/master/dashboard%20generation.md).
 
@@ -22,14 +23,17 @@ Details on using the MCP to generate dashboards and applications can be found in
 ```
 rest-proxy/
 ├── prompt.md                    ← Sample prompt with configurable parameters
-├── anylog_proxy.py              ← Flask-based reverse proxy (handles mTLS)
-├── setup_nginx.sh               ← Script to install and configure nginx + proxy as a service
+├── anylog_proxy.py              ← Flask-based reverse proxy (handles mTLS) — alternative to nginx
+├── anylog-proxy.service         ← Sample service file for anylog_proxy.py 
+├── setup_nginx.sh               ← Script to install and configure nginx — alternative to Flask proxy
 └── power-plant-dashboard.html   ← Sample dashboard (Smart City Power Plant)
 ```
 
 ---
 
-## Python Requirements
+## Python Requirements (Flask proxy only)
+
+The Flask proxy (`anylog_proxy.py`) requires Python 3 and the following packages. Not needed if using nginx.
 
 ```
 flask
@@ -76,9 +80,11 @@ anylog-[node-type]-anylog/   ← Docker named volume
         └── client-<username>-private-key.key
 ```
 
-### What the dashboard user receives
+### Who receives the certificates
 
-The node admin should securely distribute the following three files to each dashboard user:
+Certificates are only needed when connecting to an AnyLog node over HTTPS/mTLS. How they are used depends on which proxy option you choose:
+
+**Flask proxy users** — each user runs their own proxy and needs the three files below. The node admin distributes them securely:
 
 | File | Purpose |
 |---|---|
@@ -86,7 +92,7 @@ The node admin should securely distribute the following three files to each dash
 | `client-<username>-private-key.key` | Signs the client's TLS handshake (keep private) |
 | `ca-anylog-public-key.crt` | Verifies the AnyLog node's certificate is legitimate |
 
-The user passes these to the proxy:
+The user passes them when starting the proxy:
 
 ```bash
 python anylog_proxy.py \
@@ -96,7 +102,9 @@ python anylog_proxy.py \
     --node   24.5.219.50:7849
 ```
 
-Or via the dashboard's **⚙ Settings** drawer when using Proxy mode (cert file paths are sent to the proxy's `/api/configure` endpoint for hot-reload without restarting).
+Or via the dashboard's **⚙ Settings** drawer when using Proxy mode — cert file paths are sent to the proxy's `/api/configure` endpoint and applied without restarting.
+
+**nginx admin** — the admin configures the same three files once at deploy time via `setup_nginx.sh`. Individual dashboard users never handle certificates — they only need the nginx URL.
 
 ---
 
@@ -116,11 +124,11 @@ After deployment, note:
 
 ### 2. Deploy the Proxy
 
-Choose one option depending on your setup.
+Choose **one** option — Flask proxy and nginx are independent alternatives. Do not use both.
 
-#### Option A — Flask proxy only (no nginx)
+#### Option A — Flask proxy (local or single-user)
 
-Suitable for local development or a single-user setup.
+Suitable for local development or a per-user setup. Each user runs their own proxy with their own client certificates.
 
 ```bash
 # Without mTLS (plain HTTP node):
@@ -134,7 +142,7 @@ python anylog_proxy.py \
     --cacert /path/to/ca.crt
 ```
 
-The proxy starts at `http://localhost:5000`. Open the dashboard and configure Proxy mode to point at `http://localhost:5000`.
+The proxy starts at `http://localhost:5000`. Open the dashboard, click ⚙ Settings, select **Flask Proxy** mode, and set the Proxy URL to `http://localhost:5000`.
 
 **All CLI options:**
 
@@ -151,24 +159,28 @@ The proxy starts at `http://localhost:5000`. Open the dashboard and configure Pr
 
 Environment variable equivalents: `ANYLOG_NODE`, `ANYLOG_CERT`, `ANYLOG_KEY`, `ANYLOG_CACERT`, `PROXY_PORT`, `PROXY_HOST`.
 
-#### Option B — nginx + Flask proxy as a systemd service (Ubuntu)
+#### Option B — nginx (production / shared access)
 
-Suitable for shared or production deployments. nginx handles TLS termination, serves the dashboard as a static file, and reverse-proxies `/api/*` to the Flask proxy running on an internal port.
+Suitable for shared or production deployments. nginx serves the dashboard as a static file and proxies `/api/` **directly to the AnyLog node** — no Flask or Python required. TLS termination (browser → nginx) and mTLS (nginx → AnyLog node) are both configured by the admin at deploy time.
 
 ```bash
-# Place all files in the same directory, then:
-
-# Basic (HTTP only):
-sudo bash setup_nginx.sh --node 24.5.219.50:32349
-
-# With self-signed TLS:
+# Basic — HTTP, no mTLS:
 sudo bash setup_nginx.sh \
-    --node 24.5.219.50:32349 \
-    --tls
+    --node      24.5.219.50:32349 \
+    --dashboard /path/to/my-dashboard.html
 
-# Full — with mTLS certs and a real domain:
+# With mTLS to the AnyLog node:
 sudo bash setup_nginx.sh \
     --node      24.5.219.50:7849 \
+    --dashboard /path/to/my-dashboard.html \
+    --cert      /etc/anylog/client.crt \
+    --key       /etc/anylog/client.key \
+    --cacert    /etc/anylog/ca.crt
+
+# With self-signed TLS (browser → nginx):
+sudo bash setup_nginx.sh \
+    --node      24.5.219.50:7849 \
+    --dashboard /path/to/my-dashboard.html \
     --cert      /etc/anylog/client.crt \
     --key       /etc/anylog/client.key \
     --cacert    /etc/anylog/ca.crt \
@@ -177,35 +189,30 @@ sudo bash setup_nginx.sh \
 ```
 
 **What the script does:**
-1. Installs nginx, Python 3, and creates a Python venv at `/opt/anylog/venv`
-2. Installs Flask dependencies into the venv
-3. Creates a dedicated `anylog` system user
-4. Registers the Flask proxy as a `systemd` service (`anylog-proxy`) that starts on boot and restarts on failure
-5. Writes an nginx site config that serves the dashboard at `/` and proxies `/api/` to the Flask proxy
-6. Adds CORS headers and handles `OPTIONS` preflight requests so the browser never sees a CORS error
-7. Optionally generates a self-signed TLS certificate (replace with a real cert for production)
+1. Installs nginx and openssl
+2. Copies the dashboard HTML to `/var/www/anylog/`
+3. Copies mTLS client certificates to `/etc/nginx/ssl/anylog/` (if provided)
+4. Writes an nginx site config that serves the dashboard at `/` and proxies `/api/` directly to the AnyLog node using `proxy_ssl_certificate` directives
+5. Adds CORS headers and handles `OPTIONS` preflight requests
+6. Optionally generates a self-signed TLS certificate for the browser-facing side
 
 **After setup:**
 
 ```
-Dashboard:    http(s)://<domain>/
-Health check: http(s)://<domain>/api/health
-
-Service logs: journalctl -u anylog-proxy -f
-nginx logs:   tail -f /var/log/nginx/anylog_error.log
+Dashboard:   http(s)://<domain>/
+nginx logs:  tail -f /var/log/nginx/anylog_error.log
 
 Service control:
-  systemctl status  anylog-proxy
-  systemctl restart anylog-proxy
-  systemctl reload  nginx
+  systemctl reload nginx
+  systemctl status nginx
 
 Files installed:
-  /opt/anylog/anylog_proxy.py
-  /opt/anylog/venv/
   /var/www/anylog/<dashboard>.html
+  /etc/nginx/ssl/anylog/          ← mTLS certs (if provided)
   /etc/nginx/sites-available/anylog-dashboard
-  /etc/systemd/system/anylog-proxy.service
 ```
+
+> **Certificate note for nginx:** The admin provides certificates at deploy time via `--cert/--key/--cacert`. Dashboard users only need to enter the nginx URL — they never handle certificate files directly.
 
 ---
 
@@ -241,15 +248,13 @@ Use when the node requires mTLS or HTTPS.
 
 #### Connection mode: nginx
 
-Use when the proxy is deployed behind nginx (Option B above).
+Use when nginx is deployed via `setup_nginx.sh`. Certificates and routing are handled server-side by the admin — the browser user only needs the nginx URL.
 
 | Field | Example |
 |---|---|
 | nginx URL | `http://localhost` or `https://dashboard.example.com` |
-| AnyLog Node URL | `https://24.5.219.50:7849` |
 | Database | `cos` |
 | Table | `pp_pm` |
-| Client Cert / Key / CA | PEM content pasted directly — stored in browser memory only |
 
 ---
 
@@ -408,8 +413,8 @@ The dashboard fell back to demo data because the live query returned no results 
 
 **nginx `502 Bad Gateway`**
 
-The Flask proxy service is not running. Check:
+nginx cannot reach the AnyLog node. Check the node URL configured in `setup_nginx.sh` (`--node`), firewall rules, and that the node's REST port is open. Check the nginx error log:
 ```bash
-systemctl status anylog-proxy
-journalctl -u anylog-proxy -n 50
+tail -f /var/log/nginx/anylog_error.log
+nginx -t   # validate config
 ```

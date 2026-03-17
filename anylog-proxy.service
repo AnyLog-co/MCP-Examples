@@ -1,0 +1,53 @@
+[Unit]
+Description=AnyLog Dashboard Flask Proxy
+Documentation=https://github.com/AnyLog-co/documentation
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+
+# ── User ──────────────────────────────────────────────────────────────────
+# Run as a dedicated non-root user.
+# Create with: sudo useradd --system --no-create-home --shell /usr/sbin/nologin anylog
+User=anylog
+Group=anylog
+
+# ── Working directory ─────────────────────────────────────────────────────
+# Place anylog_proxy.py and the dashboard HTML here.
+WorkingDirectory=/opt/anylog
+
+# ── Command ───────────────────────────────────────────────────────────────
+# Must be a single line — systemd does not support backslash continuations.
+# Use the Environment variables below to keep this readable, or inline all flags here.
+ExecStart=/usr/bin/python3 /opt/anylog/anylog_proxy.py --node 24.5.219.50:7849 --cert /opt/anylog/certs/client-public-key.crt --key /opt/anylog/certs/client-private-key.key --cacert /opt/anylog/certs/ca-anylog-public-key.crt --dashboard /opt/anylog/power-plant-dashboard.html --host 127.0.0.1 --port 5000
+
+# ── Environment (alternative to CLI flags) ───────────────────────────────
+# These are picked up by anylog_proxy.py as fallback defaults.
+# Comment out if you prefer to pass everything via ExecStart flags above.
+Environment=ANYLOG_NODE=24.5.219.50:7849
+Environment=ANYLOG_CERT=/opt/anylog/certs/client-public-key.crt
+Environment=ANYLOG_KEY=/opt/anylog/certs/client-private-key.key
+Environment=ANYLOG_CACERT=/opt/anylog/certs/ca-anylog-public-key.crt
+Environment=PROXY_PORT=5000
+Environment=PROXY_HOST=127.0.0.1
+
+# ── Restart behaviour ─────────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+# ── Logging ───────────────────────────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=anylog-proxy
+
+# ── Hardening (optional but recommended) ─────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/anylog
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
