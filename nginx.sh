@@ -48,7 +48,7 @@
 #   # Full options:
 #   sudo bash setup_nginx.sh \
 #       --node       24.5.219.50:7849 \
-#       --dashboard  /path/to/power-plant-dashboard.html \
+#       --dashboard  /path/to/dashboard-power-plant.html \
 #       --cert       /path/to/client.crt \
 #       --key        /path/to/client.key \
 #       --cacert     /path/to/ca.crt \

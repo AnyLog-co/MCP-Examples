@@ -68,7 +68,7 @@ KEY_FILE      = None   # client private key  (.key)
 CA_FILE       = None   # CA cert for server verification — None = skip verification
 TIMEOUT       = 30     # seconds
 DEST_NODE_URL = None   # default AnyLog node URL (http:// or https://)
-DASHBOARD_FILE = "power-plant-dashboard.html"  # file served at GET /dashboard
+DASHBOARD_FILE = "dashboard-power-plant.html"  # file served at GET /dashboard
 
 # Headers that are proxy-internal and must NOT be forwarded to AnyLog
 _PROXY_KEYS = {"url", "content-type", "content_type"}
@@ -293,8 +293,8 @@ Examples:
                         default=30,
                         help="Request timeout in seconds (default: 30)")
     parser.add_argument("--dashboard",
-                        default=os.environ.get("ANYLOG_DASHBOARD", "power-plant-dashboard.html"),
-                        help="HTML file to serve at GET /dashboard (default: power-plant-dashboard.html)")
+                        default=os.environ.get("ANYLOG_DASHBOARD", "dashboard-power-plant.html"),
+                        help="HTML file to serve at GET /dashboard (default: dashboard-power-plant.html)")
 
     args = parser.parse_args()
 

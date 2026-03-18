@@ -26,7 +26,8 @@ rest-proxy/
 ├── anylog_proxy.py              ← Flask-based reverse proxy (handles mTLS) — alternative to nginx
 ├── anylog-proxy.service         ← Sample service file for anylog_proxy.py 
 ├── setup_nginx.sh               ← Script to install and configure nginx — alternative to Flask proxy
-└── power-plant-dashboard.html   ← Sample dashboard (Smart City Power Plant)
+├── dashboard-node-status.html   ← Sample dashboard for getting node / network status
+└── dashboard-power-plant.html   ← Sample dashboard (Smart City Power Plant)
 ```
 
 ---
@@ -266,7 +267,7 @@ The sample dashboard (`power-plant-dashboard.html`) demonstrates a Smart City Po
 
 ```bash
 # Open in browser — will use demo data if the node is unreachable
-open power-plant-dashboard.html
+open dashboard-power-plant.html
 ```
 
 **To run it via the Flask proxy:**

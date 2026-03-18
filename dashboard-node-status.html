@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnyLog Node Inspector</title>
+<style>
+  :root {
+    --bg:           #0a0c10;
+    --surface:      #111318;
+    --surface2:     #181c24;
+    --border:       #1e2330;
+    --border-bright:#2a3248;
+    --accent:       #00d4aa;
+    --accent2:      #0088ff;
+    --accent3:      #a78bfa;
+    --accent-dim:   rgba(0,212,170,0.10);
+    --text:         #e2e8f0;
+    --text-dim:     #64748b;
+    --text-mid:     #94a3b8;
+    --success:      #22c55e;
+    --warning:      #f59e0b;
+    --error:        #ef4444;
+    --mono: 'Cascadia Code','Fira Code','Consolas','Menlo','Monaco',monospace;
+    --sans: 'Segoe UI','SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,170,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,170,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+  }
+
+  .app {
+    position: relative; z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 32px;
+  }
+  .logo {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--sans); font-weight: 800; font-size: 18px; color: #000;
+    flex-shrink: 0;
+    box-shadow: 0 0 24px rgba(0,212,170,0.25);
+  }
+  .header-text h1 {
+    font-family: var(--sans); font-size: 22px; font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .header-text p {
+    font-size: 10px; color: var(--text-dim);
+    letter-spacing: 0.1em; text-transform: uppercase; margin-top: 3px;
+  }
+
+  /* connection badge */
+  .conn-badge {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 7px;
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-dim);
+    border: 1px solid var(--border-bright);
+    padding: 6px 14px; border-radius: 5px;
+    background: var(--surface2);
+    transition: all 0.3s;
+    white-space: nowrap;
+  }
+  .conn-badge.ok    { color: var(--accent);  border-color: rgba(0,212,170,0.35); background: var(--accent-dim); }
+  .conn-badge.error { color: var(--error);   border-color: rgba(239,68,68,0.35); }
+  .conn-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--text-dim); flex-shrink: 0; transition: background 0.3s;
+  }
+  .conn-badge.ok    .conn-dot { background: var(--accent); box-shadow: 0 0 7px rgba(0,212,170,0.7); animation: blink 2s infinite; }
+  .conn-badge.error .conn-dot { background: var(--error); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ── Config card ── */
+  .config-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 24px;
+    margin-bottom: 24px;
+  }
+  .config-row {
+    display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;
+  }
+  .input-group { flex: 1; min-width: 240px; }
+  .input-group label {
+    display: block; font-size: 10px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px;
+  }
+  input[type="text"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border-bright);
+    border-radius: 7px;
+    color: var(--text);
+    font-family: var(--mono); font-size: 13px;
+    padding: 10px 14px; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  input[type="text"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,212,170,0.10);
+  }
+  input[type="text"]::placeholder { color: var(--text-dim); }
+
+  .btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 20px; border-radius: 7px; border: none;
+    cursor: pointer; font-family: var(--mono); font-size: 12px;
+    font-weight: 600; letter-spacing: 0.05em;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #00b894);
+    color: #000;
+  }
+  .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 4px 18px rgba(0,212,170,0.35); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; filter: none; }
+  .btn-secondary {
+    background: var(--surface2); color: var(--text-mid);
+    border: 1px solid var(--border-bright);
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .info-strip {
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: rgba(0,136,255,0.05);
+    border: 1px solid rgba(0,136,255,0.18);
+    border-radius: 7px;
+    font-size: 11px; color: #60a5fa; line-height: 1.8;
+    display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+  }
+  .info-strip code {
+    background: rgba(0,0,0,0.3); padding: 1px 7px;
+    border-radius: 3px; font-size: 10.5px; color: var(--accent);
+  }
+  .cors-warn {
+    margin-top: 10px; padding: 9px 14px;
+    background: rgba(245,158,11,0.06);
+    border: 1px solid rgba(245,158,11,0.22);
+    border-radius: 7px;
+    font-size: 11px; color: var(--warning); line-height: 1.7; display: none;
+  }
+
+  /* ── Layout ── */
+  .row-full { margin-bottom: 20px; }
+  .row-half {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 760px) { .row-half { grid-template-columns: 1fr; } }
+
+  /* ── Section card ── */
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+    gap: 12px; flex-wrap: wrap;
+  }
+  .section-title {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--sans); font-size: 13px; font-weight: 600;
+  }
+  .section-icon {
+    width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .icon-status  { background: rgba(0,212,170,0.13); color: var(--accent); }
+  .icon-node    { background: rgba(0,136,255,0.13); color: var(--accent2); }
+  .icon-network { background: rgba(167,139,250,0.13); color: var(--accent3); }
+
+  .section-meta {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-cmd {
+    font-size: 10px; color: var(--text-dim);
+    font-family: var(--mono);
+    background: var(--bg); padding: 3px 9px;
+    border-radius: 4px; border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-dim); flex-shrink: 0; transition: background 0.3s;
+  }
+  .status-dot.ok      { background: var(--success); box-shadow: 0 0 8px rgba(34,197,94,0.5); }
+  .status-dot.error   { background: var(--error); }
+  .status-dot.loading { background: var(--accent); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .section-body { padding: 20px; flex: 1; }
+
+  /* placeholder / loading / error */
+  .placeholder, .loading-state {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 180px; color: var(--text-dim);
+    font-size: 11px; gap: 12px; opacity: 0.5;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .spinner {
+    width: 30px; height: 30px;
+    border: 2px solid var(--border-bright);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-box {
+    background: rgba(239,68,68,0.07);
+    border: 1px solid rgba(239,68,68,0.25);
+    border-radius: 8px; padding: 14px;
+    font-size: 11px; color: var(--error); line-height: 1.7;
+  }
+  .error-box strong { display: block; margin-bottom: 4px; font-size: 12px; }
+
+  /* KV grid (status panel) */
+  .kv-grid { display: grid; gap: 2px; }
+  .kv-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 10px; border-radius: 5px;
+    transition: background 0.15s; gap: 16px;
+  }
+  .kv-row:hover { background: var(--surface2); }
+  .kv-key { font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
+  .kv-val { font-size: 12px; color: var(--text); text-align: right; word-break: break-all; }
+  .kv-val.highlight { color: var(--accent); font-weight: 500; }
+  .kv-val.running   { color: var(--success); font-weight: 600; }
+  .kv-val.stopped   { color: var(--error); }
+  .kv-val.bool-false{ color: var(--text-dim); }
+
+  /* text-table rendering */
+  .tbl-wrap { overflow-x: auto; }
+  table.al-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 11.5px;
+  }
+  table.al-table th {
+    text-align: left; padding: 8px 12px;
+    background: var(--bg);
+    color: var(--text-mid); font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase; font-size: 10px;
+    border-bottom: 1px solid var(--border-bright);
+    white-space: nowrap;
+  }
+  table.al-table td {
+    padding: 8px 12px;
+    color: var(--text); border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  table.al-table tr:last-child td { border-bottom: none; }
+  table.al-table tr:hover td { background: var(--surface2); }
+
+  .pass-badge, .fail-badge, .plus-badge {
+    display: inline-block; padding: 2px 10px;
+    border-radius: 4px; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .pass-badge  { background: rgba(34,197,94,0.12); color: var(--success); }
+  .fail-badge  { background: rgba(239,68,68,0.12);  color: var(--error); }
+  .plus-badge  { background: rgba(0,212,170,0.12);  color: var(--accent); }
+
+  /* node type pills */
+  .ntype {
+    display: inline-block; padding: 2px 9px;
+    border-radius: 4px; font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .ntype-master   { background: rgba(245,158,11,0.12); color: var(--warning); }
+  .ntype-operator { background: rgba(0,136,255,0.12);  color: var(--accent2); }
+  .ntype-query    { background: rgba(167,139,250,0.12); color: var(--accent3); }
+
+  /* raw toggle */
+  .raw-toggle {
+    margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px;
+  }
+  .raw-toggle summary {
+    font-size: 10px; color: var(--text-dim);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    cursor: pointer; user-select: none; list-style: none;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .raw-toggle summary:hover { color: var(--accent); }
+  .raw-toggle summary::before { content: '▶'; font-size: 8px; transition: transform 0.2s; }
+  details[open] > summary::before { transform: rotate(90deg); }
+  pre.raw-pre {
+    margin-top: 10px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px; font-size: 10px; color: var(--text-mid);
+    overflow-x: auto; line-height: 1.6;
+    white-space: pre; tab-size: 4;
+  }
+
+  /* summary row for network */
+  .net-summary {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    margin-bottom: 14px; padding: 10px 14px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 7px;
+  }
+  .net-stat { text-align: center; }
+  .net-stat .num { font-size: 20px; font-weight: 700; color: var(--accent); line-height: 1; }
+  .net-stat .lbl { font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 3px; }
+
+  /* Footer */
+  .footer {
+    margin-top: 32px; padding-top: 18px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between;
+    align-items: center; flex-wrap: wrap; gap: 12px;
+  }
+  .footer-left { font-size: 10px; color: var(--text-dim); letter-spacing: 0.05em; }
+  .last-fetch  { font-size: 10px; color: var(--text-dim); }
+  #lastFetchTime { color: var(--accent); }
+  .auto-refresh-toggle {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em;
+    text-transform: uppercase; cursor: pointer; user-select: none;
+  }
+  .toggle-pill {
+    width: 32px; height: 17px; border-radius: 9px;
+    background: var(--border-bright); position: relative;
+    transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle-pill::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--text-dim); transition: all 0.2s;
+  }
+  .toggle-pill.on { background: var(--accent); }
+  .toggle-pill.on::after { left: 17px; background: #000; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">AL</div>
+    <div class="header-text">
+      <h1>AnyLog Node Inspector</h1>
+      <p>Direct REST · No Proxy · API v1.23</p>
+    </div>
+    <div class="conn-badge" id="connBadge">
+      <div class="conn-dot"></div>
+      <span id="connLabel">Not connected</span>
+    </div>
+  </div>
+
+  <!-- Config -->
+  <div class="config-card">
+    <div class="config-row">
+      <div class="input-group">
+        <label>AnyLog Node URL</label>
+        <input type="text" id="nodeUrl"
+               placeholder="http://24.5.219.50:32349"
+               value="http://24.5.219.50:32349">
+      </div>
+      <button class="btn btn-primary" id="fetchBtn" onclick="fetchAll()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Fetch Data
+      </button>
+      <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+    </div>
+
+    <div class="info-strip">
+      <span>
+        <strong style="color:var(--accent2)">▸ Mode:</strong>
+        Browser → AnyLog node directly via <code>POST</code>
+      </span>
+      <span>Header: <code>Content-Type: application/json</code></span>
+      <span>Body: <code>{"User-Agent":"AnyLog/1.23","command":"..."}</code></span>
+    </div>
+    <div class="cors-warn" id="corsWarn">
+      ⚠ CORS issue detected. AnyLog must respond with
+      <code>Access-Control-Allow-Origin: *</code> for browser-direct calls to work.
+      If blocked, use the Python proxy version instead.
+    </div>
+  </div>
+
+  <!-- Row 1: Node Status (full width) -->
+  <div class="row-full">
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <div class="section-icon icon-status">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+            </svg>
+          </div>
+          Node Status
+        </div>
+        <div class="section-meta">
+          <span class="status-dot" id="statusDot"></span>
+          <span class="section-cmd">get status where format=json</span>
+        </div>
+      </div>
+      <div class="section-body" id="statusBody">
+        <div class="placeholder">
+          <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+          </svg>
+          <span>Awaiting fetch…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 2: test node + test network -->
+  <div class="row-half">
+
+    <!-- test node -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <div class="section-icon icon-node">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+            </svg>
+          </div>
+          Node Test
+        </div>
+        <div class="section-meta">
+          <span class="status-dot" id="nodeDot"></span>
+          <span class="section-cmd">test node</span>
+        </div>
+      </div>
+      <div class="section-body" id="nodeBody">
+        <div class="placeholder">
+          <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+          </svg>
+          <span>Awaiting fetch…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- test network -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">
+          <div class="section-icon icon-network">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/>
+              <path d="M12 7v4M12 11l-7 6M12 11l7 6"/>
+            </svg>
+          </div>
+          Network Test
+        </div>
+        <div class="section-meta">
+          <span class="status-dot" id="netDot"></span>
+          <span class="section-cmd">test network</span>
+        </div>
+      </div>
+      <div class="section-body" id="netBody">
+        <div class="placeholder">
+          <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/>
+            <path d="M12 7v4M12 11l-7 6M12 11l7 6"/>
+          </svg>
+          <span>Awaiting fetch…</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-left">AnyLog Node Inspector · Direct POST · v1.23</div>
+    <div class="auto-refresh-toggle" onclick="toggleAutoRefresh()" title="Auto-refresh every 30 s">
+      <div class="toggle-pill" id="arPill"></div>
+      <span id="arLabel">Auto-refresh</span>
+    </div>
+    <div class="last-fetch">Last fetch: <span id="lastFetchTime">—</span></div>
+  </div>
+
+</div><!-- .app -->
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const USER_AGENT_HEADER = "AnyLog/1.23";
+let autoRefreshTimer = null;
+let autoRefreshOn = false;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function setDot(id, state) {
+  document.getElementById(id).className = "status-dot " + state;
+}
+function loadingHTML(msg) {
+  msg = msg || "Querying node…";
+  return `<div class="loading-state"><div class="spinner"></div><span>${esc(msg)}</span></div>`;
+}
+function errorHTML(title, detail) {
+  return `<div class="error-box"><strong>⚠ ${esc(title)}</strong>${detail ? `<br><span style="opacity:.8">${esc(detail)}</span>` : ""}</div>`;
+}
+
+// ── Core POST ─────────────────────────────────────────────────────────────────
+async function queryNode(nodeUrl, command) {
+  const resp = await fetch(nodeUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ "User-Agent": USER_AGENT_HEADER, "command": command }),
+    signal: AbortSignal.timeout(15000)
+  });
+  const raw = await resp.text();
+  return raw;
+}
+
+// ── Parse pipe-delimited text table ──────────────────────────────────────────
+// AnyLog tables look like:
+//   Col1                 Col2      Col3
+//   ---------------------|---------|-----|
+//   val1                 |val2     |val3 |
+function parsePipeTable(text) {
+  const lines = text.split("\n").filter(l => l.trim().length > 0);
+  if (lines.length < 2) return null;
+
+  // separator line index
+  const sepIdx = lines.findIndex(l => /^[-|]+$/.test(l.trim()));
+  if (sepIdx < 1) return null;
+
+  const headerLine = lines[sepIdx - 1];
+  const dataLines  = lines.slice(sepIdx + 1);
+
+  // Build column widths from separator
+  const sep = lines[sepIdx];
+  // columns are delimited by | in separator
+  // e.g. "------|------|------|"
+  // Header cells are fixed-width up to each pipe position
+  const pipes = [];
+  for (let i = 0; i < sep.length; i++) {
+    if (sep[i] === "|") pipes.push(i);
+  }
+
+  if (pipes.length === 0) return null;
+
+  function sliceCols(line) {
+    const cells = [];
+    let prev = 0;
+    for (const p of pipes) {
+      cells.push(line.substring(prev, p).trim());
+      prev = p + 1;
+    }
+    // remainder
+    const rest = line.substring(prev).trim();
+    if (rest) cells.push(rest);
+    return cells;
+  }
+
+  const headers = sliceCols(headerLine);
+  const rows = dataLines
+    .filter(l => l.trim() && !/^[-|]+$/.test(l.trim()))
+    .map(l => sliceCols(l));
+
+  return { headers, rows };
+}
+
+// ── Render: get status (JSON) ─────────────────────────────────────────────────
+function renderStatus(raw) {
+  let data;
+  try { data = JSON.parse(raw); }
+  catch {
+    setDot("statusDot", "error");
+    document.getElementById("statusBody").innerHTML = errorHTML("Non-JSON response", raw.substring(0,300));
+    return;
+  }
+
+  setDot("statusDot", "ok");
+  updateConnBadge(true, data.assigned_name || data.name || "connected");
+
+  function flatten(obj, prefix) {
+    prefix = prefix || "";
+    const out = {};
+    for (const [k, v] of Object.entries(obj || {})) {
+      const key = prefix ? `${prefix}.${k}` : k;
+      if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+        Object.assign(out, flatten(v, key));
+      } else {
+        out[key] = Array.isArray(v) ? JSON.stringify(v) : v;
+      }
+    }
+    return out;
+  }
+
+  function valClass(k, v) {
+    const s = String(v).toLowerCase(), kk = k.toLowerCase();
+    if (kk.includes("status") || kk.includes("state")) {
+      if (s === "running" || s === "true" || s === "ok") return "running";
+      if (s === "stopped" || s === "false" || s === "error") return "stopped";
+    }
+    if (v === false) return "bool-false";
+    if (kk.includes("name") || kk.includes("version") || kk.includes("ip") || kk.includes("port")) return "highlight";
+    return "";
+  }
+
+  const flat = flatten(data);
+  const rows = Object.entries(flat).map(([k, v]) => `
+    <div class="kv-row">
+      <span class="kv-key">${esc(k)}</span>
+      <span class="kv-val ${valClass(k, v)}">${esc(String(v))}</span>
+    </div>`).join("");
+
+  document.getElementById("statusBody").innerHTML =
+    `<div class="kv-grid">${rows}</div>` + rawToggle(raw);
+}
+
+// ── Render: test node ─────────────────────────────────────────────────────────
+function renderNodeTest(raw) {
+  if (!raw || !raw.trim()) {
+    setDot("nodeDot", "error");
+    document.getElementById("nodeBody").innerHTML = errorHTML("Empty response");
+    return;
+  }
+
+  const parsed = parsePipeTable(raw);
+  if (!parsed) {
+    setDot("nodeDot", "error");
+    document.getElementById("nodeBody").innerHTML =
+      errorHTML("Could not parse table") + rawToggle(raw, true);
+    return;
+  }
+
+  const allPass = parsed.rows.every(r => {
+    const s = (r[1] || "").toLowerCase();
+    return s.includes("pass") || s.includes("running") || s.includes("+");
+  });
+  setDot("nodeDot", allPass ? "ok" : "error");
+
+  function statusCell(val) {
+    const v = val.toLowerCase();
+    if (v.includes("pass"))    return `<span class="pass-badge">Pass</span>`;
+    if (v.includes("fail"))    return `<span class="fail-badge">Fail</span>`;
+    if (v === "+" || v === "+") return `<span class="plus-badge">+</span>`;
+    if (v.includes("running")) return `<span class="pass-badge">${esc(val)}</span>`;
+    return `<span style="color:var(--text-mid)">${esc(val)}</span>`;
+  }
+
+  const thead = `<tr>${parsed.headers.map(h => `<th>${esc(h)}</th>`).join("")}</tr>`;
+  const tbody = parsed.rows.map(r => {
+    const cells = r.map((c, i) => {
+      if (i === r.length - 1 || i === 1) return `<td>${statusCell(c)}</td>`;
+      return `<td>${esc(c)}</td>`;
+    }).join("");
+    return `<tr>${cells}</tr>`;
+  }).join("");
+
+  document.getElementById("nodeBody").innerHTML =
+    `<div class="tbl-wrap"><table class="al-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`
+    + rawToggle(raw, true);
+}
+
+// ── Render: test network ──────────────────────────────────────────────────────
+function renderNetwork(raw) {
+  if (!raw || !raw.trim()) {
+    setDot("netDot", "error");
+    document.getElementById("netBody").innerHTML = errorHTML("Empty response");
+    return;
+  }
+
+  const parsed = parsePipeTable(raw);
+  if (!parsed) {
+    setDot("netDot", "error");
+    document.getElementById("netBody").innerHTML =
+      errorHTML("Could not parse table") + rawToggle(raw, true);
+    return;
+  }
+
+  setDot("netDot", "ok");
+
+  // Summary stats
+  const typeCounts = {};
+  let onlineCount = 0;
+  parsed.rows.forEach(r => {
+    const type = (r[1] || "").trim().toLowerCase();
+    typeCounts[type] = (typeCounts[type] || 0) + 1;
+    const status = (r[r.length - 1] || "").trim();
+    if (status === "+" || status.includes("+")) onlineCount++;
+  });
+
+  const summaryItems = [
+    { num: parsed.rows.length, lbl: "Total" },
+    { num: onlineCount, lbl: "Online" },
+    ...Object.entries(typeCounts).map(([k, v]) => ({ num: v, lbl: k }))
+  ];
+
+  const summaryHTML = `<div class="net-summary">${
+    summaryItems.map(s =>
+      `<div class="net-stat"><div class="num">${s.num}</div><div class="lbl">${esc(s.lbl)}</div></div>`
+    ).join("")
+  }</div>`;
+
+  function typeCell(val) {
+    const v = val.toLowerCase().trim();
+    if (v === "master")   return `<span class="ntype ntype-master">master</span>`;
+    if (v === "operator") return `<span class="ntype ntype-operator">operator</span>`;
+    if (v === "query")    return `<span class="ntype ntype-query">query</span>`;
+    return `<span class="ntype" style="background:rgba(148,163,184,0.1);color:var(--text-mid)">${esc(val)}</span>`;
+  }
+  function statusCell(val) {
+    const v = val.trim();
+    if (v === "+") return `<span class="plus-badge">+</span>`;
+    if (v.toLowerCase().includes("pass")) return `<span class="pass-badge">${esc(v)}</span>`;
+    if (v.toLowerCase().includes("fail")) return `<span class="fail-badge">${esc(v)}</span>`;
+    return `<span style="color:var(--text-dim)">${esc(v)}</span>`;
+  }
+
+  // figure out which column index is "node type" and "status"
+  const typeIdx   = parsed.headers.findIndex(h => /type/i.test(h));
+  const statusIdx = parsed.headers.length - 1; // usually last col
+
+  const thead = `<tr>${parsed.headers.map(h => `<th>${esc(h)}</th>`).join("")}</tr>`;
+  const tbody = parsed.rows.map(r => {
+    const cells = r.map((c, i) => {
+      if (i === typeIdx)   return `<td>${typeCell(c)}</td>`;
+      if (i === statusIdx) return `<td>${statusCell(c)}</td>`;
+      return `<td>${esc(c)}</td>`;
+    }).join("");
+    return `<tr>${cells}</tr>`;
+  }).join("");
+
+  document.getElementById("netBody").innerHTML =
+    summaryHTML +
+    `<div class="tbl-wrap"><table class="al-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`
+    + rawToggle(raw, true);
+}
+
+// ── Raw toggle ────────────────────────────────────────────────────────────────
+function rawToggle(raw, isText) {
+  const label = isText ? "Raw text" : "Raw JSON";
+  return `<details class="raw-toggle">
+    <summary>${label}</summary>
+    <pre class="raw-pre">${esc(raw)}</pre>
+  </details>`;
+}
+
+// ── Connection badge ──────────────────────────────────────────────────────────
+function updateConnBadge(ok, label) {
+  const b = document.getElementById("connBadge");
+  const l = document.getElementById("connLabel");
+  b.className = "conn-badge " + (ok ? "ok" : "error");
+  l.textContent = label || (ok ? "Connected" : "Offline");
+}
+
+// ── Main fetch ────────────────────────────────────────────────────────────────
+async function fetchAll() {
+  const url = document.getElementById("nodeUrl").value.trim();
+  if (!url) { alert("Please enter a node URL."); return; }
+
+  const btn = document.getElementById("fetchBtn");
+  btn.disabled = true;
+  btn.innerHTML = `<div style="width:13px;height:13px;border:2px solid rgba(0,0,0,0.25);border-top-color:#000;border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0"></div> Fetching…`;
+
+  document.getElementById("statusBody").innerHTML = loadingHTML("get status where format=json");
+  document.getElementById("nodeBody").innerHTML   = loadingHTML("test node");
+  document.getElementById("netBody").innerHTML    = loadingHTML("test network");
+  setDot("statusDot","loading"); setDot("nodeDot","loading"); setDot("netDot","loading");
+  document.getElementById("corsWarn").style.display = "none";
+
+  const [r1, r2, r3] = await Promise.allSettled([
+    queryNode(url, "get status where format=json"),
+    queryNode(url, "test node"),
+    queryNode(url, "test network"),
+  ]);
+
+  if (r1.status === "fulfilled") {
+    renderStatus(r1.value);
+  } else {
+    const err = r1.reason?.message || String(r1.reason);
+    setDot("statusDot","error");
+    updateConnBadge(false, "Offline");
+    document.getElementById("statusBody").innerHTML = errorHTML("Status fetch failed", err);
+    if (err.toLowerCase().includes("cors") || err.toLowerCase().includes("failed to fetch") || err.toLowerCase().includes("network")) {
+      document.getElementById("corsWarn").style.display = "block";
+    }
+  }
+
+  if (r2.status === "fulfilled") renderNodeTest(r2.value);
+  else { setDot("nodeDot","error"); document.getElementById("nodeBody").innerHTML = errorHTML("test node failed", r2.reason?.message); }
+
+  if (r3.status === "fulfilled") renderNetwork(r3.value);
+  else { setDot("netDot","error"); document.getElementById("netBody").innerHTML = errorHTML("test network failed", r3.reason?.message); }
+
+  document.getElementById("lastFetchTime").textContent = new Date().toLocaleTimeString();
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Fetch Data`;
+}
+
+// ── Clear ─────────────────────────────────────────────────────────────────────
+function clearAll() {
+  const ph = (icon, msg) => `<div class="placeholder">${icon}<span>${msg}</span></div>`;
+  const clockSvg = `<svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`;
+  const monSvg   = `<svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>`;
+  const netSvg   = `<svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v4M12 11l-7 6M12 11l7 6"/></svg>`;
+  document.getElementById("statusBody").innerHTML = ph(clockSvg, "Awaiting fetch…");
+  document.getElementById("nodeBody").innerHTML   = ph(monSvg,   "Awaiting fetch…");
+  document.getElementById("netBody").innerHTML    = ph(netSvg,   "Awaiting fetch…");
+  ["statusDot","nodeDot","netDot"].forEach(id => setDot(id, ""));
+  document.getElementById("lastFetchTime").textContent = "—";
+  document.getElementById("corsWarn").style.display = "none";
+  updateConnBadge(false, "Not connected");
+}
+
+// ── Auto-refresh ──────────────────────────────────────────────────────────────
+function toggleAutoRefresh() {
+  autoRefreshOn = !autoRefreshOn;
+  const pill  = document.getElementById("arPill");
+  const label = document.getElementById("arLabel");
+  if (autoRefreshOn) {
+    pill.classList.add("on");
+    label.textContent = "Auto-refresh (30s)";
+    autoRefreshTimer = setInterval(fetchAll, 30000);
+  } else {
+    pill.classList.remove("on");
+    label.textContent = "Auto-refresh";
+    clearInterval(autoRefreshTimer);
+  }
+}
+
+// ── Auto-fetch on load ────────────────────────────────────────────────────────
+window.addEventListener("load", () => {
+  fetchAll();
+});
+</script>
+</body>
+</html>
