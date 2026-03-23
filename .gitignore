@@ -1,6 +1,7 @@
 # Python virtual environment
 .idea/
 myenv/
+venv/
 
 # Bytecode + cache
 __pycache__/
