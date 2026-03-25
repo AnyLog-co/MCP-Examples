@@ -27,7 +27,8 @@ rest-proxy/
 ├── anylog-proxy.service         ← Sample service file for anylog_proxy.py 
 ├── setup_nginx.sh               ← Script to install and configure nginx — alternative to Flask proxy
 ├── dashboard-node-status.html   ← Sample dashboard for getting node / network status
-└── dashboard-power-plant.html   ← Sample dashboard (Smart City Power Plant)
+├── dashboard-power-plant.html   ← Sample dashboard (Smart City Power Plant)
+└── dashboard-power-plant2.html   ← Sample dashboard (Smart City Power Plant) but using CNS (custome human-readable column value naming logic for `monitor_id`)
 ```
 
 ---
