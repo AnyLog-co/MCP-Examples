@@ -54,7 +54,7 @@ BRIDGE_SCRIPT="${SCRIPT_DIR}/mcp_web_bridge.py"
 # ---------------------------------------------------------------------------
 # Defaults (can be overridden by env vars)
 # ---------------------------------------------------------------------------
-: "${BRIDGE_MCP_URL:=http://50.116.13.109:32049/mcp/sse}"
+: "${BRIDGE_MCP_URL:=http://66.175.217.145:32349/mcp/sse}"
 : "${BRIDGE_MCP_PROXY:=./venv/bin/mcp-proxy}"
 : "${BRIDGE_PORT:=8080}"
 : "${BRIDGE_HOST:=0.0.0.0}"
