@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-MCP Web Bridge  v4.2
+MCP Web Bridge  v4.3
 ====================
 Bridges HTTP REST requests from browser dashboards → MCP protocol → AnyLog network.
 
-NEW IN v4.2
+NEW IN v4.3
 -----------
 * _send_rpc deadline reduced from 45 s → 30 s (well under JOB_TIMEOUT_S=60 s)
   so the worker thread never freezes behind a hanging readline.
@@ -17,6 +17,14 @@ NEW IN v4.2
   AnyLog-style TLS port (contains ":320"), which is the most common cause
   of silent 60-second timeouts.
 * clientInfo version bumped to 4.1 in MCP handshake.
+
+NEW IN v4.3
+-----------
+* /api/query and /api/query/increment omit the "nodes" parameter entirely so
+  AnyLog routes each query to all nodes hosting the table automatically.
+* /api/query/increment now forwards the optional "where" clause from the
+  request body (e.g. rig_id filter) which was previously silently dropped.
+* Query endpoints log dbms/table/sql at INFO level for easy verification.
 
 NEW IN v4.0 / v4.1
 -------------------
@@ -333,12 +341,10 @@ _mcp_proc: Optional[subprocess.Popen] = None
 _mcp_lock = threading.Lock()
 _req_id   = 0
 
-MCP_SPAWN_RETRIES = 2   # how many times to retry spawning on handshake failure
-
 
 def _spawn_mcp_proc() -> subprocess.Popen:
     """Spawn a fresh mcp-proxy and complete the MCP initialize handshake.
-    Raises on failure so the caller can decide whether to retry."""
+    Raises on failure — no retries."""
     import select as _select
     mcp_url = CFG["mcp_url"]
     log.info("Spawning mcp-proxy → %s", mcp_url)
@@ -393,31 +399,15 @@ def _get_mcp_proc() -> subprocess.Popen:
         if alive:
             return _mcp_proc
 
-    # Proc is dead or missing — spawn outside the lock so we don't block
-    # other threads for the duration of the handshake.
-    last_exc: Optional[Exception] = None
-    for attempt in range(1, MCP_SPAWN_RETRIES + 1):
-        try:
-            new_proc = _spawn_mcp_proc()
-        except Exception as exc:
-            last_exc = exc
-            log.warning("mcp-proxy spawn attempt %d/%d failed: %s",
-                        attempt, MCP_SPAWN_RETRIES, exc)
-            time.sleep(1.0)
-            continue
-
-        with _mcp_lock:
-            # Another thread might have raced us — accept whichever proc won.
-            if _mcp_proc is None or _mcp_proc.poll() is not None:
-                _mcp_proc = new_proc
-            else:
-                # We lost the race; kill our surplus proc.
-                new_proc.kill()
-        return _mcp_proc
-
-    raise RuntimeError(
-        f"Failed to spawn mcp-proxy after {MCP_SPAWN_RETRIES} attempts: {last_exc}"
-    )
+    # Proc is dead or missing — spawn once, no retries.
+    new_proc = _spawn_mcp_proc()   # raises on failure
+    with _mcp_lock:
+        # Another thread might have raced us — accept whichever proc won.
+        if _mcp_proc is None or _mcp_proc.poll() is not None:
+            _mcp_proc = new_proc
+        else:
+            new_proc.kill()   # lost the race; discard surplus
+    return _mcp_proc
 
 
 def _send_rpc(proc: subprocess.Popen, method: str,
@@ -461,38 +451,21 @@ def _send_rpc(proc: subprocess.Popen, method: str,
 def _call_mcp(tool: str, params: Dict[str, Any]) -> Any:
     """Call an MCP tool and return parsed result. Called ONLY from worker thread."""
     t0 = time.time()
-    param_summary = json.dumps(params)[:200]
-    log.info("MCP ▶  tool=%-28s  params=%s", tool, param_summary)
+    log.info("MCP ▶  tool=%-28s  params=%s", tool, json.dumps(params))
     _log_event({
         "kind": "mcp_req",
         "tool": tool,
         "params": params,
     })
 
-    # Retry once if the proc is dead or the connection closes unexpectedly.
-    for attempt in range(2):
-        try:
-            proc = _get_mcp_proc()
-        except RuntimeError as exc:
-            raise RuntimeError(f"Cannot get mcp-proxy: {exc}") from exc
+    # Single attempt — no respawn on failure. If the proc is dead or the
+    # connection fails, surface the error immediately to the caller.
+    try:
+        proc = _get_mcp_proc()
+    except RuntimeError as exc:
+        raise RuntimeError(f"Cannot get mcp-proxy: {exc}") from exc
 
-        try:
-            resp = _send_rpc(proc, "tools/call", {"name": tool, "arguments": params})
-            break   # success — fall through to response parsing
-        except (TimeoutError, OSError, BrokenPipeError) as exc:
-            log.warning("MCP connection error on attempt %d: %s — killing proc and retrying",
-                        attempt + 1, exc)
-            # Force-kill the dead proc so _get_mcp_proc will respawn.
-            global _mcp_proc
-            with _mcp_lock:
-                if _mcp_proc is proc:
-                    _mcp_proc = None
-            proc.kill()
-            if attempt == 1:
-                raise RuntimeError(f"MCP connection failed after retry: {exc}") from exc
-            time.sleep(0.5)
-    else:
-        raise RuntimeError("MCP call loop exhausted without a response")
+    resp = _send_rpc(proc, "tools/call", {"name": tool, "arguments": params})
 
     if resp is None:
         log.warning("MCP ◀  tool=%-28s  → None response", tool)
@@ -521,9 +494,9 @@ def _call_mcp(tool: str, params: Dict[str, Any]) -> Any:
             # the query (bad SQL, unknown table, etc).  Make that explicit.
             if not err_text:
                 err_text = "(AnyLog returned isError=true with no message — check SQL/table name)"
-            log.error("MCP ✗  tool=%-28s  → isError: %s", tool, err_text[:300])
+            log.error("MCP ✗  tool=%-28s  → isError: %s", tool, err_text)
             _log_event({"kind": "mcp_resp", "tool": tool, "ms": int((time.time()-t0)*1000),
-                        "status": "isError", "error": err_text[:300]})
+                        "status": "isError", "error": err_text})
             raise RuntimeError(f"MCP tool error: {err_text}")
         texts = [c["text"] for c in result["content"] if c.get("type") == "text"]
         combined = "\n".join(texts)
@@ -534,19 +507,19 @@ def _call_mcp(tool: str, params: Dict[str, Any]) -> Any:
             log.info("MCP ◀  tool=%-28s  → %s rows  (%dms)", tool, row_count, ms)
             _log_event({"kind": "mcp_resp", "tool": tool, "ms": ms,
                         "status": "ok", "row_count": row_count,
-                        "result_preview": json.dumps(parsed)[:600] if isinstance(parsed, list) and len(parsed) > 0 else str(parsed)[:600]})
+                        "result": parsed})
             return parsed
         except json.JSONDecodeError:
             ms = int((time.time() - t0) * 1000)
             log.info("MCP ◀  tool=%-28s  → text (%d chars)  (%dms)", tool, len(combined), ms)
             _log_event({"kind": "mcp_resp", "tool": tool, "ms": ms,
-                        "status": "ok", "result_preview": combined[:600]})
+                        "status": "ok", "result": combined})
             return combined
 
     ms = int((time.time() - t0) * 1000)
     log.info("MCP ◀  tool=%-28s  → raw result  (%dms)", tool, ms)
     _log_event({"kind": "mcp_resp", "tool": tool, "ms": ms,
-                "status": "ok", "result_preview": str(result)[:600]})
+                "status": "ok", "result": result})
     return result
 
 
@@ -643,13 +616,13 @@ def _before():
     if request.method == "POST":
         body = request.get_data(as_text=True)
         log.info("HTTP ▶  %s %s  body=%s", request.method, request.path,
-                 body[:300] if body else "(empty)")
+                 body if body else "(empty)")
         _log_event({
             "kind": "http_req",
             "req_id": g._req_id,
             "method": request.method,
             "path": request.path,
-            "body": body[:600] if body else None,
+            "body": body if body else None,
         })
     else:
         log.info("HTTP ▶  %s %s  args=%s", request.method, request.path,
@@ -670,12 +643,12 @@ def _after(response):
              request.method, request.path, response.status_code, ms)
     if not (request.path.startswith("/api/log") or request.path == "/debug"
             or request.method == "OPTIONS"):
-        # Capture a snippet of the response body for the log panel
-        body_preview = None
+        # Capture full response body for the log panel
+        resp_body = None
         ct = response.content_type or ""
         if "json" in ct:
             try:
-                body_preview = response.get_data(as_text=True)[:800]
+                resp_body = response.get_data(as_text=True)
             except Exception:
                 pass
         _log_event({
@@ -685,7 +658,7 @@ def _after(response):
             "path": request.path,
             "status": response.status_code,
             "ms": ms,
-            "body": body_preview,
+            "body": resp_body,
         })
     return response
 
@@ -824,12 +797,12 @@ def api_query():
     body  = request.get_json(force=True) or {}
     dbms  = body.get("dbms", "")
     sql   = body.get("sql", "")
-    nodes = body.get("nodes", "")
     if not dbms or not sql:
         return jsonify({"error": "body must contain {dbms, sql}"}), 400
+
+    # No "nodes" param — AnyLog automatically routes to all nodes hosting the table.
+    log.info("api_query  dbms=%s  sql=%.120s", dbms, sql)
     params = {"dbms": dbms, "sql": sql}
-    if nodes:
-        params["nodes"] = nodes
     result, err = _run_job("executeQuery", params, ttl=DATA_TTL_S)
     if err:
         return jsonify({"error": err}), 500
@@ -847,6 +820,10 @@ def api_query_increment():
     if missing:
         return jsonify({"error": f"missing fields: {missing}"}), 400
 
+    # No "nodes" param — AnyLog automatically routes to all nodes hosting the table.
+    log.info("api_query_increment  dbms=%s  table=%s  where=%.80s",
+             body["dbms"], body["table"], body.get("where", ""))
+
     params = {
         "dbms":           body["dbms"],
         "table":          body["table"],
@@ -857,8 +834,9 @@ def api_query_increment():
         "timeUnit":       body["timeUnit"],
         "projections":    body["projections"],
     }
-    if "nodes" in body:
-        params["nodes"] = body["nodes"]
+    # Forward optional WHERE clause (e.g. rig_id filter from dashboard)
+    if body.get("where"):
+        params["where"] = body["where"]
 
     result, err = _run_job("queryWithIncrement", params, ttl=DATA_TTL_S)
     if err:
@@ -1111,9 +1089,9 @@ function bodyHTML(ev) {
   for (const [k,v] of Object.entries(ev)) {
     if (!skip.has(k) && v !== null && v !== undefined) obj[k] = v;
   }
-  // Try to pretty-print body / result_preview as JSON
+  // Try to pretty-print body / result as JSON
   if (obj.body) { try { obj.body = JSON.parse(obj.body); } catch(_){} }
-  if (obj.result_preview) { try { obj.result_preview = JSON.parse(obj.result_preview); } catch(_){} }
+  if (obj.result) { try { obj.result = (typeof obj.result === "string") ? JSON.parse(obj.result) : obj.result; } catch(_){} }
   return `<pre>${syntaxHL(obj)}</pre>`;
 }
 
@@ -1366,7 +1344,7 @@ def main() -> None:
     log_level_label = "DEBUG" if args.debug else ("WARNING (quiet)" if args.quiet else "INFO")
 
     print("=" * 65, file=sys.stderr)
-    print("MCP Web Bridge  v4.2  (single-worker, all MCP calls serialised)",
+    print("MCP Web Bridge  v4.3  (single-worker, all MCP calls serialised)",
           file=sys.stderr)
     print("=" * 65, file=sys.stderr)
     print(f"  MCP URL   : {CFG['mcp_url']}",  file=sys.stderr)
