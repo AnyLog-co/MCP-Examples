@@ -1,11 +1,33 @@
 #!/usr/bin/env python3
 """
-MCP Web Bridge  v4.0
+MCP Web Bridge  v4.3
 ====================
 Bridges HTTP REST requests from browser dashboards → MCP protocol → AnyLog network.
 
-NEW IN v4.0
+NEW IN v4.3
 -----------
+* _send_rpc deadline reduced from 45 s → 30 s (well under JOB_TIMEOUT_S=60 s)
+  so the worker thread never freezes behind a hanging readline.
+* _send_rpc uses select() with 0.5 s polling instead of blocking readline(),
+  allowing early detection of a dead mcp-proxy process (OSError on poll()!=None).
+* _spawn_mcp_proc now drains mcp-proxy stderr non-blocking on failure so the
+  real error (TLS mismatch, connection refused, bad URL) appears in the log
+  instead of a bare TimeoutError.
+* HTTP → HTTPS warning: logs a WARNING if --mcp-url uses http:// on an
+  AnyLog-style TLS port (contains ":320"), which is the most common cause
+  of silent 60-second timeouts.
+* clientInfo version bumped to 4.1 in MCP handshake.
+
+NEW IN v4.3
+-----------
+* /api/query and /api/query/increment omit the "nodes" parameter entirely so
+  AnyLog routes each query to all nodes hosting the table automatically.
+* /api/query/increment now forwards the optional "where" clause from the
+  request body (e.g. rig_id filter) which was previously silently dropped.
+* Query endpoints log dbms/table/sql at INFO level for easy verification.
+
+NEW IN v4.0 / v4.1
+-------------------
 * --mcp-url  CLI argument  : choose which MCP SSE server to connect to at launch
 * --mcp-proxy CLI argument : override the mcp-proxy binary path
 * --port / --host          : bind address control
@@ -203,6 +225,40 @@ def cache_clear() -> None:
         _cache_ts.clear()
 
 # ---------------------------------------------------------------------------
+# API Call Event Log  (in-memory circular buffer, streamed via SSE)
+# ---------------------------------------------------------------------------
+import collections
+
+_EVENT_LOG_MAX = 200          # keep last N entries
+_event_log: collections.deque = collections.deque(maxlen=_EVENT_LOG_MAX)
+_event_log_lock = threading.Lock()
+_event_log_listeners: List[queue.Queue] = []
+_event_log_listeners_lock = threading.Lock()
+
+
+def _log_event(entry: Dict[str, Any]) -> None:
+    """Append an event to the circular buffer and fan-out to SSE listeners."""
+    entry.setdefault("ts", time.time())
+    with _event_log_lock:
+        _event_log.append(entry)
+    # Fan out to any open /api/log SSE streams
+    with _event_log_listeners_lock:
+        dead = []
+        for q in _event_log_listeners:
+            try:
+                q.put_nowait(entry)
+            except Exception:
+                dead.append(q)
+        for q in dead:
+            _event_log_listeners.remove(q)
+
+
+def _snapshot_log() -> List[Dict]:
+    with _event_log_lock:
+        return list(_event_log)
+
+
+# ---------------------------------------------------------------------------
 # Job / Worker
 # ---------------------------------------------------------------------------
 @dataclass
@@ -286,27 +342,72 @@ _mcp_lock = threading.Lock()
 _req_id   = 0
 
 
+def _spawn_mcp_proc() -> subprocess.Popen:
+    """Spawn a fresh mcp-proxy and complete the MCP initialize handshake.
+    Raises on failure — no retries."""
+    import select as _select
+    mcp_url = CFG["mcp_url"]
+    log.info("Spawning mcp-proxy → %s", mcp_url)
+
+    # Warn loudly if the URL looks like it should be HTTPS but uses http://.
+    # This is the most common cause of silent 60-second timeouts against
+    # AnyLog nodes (which default to TLS on port 32x49).
+    if mcp_url.startswith("http://") and ":320" in mcp_url:
+        log.warning(
+            "MCP URL uses http:// on what looks like an AnyLog TLS port (%s). "
+            "If the node requires HTTPS this will silently hang. "
+            "Restart with --mcp-url https://... if you see timeouts.", mcp_url
+        )
+
+    proc = subprocess.Popen(
+        [CFG["mcp_proxy"], mcp_url],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+    try:
+        # MCP initialize handshake — done OUTSIDE _mcp_lock so we don't
+        # hold the lock for up to 30 s during a blocking readline.
+        _send_rpc(proc, "initialize", {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "mcp-web-bridge", "version": "4.1"},
+        })
+        _send_rpc(proc, "notifications/initialized", {})
+    except Exception:
+        # Drain stderr (non-blocking) before killing so the real error
+        # (TLS mismatch, connection refused, bad URL, etc.) is visible.
+        try:
+            ready, _, _ = _select.select([proc.stderr], [], [], 1.0)
+            if ready:
+                stderr_out = proc.stderr.read(800)
+                if stderr_out:
+                    log.warning("mcp-proxy stderr during failed spawn:\n%s", stderr_out)
+        except Exception:
+            pass
+        proc.kill()
+        raise
+    return proc
+
+
 def _get_mcp_proc() -> subprocess.Popen:
     global _mcp_proc
     with _mcp_lock:
+        alive = _mcp_proc is not None and _mcp_proc.poll() is None
+        if alive:
+            return _mcp_proc
+
+    # Proc is dead or missing — spawn once, no retries.
+    new_proc = _spawn_mcp_proc()   # raises on failure
+    with _mcp_lock:
+        # Another thread might have raced us — accept whichever proc won.
         if _mcp_proc is None or _mcp_proc.poll() is not None:
-            log.info("Spawning mcp-proxy → %s", CFG["mcp_url"])
-            _mcp_proc = subprocess.Popen(
-                [CFG["mcp_proxy"], CFG["mcp_url"]],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,
-            )
-            # MCP initialize handshake
-            _send_rpc(_mcp_proc, "initialize", {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "mcp-web-bridge", "version": "4.0"},
-            })
-            _send_rpc(_mcp_proc, "notifications/initialized", {})
-        return _mcp_proc
+            _mcp_proc = new_proc
+        else:
+            new_proc.kill()   # lost the race; discard surplus
+    return _mcp_proc
 
 
 def _send_rpc(proc: subprocess.Popen, method: str,
@@ -321,12 +422,22 @@ def _send_rpc(proc: subprocess.Popen, method: str,
     if method == "notifications/initialized":
         return None
 
-    # Read until we get the response matching our id
-    deadline = time.time() + 45
+    # Read until we get the response matching our id.
+    # Use select() with a short poll interval so we can:
+    #   1. honour the deadline without blocking the worker thread indefinitely
+    #   2. detect a dead proc early (poll() != None) and raise OSError
+    # Deadline is 30 s — well under JOB_TIMEOUT_S (60 s) so the HTTP layer
+    # always gets a clean error rather than a silent timeout.
+    import select as _select
+    deadline = time.time() + 30
     while time.time() < deadline:
+        if proc.poll() is not None:
+            raise OSError(f"mcp-proxy exited (rc={proc.poll()}) while waiting for id={_req_id}")
+        ready, _, _ = _select.select([proc.stdout], [], [], 0.5)
+        if not ready:
+            continue
         raw = proc.stdout.readline()
         if not raw:
-            time.sleep(0.05)
             continue
         try:
             msg = json.loads(raw)
@@ -334,24 +445,39 @@ def _send_rpc(proc: subprocess.Popen, method: str,
                 return msg
         except json.JSONDecodeError:
             continue
-    raise TimeoutError(f"No response for id={_req_id} method={method}")
+    raise TimeoutError(f"No response for id={_req_id} method={method} (30s deadline)")
 
 
 def _call_mcp(tool: str, params: Dict[str, Any]) -> Any:
     """Call an MCP tool and return parsed result. Called ONLY from worker thread."""
     t0 = time.time()
-    param_summary = json.dumps(params)[:200]
-    log.info("MCP ▶  tool=%-28s  params=%s", tool, param_summary)
-    proc = _get_mcp_proc()
+    log.info("MCP ▶  tool=%-28s  params=%s", tool, json.dumps(params))
+    _log_event({
+        "kind": "mcp_req",
+        "tool": tool,
+        "params": params,
+    })
+
+    # Single attempt — no respawn on failure. If the proc is dead or the
+    # connection fails, surface the error immediately to the caller.
+    try:
+        proc = _get_mcp_proc()
+    except RuntimeError as exc:
+        raise RuntimeError(f"Cannot get mcp-proxy: {exc}") from exc
+
     resp = _send_rpc(proc, "tools/call", {"name": tool, "arguments": params})
 
     if resp is None:
         log.warning("MCP ◀  tool=%-28s  → None response", tool)
+        _log_event({"kind": "mcp_resp", "tool": tool, "ms": int((time.time()-t0)*1000),
+                    "status": "none", "result": None})
         return None
 
     if "error" in resp:
         err_msg = resp["error"].get("message", str(resp["error"]))
         log.error("MCP ✗  tool=%-28s  → error: %s", tool, err_msg)
+        _log_event({"kind": "mcp_resp", "tool": tool, "ms": int((time.time()-t0)*1000),
+                    "status": "error", "error": err_msg})
         raise RuntimeError(err_msg)
 
     result = resp.get("result", {})
@@ -364,7 +490,13 @@ def _call_mcp(tool: str, params: Dict[str, Any]) -> Any:
                 if c.get("type") == "text":
                     err_text = c["text"]
                     break
-            log.error("MCP ✗  tool=%-28s  → isError: %s", tool, err_text[:200])
+            # isError with no message text often means the AnyLog node rejected
+            # the query (bad SQL, unknown table, etc).  Make that explicit.
+            if not err_text:
+                err_text = "(AnyLog returned isError=true with no message — check SQL/table name)"
+            log.error("MCP ✗  tool=%-28s  → isError: %s", tool, err_text)
+            _log_event({"kind": "mcp_resp", "tool": tool, "ms": int((time.time()-t0)*1000),
+                        "status": "isError", "error": err_text})
             raise RuntimeError(f"MCP tool error: {err_text}")
         texts = [c["text"] for c in result["content"] if c.get("type") == "text"]
         combined = "\n".join(texts)
@@ -373,14 +505,21 @@ def _call_mcp(tool: str, params: Dict[str, Any]) -> Any:
             row_count = len(parsed) if isinstance(parsed, list) else "dict"
             ms = int((time.time() - t0) * 1000)
             log.info("MCP ◀  tool=%-28s  → %s rows  (%dms)", tool, row_count, ms)
+            _log_event({"kind": "mcp_resp", "tool": tool, "ms": ms,
+                        "status": "ok", "row_count": row_count,
+                        "result": parsed})
             return parsed
         except json.JSONDecodeError:
             ms = int((time.time() - t0) * 1000)
             log.info("MCP ◀  tool=%-28s  → text (%d chars)  (%dms)", tool, len(combined), ms)
+            _log_event({"kind": "mcp_resp", "tool": tool, "ms": ms,
+                        "status": "ok", "result": combined})
             return combined
 
     ms = int((time.time() - t0) * 1000)
     log.info("MCP ◀  tool=%-28s  → raw result  (%dms)", tool, ms)
+    _log_event({"kind": "mcp_resp", "tool": tool, "ms": ms,
+                "status": "ok", "result": result})
     return result
 
 
@@ -466,14 +605,35 @@ import time as _time
 @app.before_request
 def _before():
     from flask import g
+    import uuid as _uuid
     g._t0 = _time.time()
+    g._req_id = str(_uuid.uuid4())[:8]
+    # Skip logging for the debug/log endpoints themselves to avoid noise
+    if request.path.startswith("/api/log") or request.path == "/debug":
+        return
+    if request.method in ("OPTIONS",):
+        return
     if request.method == "POST":
         body = request.get_data(as_text=True)
         log.info("HTTP ▶  %s %s  body=%s", request.method, request.path,
-                 body[:300] if body else "(empty)")
+                 body if body else "(empty)")
+        _log_event({
+            "kind": "http_req",
+            "req_id": g._req_id,
+            "method": request.method,
+            "path": request.path,
+            "body": body if body else None,
+        })
     else:
         log.info("HTTP ▶  %s %s  args=%s", request.method, request.path,
                  dict(request.args))
+        _log_event({
+            "kind": "http_req",
+            "req_id": g._req_id,
+            "method": request.method,
+            "path": request.path,
+            "args": dict(request.args),
+        })
 
 @app.after_request
 def _after(response):
@@ -481,6 +641,25 @@ def _after(response):
     ms = int((_time.time() - getattr(g, "_t0", _time.time())) * 1000)
     log.info("HTTP ◀  %s %s  status=%d  (%dms)",
              request.method, request.path, response.status_code, ms)
+    if not (request.path.startswith("/api/log") or request.path == "/debug"
+            or request.method == "OPTIONS"):
+        # Capture full response body for the log panel
+        resp_body = None
+        ct = response.content_type or ""
+        if "json" in ct:
+            try:
+                resp_body = response.get_data(as_text=True)
+            except Exception:
+                pass
+        _log_event({
+            "kind": "http_resp",
+            "req_id": getattr(g, "_req_id", "?"),
+            "method": request.method,
+            "path": request.path,
+            "status": response.status_code,
+            "ms": ms,
+            "body": resp_body,
+        })
     return response
 
 
@@ -618,12 +797,12 @@ def api_query():
     body  = request.get_json(force=True) or {}
     dbms  = body.get("dbms", "")
     sql   = body.get("sql", "")
-    nodes = body.get("nodes", "")
     if not dbms or not sql:
         return jsonify({"error": "body must contain {dbms, sql}"}), 400
+
+    # No "nodes" param — AnyLog automatically routes to all nodes hosting the table.
+    log.info("api_query  dbms=%s  sql=%.120s", dbms, sql)
     params = {"dbms": dbms, "sql": sql}
-    if nodes:
-        params["nodes"] = nodes
     result, err = _run_job("executeQuery", params, ttl=DATA_TTL_S)
     if err:
         return jsonify({"error": err}), 500
@@ -641,6 +820,10 @@ def api_query_increment():
     if missing:
         return jsonify({"error": f"missing fields: {missing}"}), 400
 
+    # No "nodes" param — AnyLog automatically routes to all nodes hosting the table.
+    log.info("api_query_increment  dbms=%s  table=%s  where=%.80s",
+             body["dbms"], body["table"], body.get("where", ""))
+
     params = {
         "dbms":           body["dbms"],
         "table":          body["table"],
@@ -651,8 +834,9 @@ def api_query_increment():
         "timeUnit":       body["timeUnit"],
         "projections":    body["projections"],
     }
-    if "nodes" in body:
-        params["nodes"] = body["nodes"]
+    # Forward optional WHERE clause (e.g. rig_id filter from dashboard)
+    if body.get("where"):
+        params["where"] = body["where"]
 
     result, err = _run_job("queryWithIncrement", params, ttl=DATA_TTL_S)
     if err:
@@ -703,6 +887,317 @@ def api_worker_status():
     })
 
 
+# ── API Call Log — SSE stream & snapshot ──────────────────────────────────────
+@app.route("/api/log/snapshot")
+def api_log_snapshot():
+    """Return the current circular buffer as JSON (no streaming)."""
+    return jsonify({"events": _snapshot_log(), "max": _EVENT_LOG_MAX})
+
+
+@app.route("/api/log/stream")
+def api_log_stream():
+    """
+    Server-Sent Events stream of API call events.
+    Each event is a JSON line:  data: {...}\\n\\n
+    """
+    from flask import Response, stream_with_context
+
+    q: queue.Queue = queue.Queue(maxsize=500)
+    with _event_log_listeners_lock:
+        _event_log_listeners.append(q)
+
+    # Send existing buffer first so the client sees history on connect
+    snapshot = _snapshot_log()
+
+    def generate():
+        try:
+            # Flush history
+            for ev in snapshot:
+                yield f"data: {json.dumps(ev)}\n\n"
+            # Stream live events
+            while True:
+                try:
+                    ev = q.get(timeout=20)
+                    yield f"data: {json.dumps(ev)}\n\n"
+                except queue.Empty:
+                    yield ": keepalive\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            with _event_log_listeners_lock:
+                try:
+                    _event_log_listeners.remove(q)
+                except ValueError:
+                    pass
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+# ── Debug / Log Panel ─────────────────────────────────────────────────────────
+_DEBUG_PAGE = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MCP Bridge · API Log</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#c9d1d9;font-family:'Courier New',monospace;font-size:12px;height:100vh;display:flex;flex-direction:column}
+#toolbar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#161b22;border-bottom:1px solid #30363d;flex-shrink:0;flex-wrap:wrap}
+#toolbar h1{font-size:13px;font-weight:700;color:#58a6ff;letter-spacing:.06em;white-space:nowrap}
+.tb-sep{width:1px;height:20px;background:#30363d}
+button{padding:4px 10px;border-radius:4px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;cursor:pointer;font-size:11px;font-family:inherit}
+button:hover{border-color:#58a6ff;color:#58a6ff}
+button.active{border-color:#3fb950;color:#3fb950;background:#0d2119}
+#status-dot{width:8px;height:8px;border-radius:50%;background:#f85149;flex-shrink:0}
+#status-dot.live{background:#3fb950;box-shadow:0 0 6px #3fb950}
+#count{font-size:11px;color:#8b949e;margin-left:auto}
+#filter-bar{display:flex;gap:6px;align-items:center}
+#filter-bar label{color:#8b949e;font-size:11px}
+#filter-input{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:3px 7px;border-radius:4px;font-size:11px;font-family:inherit;width:180px}
+#filter-input:focus{outline:none;border-color:#58a6ff}
+select{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:3px 7px;border-radius:4px;font-size:11px;font-family:inherit}
+select:focus{outline:none;border-color:#58a6ff}
+#log{flex:1;overflow-y:auto;padding:6px 0}
+.ev{border-bottom:1px solid #161b22;cursor:pointer;user-select:none}
+.ev:hover{background:#161b22}
+.ev-hdr{display:flex;align-items:center;gap:8px;padding:5px 12px;min-height:28px}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:.05em;white-space:nowrap}
+.b-http-req {background:#0d2a4a;color:#58a6ff;border:1px solid #1f6feb}
+.b-http-resp{background:#0d2a4a;color:#79c0ff;border:1px solid #1f6feb}
+.b-mcp-req  {background:#1a2a0d;color:#7ee787;border:1px solid #2ea043}
+.b-mcp-resp {background:#1a2a0d;color:#56d364;border:1px solid #2ea043}
+.b-err      {background:#2d0f0f;color:#f85149;border:1px solid #6e1a1a}
+.method{color:#d29922;font-weight:700;font-size:11px}
+.path{color:#c9d1d9}
+.tool{color:#7ee787;font-weight:700}
+.ms{color:#6e7681;font-size:10px;margin-left:auto;white-space:nowrap}
+.status-ok  {color:#3fb950}
+.status-err {color:#f85149}
+.ts-label{color:#484f58;font-size:10px;white-space:nowrap}
+.ev-body{display:none;padding:6px 12px 10px 30px;border-top:1px solid #21262d;background:#080c10}
+.ev-body.open{display:block}
+.ev-body pre{white-space:pre-wrap;word-break:break-all;color:#8b949e;font-size:11px;line-height:1.5;max-height:320px;overflow-y:auto}
+.json-key{color:#79c0ff}
+.json-str{color:#a5d6ff}
+.json-num{color:#f2cc60}
+.json-bool{color:#ff7b72}
+.json-null{color:#8b949e}
+#empty{display:none;text-align:center;padding:60px 20px;color:#484f58}
+#empty.show{display:block}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:#0d1117}
+::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <h1>🔌 MCP Bridge · API Log</h1>
+  <div class="tb-sep"></div>
+  <div id="status-dot"></div>
+  <span id="conn-label" style="font-size:11px;color:#8b949e">disconnected</span>
+  <div class="tb-sep"></div>
+  <div id="filter-bar">
+    <label>Filter:</label>
+    <input id="filter-input" type="text" placeholder="path, tool, status…">
+    <select id="kind-filter">
+      <option value="">All kinds</option>
+      <option value="http_req">HTTP req</option>
+      <option value="http_resp">HTTP resp</option>
+      <option value="mcp_req">MCP req</option>
+      <option value="mcp_resp">MCP resp</option>
+    </select>
+  </div>
+  <div class="tb-sep"></div>
+  <button id="btn-pause">⏸ Pause</button>
+  <button id="btn-clear">🗑 Clear</button>
+  <button id="btn-top">⬆ Top</button>
+  <button id="btn-bottom">⬇ Bottom</button>
+  <span id="count" style="font-size:11px;color:#484f58">0 events</span>
+</div>
+<div id="log"><div id="empty" class="show">No events yet — waiting for API calls…</div></div>
+
+<script>
+const log = document.getElementById('log');
+const empty = document.getElementById('empty');
+const dot = document.getElementById('status-dot');
+const connLabel = document.getElementById('conn-label');
+const countEl = document.getElementById('count');
+const filterInput = document.getElementById('filter-input');
+const kindFilter = document.getElementById('kind-filter');
+const btnPause = document.getElementById('btn-pause');
+
+let events = [];
+let paused = false;
+let es = null;
+
+function fmtTime(ts) {
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString('en-US', {hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit'}) +
+    '.' + String(d.getMilliseconds()).padStart(3,'0');
+}
+
+function syntaxHL(obj) {
+  const s = JSON.stringify(obj, null, 2);
+  return s.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+    if (/^"/.test(m)) {
+      if (/:$/.test(m)) return `<span class="json-key">${m}</span>`;
+      return `<span class="json-str">${m}</span>`;
+    }
+    if (/true|false/.test(m)) return `<span class="json-bool">${m}</span>`;
+    if (/null/.test(m)) return `<span class="json-null">${m}</span>`;
+    return `<span class="json-num">${m}</span>`;
+  });
+}
+
+function kindBadge(ev) {
+  if (ev.kind === 'http_req')  return `<span class="badge b-http-req">HTTP ▶</span>`;
+  if (ev.kind === 'http_resp') return `<span class="badge b-http-resp">HTTP ◀</span>`;
+  if (ev.kind === 'mcp_req')   return `<span class="badge b-mcp-req">MCP ▶</span>`;
+  if (ev.kind === 'mcp_resp') {
+    const cls = (ev.status && ev.status !== 'ok') ? 'b-err' : 'b-mcp-resp';
+    return `<span class="badge ${cls}">MCP ◀</span>`;
+  }
+  return `<span class="badge">${ev.kind}</span>`;
+}
+
+function mainLabel(ev) {
+  if (ev.kind === 'http_req')  return `<span class="method">${ev.method}</span> <span class="path">${ev.path}</span>`;
+  if (ev.kind === 'http_resp') {
+    const sc = ev.status >= 400 ? 'status-err' : 'status-ok';
+    return `<span class="method">${ev.method}</span> <span class="path">${ev.path}</span> <span class="${sc}">${ev.status}</span>`;
+  }
+  if (ev.kind === 'mcp_req')  return `<span class="tool">${ev.tool}</span>`;
+  if (ev.kind === 'mcp_resp') {
+    const sc = (ev.status && ev.status !== 'ok') ? 'status-err' : 'status-ok';
+    const rows = ev.row_count !== undefined ? ` <span style="color:#484f58">(${ev.row_count} rows)</span>` : '';
+    return `<span class="tool">${ev.tool}</span> <span class="${sc}">${ev.status||''}</span>${rows}`;
+  }
+  return '';
+}
+
+function bodyHTML(ev) {
+  const parts = [];
+  const skip = new Set(['kind','ts','req_id']);
+  const obj = {};
+  for (const [k,v] of Object.entries(ev)) {
+    if (!skip.has(k) && v !== null && v !== undefined) obj[k] = v;
+  }
+  // Try to pretty-print body / result as JSON
+  if (obj.body) { try { obj.body = JSON.parse(obj.body); } catch(_){} }
+  if (obj.result) { try { obj.result = (typeof obj.result === "string") ? JSON.parse(obj.result) : obj.result; } catch(_){} }
+  return `<pre>${syntaxHL(obj)}</pre>`;
+}
+
+function matchesFilter(ev) {
+  const kf = kindFilter.value;
+  if (kf && ev.kind !== kf) return false;
+  const txt = filterInput.value.trim().toLowerCase();
+  if (!txt) return true;
+  return JSON.stringify(ev).toLowerCase().includes(txt);
+}
+
+function renderAll() {
+  const filtered = events.filter(matchesFilter);
+  empty.className = filtered.length === 0 ? 'show' : '';
+  countEl.textContent = `${filtered.length} / ${events.length} events`;
+  // Remove all existing rows
+  Array.from(log.querySelectorAll('.ev')).forEach(n => n.remove());
+  // Re-insert in order
+  for (const ev of filtered) {
+    log.appendChild(buildRow(ev));
+  }
+}
+
+function buildRow(ev) {
+  const div = document.createElement('div');
+  div.className = 'ev';
+  div.dataset.id = ev._id;
+  const ms = ev.ms ? `<span class="ms">${ev.ms}ms</span>` : '';
+  div.innerHTML = `
+    <div class="ev-hdr">
+      <span class="ts-label">${fmtTime(ev.ts)}</span>
+      ${kindBadge(ev)}
+      ${mainLabel(ev)}
+      ${ms}
+    </div>
+    <div class="ev-body">${bodyHTML(ev)}</div>`;
+  div.querySelector('.ev-hdr').addEventListener('click', () => {
+    const body = div.querySelector('.ev-body');
+    body.classList.toggle('open');
+  });
+  return div;
+}
+
+function appendEvent(ev) {
+  ev._id = events.length;
+  events.push(ev);
+  if (!matchesFilter(ev)) {
+    countEl.textContent = `${events.filter(matchesFilter).length} / ${events.length} events`;
+    return;
+  }
+  empty.className = '';
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+  const row = buildRow(ev);
+  log.appendChild(row);
+  countEl.textContent = `${events.filter(matchesFilter).length} / ${events.length} events`;
+  if (atBottom) log.scrollTop = log.scrollHeight;
+}
+
+function connect() {
+  if (es) es.close();
+  dot.className = '';
+  connLabel.textContent = 'connecting…';
+  es = new EventSource('/api/log/stream');
+  es.onopen = () => {
+    dot.className = 'live';
+    connLabel.textContent = 'live';
+  };
+  es.onmessage = e => {
+    if (paused) return;
+    try { appendEvent(JSON.parse(e.data)); } catch(_) {}
+  };
+  es.onerror = () => {
+    dot.className = '';
+    connLabel.textContent = 'reconnecting…';
+    setTimeout(connect, 3000);
+  };
+}
+
+btnPause.addEventListener('click', () => {
+  paused = !paused;
+  btnPause.textContent = paused ? '▶ Resume' : '⏸ Pause';
+  btnPause.className = paused ? 'active' : '';
+});
+document.getElementById('btn-clear').addEventListener('click', () => {
+  events = [];
+  Array.from(log.querySelectorAll('.ev')).forEach(n => n.remove());
+  empty.className = 'show';
+  countEl.textContent = '0 events';
+});
+document.getElementById('btn-top').addEventListener('click', () => { log.scrollTop = 0; });
+document.getElementById('btn-bottom').addEventListener('click', () => { log.scrollTop = log.scrollHeight; });
+filterInput.addEventListener('input', renderAll);
+kindFilter.addEventListener('change', renderAll);
+
+connect();
+</script>
+</body>
+</html>"""
+
+
+@app.route("/debug")
+def debug_panel():
+    """Self-contained API call log panel — collapsible rows, live SSE feed."""
+    return _DEBUG_PAGE
+
+
 # ── Dashboard serve ───────────────────────────────────────────────────────────
 @app.route("/")
 def index():
@@ -715,12 +1210,13 @@ def index():
             with open(path) as f:
                 return f.read()
     return (
-        "<h1>MCP Web Bridge v4.0</h1>"
+        "<h1>MCP Web Bridge v4.2</h1>"
         "<p>MCP: <code>" + CFG.get("mcp_url", "?") + "</code></p>"
         "<p>Endpoints: /api/status  /api/uns/databases  /api/uns/discover  "
         "/api/uns/policies  /api/tables  /api/columns  /api/databases  "
         "/api/query(POST)  /api/query/increment(POST)  /api/nodes  "
         "/api/nodes/monitor  /api/cache/clear(POST)  /api/worker/status</p>"
+        "<p><a href='/debug' style='color:#58a6ff'>🔌 API Call Log Panel</a></p>"
     )
 
 
@@ -732,7 +1228,7 @@ def main() -> None:
     global CALL_DELAY_S
 
     parser = argparse.ArgumentParser(
-        description="MCP Web Bridge v4.0 — HTTP ↔ AnyLog MCP SSE proxy",
+        description="MCP Web Bridge v4.2 — HTTP ↔ AnyLog MCP SSE proxy",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -848,7 +1344,7 @@ def main() -> None:
     log_level_label = "DEBUG" if args.debug else ("WARNING (quiet)" if args.quiet else "INFO")
 
     print("=" * 65, file=sys.stderr)
-    print("MCP Web Bridge  v4.0  (single-worker, all MCP calls serialised)",
+    print("MCP Web Bridge  v4.3  (single-worker, all MCP calls serialised)",
           file=sys.stderr)
     print("=" * 65, file=sys.stderr)
     print(f"  MCP URL   : {CFG['mcp_url']}",  file=sys.stderr)
