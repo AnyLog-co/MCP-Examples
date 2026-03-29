@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MCP Web Bridge  v4.3
+MCP Web Bridge  v4.4
 ====================
 Bridges HTTP REST requests from browser dashboards → MCP protocol → AnyLog network.
 
@@ -52,6 +52,7 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import queue
 import ssl
 import subprocess
@@ -342,6 +343,39 @@ _mcp_lock = threading.Lock()
 _req_id   = 0
 
 
+def _build_mcp_cmd(mcp_proxy: str, mcp_url: str) -> list:
+    """Wrap the mcp-proxy command so Node.js stdio is unbuffered.
+
+    mcp-proxy is a Node.js process.  When its stdin/stdout are pipes (not a
+    TTY), Node defaults to full-block-buffered I/O.  This means it will not
+    read any JSON-RPC messages we write until the OS pipe buffer fills (~64 KB)
+    or the write-end of the pipe is closed (process death).  proc.stdin.flush()
+    only flushes Python's side — it cannot force Node to drain its read buffer.
+
+    Fix: wrap the spawn with stdbuf(1) on Linux or script(1) on macOS so the
+    OS presents an unbuffered (or line-buffered) stream to the child process.
+    Falls back to bare invocation if neither tool is available.
+    """
+    if sys.platform == "darwin":
+        script = shutil.which("script")
+        if script:
+            # script -q /dev/null <cmd> allocates a pseudo-TTY, making Node
+            # treat stdio as interactive → auto-flush on every write.
+            log.debug("_build_mcp_cmd: using script(1) PTY wrapper (macOS)")
+            return [script, "-q", "/dev/null", mcp_proxy, mcp_url]
+    stdbuf = shutil.which("stdbuf")
+    if stdbuf:
+        # stdbuf -i0 -o0 -e0 forces unbuffered stdin/stdout/stderr.
+        log.debug("_build_mcp_cmd: using stdbuf(1) wrapper (Linux)")
+        return [stdbuf, "-i0", "-o0", "-e0", mcp_proxy, mcp_url]
+    log.warning(
+        "_build_mcp_cmd: neither stdbuf nor script found — "
+        "mcp-proxy will run with default (buffered) stdio. "
+        "MCP calls may be delayed until the pipe buffer fills or process exits."
+    )
+    return [mcp_proxy, mcp_url]
+
+
 def _spawn_mcp_proc() -> subprocess.Popen:
     """Spawn a fresh mcp-proxy and complete the MCP initialize handshake.
     Raises on failure — no retries."""
@@ -360,12 +394,13 @@ def _spawn_mcp_proc() -> subprocess.Popen:
         )
 
     proc = subprocess.Popen(
-        [CFG["mcp_proxy"], mcp_url],
+        _build_mcp_cmd(CFG["mcp_proxy"], mcp_url),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        bufsize=1,
+        bufsize=0,          # unbuffered on Python side; Node side handled by
+                            # stdbuf/script wrapper in _build_mcp_cmd()
     )
     try:
         # MCP initialize handshake — done OUTSIDE _mcp_lock so we don't
@@ -1344,7 +1379,7 @@ def main() -> None:
     log_level_label = "DEBUG" if args.debug else ("WARNING (quiet)" if args.quiet else "INFO")
 
     print("=" * 65, file=sys.stderr)
-    print("MCP Web Bridge  v4.3  (single-worker, all MCP calls serialised)",
+    print("MCP Web Bridge  v4.4  (single-worker, all MCP calls serialised)",
           file=sys.stderr)
     print("=" * 65, file=sys.stderr)
     print(f"  MCP URL   : {CFG['mcp_url']}",  file=sys.stderr)
@@ -1367,6 +1402,8 @@ def main() -> None:
         port=CFG["port"],
         debug=args.debug,
         threaded=True,
+        use_reloader=False,        # reloader forks a child; worker thread does
+                                   # not transfer → job queue never drains
         ssl_context=ssl_context,   # None → plain HTTP; SSLContext → HTTPS
     )
 
