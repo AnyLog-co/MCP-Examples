@@ -1,51 +1,81 @@
 #!/usr/bin/env python3
 """
-MCP Web Bridge  v4.3
+MCP Web Bridge  v5.2
 ====================
 Bridges HTTP REST requests from browser dashboards → MCP protocol → AnyLog network.
 
-NEW IN v4.3
+NEW IN v5.2
 -----------
-* _send_rpc deadline reduced from 45 s → 30 s (well under JOB_TIMEOUT_S=60 s)
-  so the worker thread never freezes behind a hanging readline.
-* _send_rpc uses select() with 0.5 s polling instead of blocking readline(),
-  allowing early detection of a dead mcp-proxy process (OSError on poll()!=None).
-* _spawn_mcp_proc now drains mcp-proxy stderr non-blocking on failure so the
-  real error (TLS mismatch, connection refused, bad URL) appears in the log
-  instead of a bare TimeoutError.
-* HTTP → HTTPS warning: logs a WARNING if --mcp-url uses http:// on an
-  AnyLog-style TLS port (contains ":320"), which is the most common cause
-  of silent 60-second timeouts.
-* clientInfo version bumped to 4.1 in MCP handshake.
+* --debug now accepts an optional integer level (default 1 when flag present):
+    --debug   / --debug 1 : Python DEBUG logging + full MCP payload output (was
+                            the previous --debug behaviour, unchanged).
+    --debug 2             : all of level 1 PLUS step-through mode.  Before each
+                            executeQuery or queryWithIncrement the worker prints
+                            the full call parameters to stderr and blocks on
+                            input(), pausing the entire proxy.  All queued HTTP
+                            requests remain blocked while the operator reads the
+                            prompt.  Press Enter to send the call, 's' to skip
+                            the wait, or 'q' to disable stepping for the session.
+
+NEW IN v5.2
+-----------
+* --mcp-timeout SECS : optional per-call hard kill timer.  When set, a
+  threading.Timer fires after SECS seconds and closes the open SSE socket(s),
+  causing the read loop to exit with EOF and raising TimeoutError back to the
+  worker.  The timer is always cancelled on a successful response.  Disabled
+  by default (None = wait indefinitely).  Should be set below --job-timeout.
+
+NEW IN v5.0
+-----------
+* Strict single-call serialization — two fixes:
+  1. McpSseClient._call now holds self._lock for the ENTIRE SSE session
+     (both stream-1 and stream-2), not just for req_id assignment.  Previously
+     the lock was released before any network I/O, so on the Timbergrove
+     two-stream path a second call could open its stream-1 in the gap between
+     this call's stream-1 closing and stream-2 opening, causing the server to
+     deliver this call's response to the wrong stream.
+  2. _discover_databases_from_uns sub-calls previously bypassed the worker
+     queue via a side thread; now the entire discovery runs as a single queued
+     job inside the worker thread.
+* Removed dead _parse_sse_stream method (leftover from an earlier prototype).
+* Banner and version strings updated.
+
+NEW IN v4.4
+-----------
+* Replaced mcp-proxy subprocess with a direct McpSseClient class.
+  Eliminates the asyncio flush-delay bug that caused requests to appear unsent.
+* Per-call SSE connections: each RPC opens a fresh GET /mcp/sse, gets the
+  session endpoint, POSTs the request inline, then reads the response — all
+  without a persistent background connection.
+* Two-stream protocol: if the server closes stream-1 before delivering the
+  response (Timbergrove style), a second SSE connection receives the result.
 
 NEW IN v4.3
 -----------
 * /api/query and /api/query/increment omit the "nodes" parameter entirely so
   AnyLog routes each query to all nodes hosting the table automatically.
-* /api/query/increment now forwards the optional "where" clause from the
-  request body (e.g. rig_id filter) which was previously silently dropped.
+* /api/query/increment now forwards the optional "where" clause.
 * Query endpoints log dbms/table/sql at INFO level for easy verification.
 
 NEW IN v4.0 / v4.1
 -------------------
 * --mcp-url  CLI argument  : choose which MCP SSE server to connect to at launch
-* --mcp-proxy CLI argument : override the mcp-proxy binary path
 * --port / --host          : bind address control
-* UNS-aware database discovery: /api/uns/databases discovers the full set of
-  databases in use across all UNS policies, then caches them so dashboards
-  always query the right database for whatever MCP connector is active.
+* UNS-aware database discovery via /api/uns/databases.
 
-ARCHITECTURE (unchanged from v3)
----------------------------------
-ONE subprocess (mcp-proxy), ONE worker thread, ONE MCP connection.
+ARCHITECTURE
+------------
+ONE McpSseClient, ONE worker thread, ONE MCP call at a time.
 HTTP endpoints NEVER call MCP directly — they post a Job to the worker queue
-and block on a threading.Event until the worker completes it.
-The worker executes jobs one at a time with CALL_DELAY_S between them.
+and BLOCK on job.done.wait() until the worker signals completion.
+The worker executes jobs strictly one at a time with CALL_DELAY_S between them.
+No MCP call can start while another is running.
 
 CACHE
 -----
 Results stored in a TTL cache keyed by (tool, canonical-params).
 Metadata cached for CACHE_TTL_S; sensor/query data for DATA_TTL_S.
+Duplicate concurrent requests for the same key share one in-flight job.
 """
 
 import argparse
@@ -54,8 +84,9 @@ import logging
 import os
 import queue
 import ssl
-import subprocess
 import sys
+import requests
+import subprocess
 import threading
 import time
 import uuid
@@ -68,23 +99,24 @@ from flask_cors import CORS
 # ---------------------------------------------------------------------------
 # Defaults (all overridable via CLI)
 # ---------------------------------------------------------------------------
-
 DEFAULT_MCP_PROXY_PATH = os.path.join(
     os.path.dirname(__file__),
     "venv",
     "Scripts" if sys.platform == "win32" else "bin",
     "mcp-proxy.exe"
 )
+
 # DEFAULT_MCP_PROXY_PATH = "/Users/mdavidson58/Documents/AnyLog/Prove-IT/venv/bin/mcp-proxy"
-DEFAULT_MCP_SERVER_URL = "https://172.79.89.206:32049/mcp/sse"
 DEFAULT_PORT           = 8080
 DEFAULT_HOST           = "0.0.0.0"
 
 DEFAULT_CALL_DELAY_S = 1.5
-CALL_DELAY_S  = DEFAULT_CALL_DELAY_S  # pause between MCP calls (be gentle on the SSE server)
-JOB_TIMEOUT_S = 60    # max seconds an HTTP request waits for the worker
-CACHE_TTL_S   = 300   # 5 min — metadata (tables, UNS, status)
-DATA_TTL_S    = 30    # 30 s  — query results
+CALL_DELAY_S         = DEFAULT_CALL_DELAY_S  # pause between MCP calls
+JOB_TIMEOUT_S        = 300   # max seconds an HTTP request waits for the worker
+MCP_CALL_TIMEOUT_S   = None  # type: Optional[float]  per-call hard kill timer (None = disabled)
+DEBUG_LEVEL          = 0     # 0=INFO  1=DEBUG (--debug)  2=DEBUG+step (--debug 2)
+CACHE_TTL_S          = 300   # 5 min — metadata (tables, UNS, status)
+DATA_TTL_S           = 30    # 30 s  — query results
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -96,30 +128,31 @@ LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT, stream=sys.stderr)
 log = logging.getLogger("mcp_bridge")
 
-def _status(conn):
-    import requests
-    import json
-
+def _get_status(conn:str):
     try:
-        response = requests.post(url=conn, headers={"Content-Type": "application/json"},
+        response = requests.post(url=conn,
+                                 headers={"Content-Type": "application/json"},
                                  data=json.dumps({
                                      "command": "get status where format=json",
                                      "User-Agent": "AnyLog/1.23"
                                  }))
         response.raise_for_status()
-        print(response.json())
+        print(not response.json())
     except Exception as error:
-        raise Exception(f"Failed to execute `get status` (Error :{error})")
+        raise Exception(f"Failed to connect to AnygLog conn: {conn} (Error: {error}")
 
-def _configure_logging(quiet: bool, log_file: Optional[str], debug: bool) -> None:
+
+def _configure_logging(quiet: bool, log_file: Optional[str], debug_level: int) -> None:
     """
     Reconfigure the root logger after CLI args are parsed.
 
-    quiet=True  → WARNING level  (errors/warnings only, no per-request chatter)
-    debug=True  → DEBUG level    (overrides quiet)
-    log_file    → also write to the given file path (appends, UTF-8)
+    debug_level=0 → INFO  (default)
+    debug_level=1 → DEBUG (--debug or --debug 1)
+    debug_level=2 → DEBUG + step-through on query calls (--debug 2)
+    quiet=True    → WARNING level (errors/warnings only); overridden by debug_level >= 1
+    log_file      → also write to the given file path (appends, UTF-8)
     """
-    level = logging.DEBUG if debug else (logging.WARNING if quiet else logging.INFO)
+    level = logging.DEBUG if debug_level >= 1 else (logging.WARNING if quiet else logging.INFO)
 
     root = logging.getLogger()
     root.setLevel(level)
@@ -324,8 +357,55 @@ def _enqueue(tool: str, params: Dict[str, Any],
     return j
 
 
+_QUERY_TOOLS = {"executeQuery", "queryWithIncrement"}
+
+
+def _debug2_step(tool: str, params: Dict[str, Any]) -> None:
+    """
+    Debug level-2 step-through gate.
+
+    Called from the worker thread before dispatching executeQuery or
+    queryWithIncrement.  Prints the full call details to stderr and blocks
+    on input(), pausing the entire proxy until the operator presses Enter
+    (or types 's' to skip this call's wait, or 'q' to disable level-2
+    stepping for the rest of the session).
+
+    Because this runs inside the single worker thread, ALL queued HTTP
+    requests remain blocked while the operator reads the prompt.
+    """
+    sep = "─" * 65
+    print(f"\n{sep}", file=sys.stderr)
+    print(f"[DEBUG-2] STEP  tool={tool}", file=sys.stderr)
+    print(f"[DEBUG-2] queue depth remaining: {_job_queue.qsize()}", file=sys.stderr)
+    for k, v in params.items():
+        v_str = str(v)
+        if len(v_str) > 200:
+            v_str = v_str[:200] + "…"
+        print(f"[DEBUG-2]   {k} = {v_str}", file=sys.stderr)
+    print(f"{sep}", file=sys.stderr)
+    print("[DEBUG-2] Press Enter to send  |  's' skip wait  |  'q' quit stepping",
+          file=sys.stderr, end=" ", flush=True)
+    try:
+        ans = input().strip().lower()
+    except EOFError:
+        # stdin not a tty (e.g. piped); skip silently
+        ans = "s"
+    if ans == "q":
+        global DEBUG_LEVEL
+        DEBUG_LEVEL = 1
+        print("[DEBUG-2] Stepping disabled for remainder of session.", file=sys.stderr)
+    print(file=sys.stderr)
+
+
 def _worker() -> None:
-    """Single worker: pop jobs, call MCP, set events."""
+    """Single worker: pop jobs, call MCP, set events.
+
+    Only one MCP call is ever in-flight at any moment.  HTTP request threads
+    block on job.done.wait() and do not proceed until this worker signals them.
+
+    At DEBUG_LEVEL >= 2 the worker pauses before each executeQuery /
+    queryWithIncrement and waits for operator input on stderr/stdin.
+    """
     log.info("Worker thread started")
     while True:
         try:
@@ -335,10 +415,19 @@ def _worker() -> None:
 
         qd = _job_queue.qsize()
         log.info("WORKER dequeue  tool=%-28s  queue_remaining=%d", job.tool, qd)
+
+        # ── Debug level-2 step-through ────────────────────────────────────────
+        if DEBUG_LEVEL >= 2 and job.tool in _QUERY_TOOLS:
+            _debug2_step(job.tool, job.params)
+
         try:
-            result = _call_mcp(job.tool, job.params)
+            if job.tool == "__uns_discover_databases__":
+                result = _discover_databases_from_uns()
+                cache_set(job.cache_key, result)
+            else:
+                result = _call_mcp(job.tool, job.params)
+                cache_set(job.cache_key, result)
             job.result = result
-            cache_set(job.cache_key, result)
         except Exception as exc:
             log.error("WORKER error    tool=%-28s  err=%s", job.tool, exc)
             job.error = str(exc)
@@ -356,149 +445,358 @@ def start_worker() -> None:
 
 
 # ---------------------------------------------------------------------------
-# MCPClient — one subprocess, serialized via the worker thread
+
 # ---------------------------------------------------------------------------
-_mcp_proc: Optional[subprocess.Popen] = None
-_mcp_lock = threading.Lock()
-_req_id   = 0
+# McpSseClient -- direct SSE client, no mcp-proxy subprocess
+# ---------------------------------------------------------------------------
+# MCP-over-SSE protocol:
+#   1. GET <base>/mcp/sse   -- persistent SSE stream; first event type
+#                              'endpoint' gives the POST URL for this session.
+#   2. POST <endpoint>      -- send JSON-RPC request (immediate HTTP POST).
+#   3. SSE stream delivers responses as 'message' events matched by request id.
+#
+# This replaces the mcp-proxy subprocess approach. The subprocess approach
+# failed because mcp-proxy is an async Python (anyio/httpx) process that
+# buffers its outgoing HTTP calls internally and only flushes when the asyncio
+# event loop gets CPU or the process exits -- making requests appear unsent
+# until the bridge was killed.
+
+class McpSseClient:
+    """Direct MCP-over-SSE client using requests. Thread-safe.
+
+    The AnyLog MCP server uses a per-request SSE model:
+      - Each call opens a fresh GET /mcp/sse connection
+      - The server immediately sends an 'endpoint' event with a session POST URL
+      - The server then closes (or keeps open) the SSE stream to deliver the response
+      - The client POSTs the JSON-RPC message to the session endpoint
+      - The response arrives as a 'message' SSE event on the same stream
+
+    We therefore open a new SSE connection per RPC call rather than trying to
+    maintain a persistent connection across calls.
+    """
+
+    def __init__(self, base_url, verify_ssl=False, rpc_timeout=120.0):
+        # Normalise base_url to host root (strip trailing /mcp/sse if present)
+        _stripped = base_url.rstrip("/")
+        if _stripped.endswith("/mcp/sse"):
+            _stripped = _stripped[: -len("/mcp/sse")]
+        self._base        = _stripped
+        self._verify      = verify_ssl
+        self._rpc_timeout = rpc_timeout
+        self._req_id      = 0
+        self._lock        = threading.Lock()
+        self._session     = requests.Session()
+        self._session.verify = verify_ssl
+
+        if base_url.startswith("http://") and ":320" in base_url:
+            log.warning(
+                "McpSseClient: URL uses http:// on AnyLog TLS port (%s). "
+                "Connection will likely hang -- use https://", base_url
+            )
+
+        # No handshake needed here -- the AnyLog MCP server does not require
+        # an initialize round-trip before tool calls.  Each _call() opens its
+        # own SSE connection so there is no persistent state to set up.
+        log.info("McpSseClient configured -> %s", self._base)
+
+    # -- Per-call SSE session -------------------------------------------------
+
+    def _call(self, method, params):
+        """Open SSE stream, get session endpoint, POST the RPC, read response.
+
+        AnyLog MCP SSE protocol:
+          1. GET /mcp/sse  -> server sends endpoint event with session POST URL
+          2. POST <endpoint> with JSON-RPC payload
+          3. Server sends response as a message event on the SAME SSE stream
+
+        The stream must stay open through steps 1-3. We read lines one at a
+        time; when we see the endpoint event we immediately POST (still inside
+        the streaming read loop), then continue reading until the message event
+        arrives with our req_id.
+
+        If the server closes the stream before the response (Timbergrove style),
+        we open a second SSE connection to receive the result.
+
+        IMPORTANT — self._lock is held for the ENTIRE call (connect through
+        final response).  This prevents concurrent callers from interleaving
+        their stream-1/stream-2 connections: the AnyLog server delivers a
+        response to the next SSE connection that opens, so two overlapping
+        calls would steal each other's responses.  In practice only the single
+        worker thread calls this method, but the lock makes the guarantee
+        explicit and robust against future changes.
+        """
+        sse_url = "{}/mcp/sse".format(self._base)
+
+        # Hold self._lock across THE ENTIRE call — both SSE streams.
+        # The AnyLog server delivers a response to the next SSE connection that
+        # opens after the POST.  If two calls overlapped, stream-2 of call A
+        # could connect after stream-1 of call B, causing the server to send
+        # call A's response to call B's stream and vice-versa.  Holding the
+        # lock end-to-end prevents any such interleaving.
+        with self._lock:
+            self._req_id += 1
+            req_id = self._req_id
+
+            log.info("McpSseClient _call  id=%d  tool=%s  url=%s", req_id, params.get("name", method), sse_url)
+
+            payload = {"jsonrpc": "2.0", "id": req_id, "method": method, "params": params}
+            log.debug("McpSseClient _call  id=%d  payload=%s", req_id, json.dumps(payload))
+
+            # ── Per-call hard timeout ─────────────────────────────────────────
+            # When MCP_CALL_TIMEOUT_S is set, a Timer fires after that many
+            # seconds and closes any open response socket.  Closing the socket
+            # causes resp.raw.read(1) to return b"" (EOF), which breaks the
+            # _sse_loop read loop.  We detect the kill via _timed_out[0].
+            _timed_out  = [False]
+            _open_resps = []   # responses currently open; timer closes them all
+
+            def _kill_call():
+                _timed_out[0] = True
+                log.warning("McpSseClient TIMEOUT  id=%d  after %.1fs  -- closing socket(s)",
+                             req_id, MCP_CALL_TIMEOUT_S)
+                for r in list(_open_resps):
+                    try:
+                        r.close()
+                    except Exception:
+                        pass
+
+            timer = None
+            if MCP_CALL_TIMEOUT_S is not None:
+                timer = threading.Timer(MCP_CALL_TIMEOUT_S, _kill_call)
+                timer.daemon = True
+                timer.start()
+                log.debug("McpSseClient call-timer  id=%d  deadline=%.1fs", req_id, MCP_CALL_TIMEOUT_S)
+
+            try:
+                def _sse_loop(resp, already_posted, stream_num=1):
+                    """Iterate one SSE stream. Returns (post_url, result, did_post).
+
+                    Reads one byte at a time directly from the urllib3 socket to
+                    bypass all Python-level read buffering.  requests.iter_content()
+                    and http.client.BufferedReader accumulate data internally before
+                    releasing chunks, causing multi-second delivery delays on small
+                    SSE events.
+                    """
+                    _open_resps.append(resp)
+                    event_type = "message"
+                    data_buf = None
+                    post_url = None
+                    result = None
+                    tail = ""
+                    posted = already_posted
+                    t_start = time.time()
+                    lines_read = 0
+                    events_seen = []
+                    log.debug("McpSseClient stream-%d open  id=%d", stream_num, req_id)
+                    try:
+                        while True:
+                            line = None
+                            while line is None:
+                                b = resp.raw.read(1)
+                                if not b:
+                                    # EOF — either server closed or timer killed the socket
+                                    if tail:
+                                        line = tail.rstrip("\r")
+                                        tail = ""
+                                    break
+                                ch = b.decode("utf-8", errors="replace")
+                                if ch == "\n":
+                                    line = tail.rstrip("\r")
+                                    tail = ""
+                                else:
+                                    tail += ch
+                            if line is None:
+                                break
+                            lines_read += 1
+
+                            if not line:
+                                if data_buf is not None:
+                                    if event_type == "endpoint":
+                                        ep = data_buf.strip()
+                                        post_url = (ep if ep.startswith("http")
+                                                    else "{}{}".format(self._base, ep))
+                                        t_ep = time.time() - t_start
+                                        log.info("McpSseClient stream-%d endpoint  id=%d  url=%s  (%.1fs)",
+                                                 stream_num, req_id, post_url, t_ep)
+                                        events_seen.append("endpoint@{:.1f}s".format(t_ep))
+                                        if not posted:
+                                            t_post = time.time()
+                                            pr = self._session.post(
+                                                post_url, json=payload,
+                                                timeout=10, verify=self._verify)
+                                            pr.raise_for_status()
+                                            log.info("McpSseClient stream-%d POST    id=%d  tool=%s  status=%d  (%.0fms)",
+                                                     stream_num, req_id,
+                                                     params.get("name", method),
+                                                     pr.status_code,
+                                                     (time.time()-t_post)*1000)
+                                            posted = True
+                                    elif event_type == "message":
+                                        t_msg = time.time() - t_start
+                                        try:
+                                            msg = json.loads(data_buf)
+                                            msg_id = msg.get("id")
+                                            if msg_id == req_id:
+                                                resp_size = len(data_buf)
+                                                log.info("McpSseClient stream-%d message id=%d matched  resp_chars=%d  elapsed=%.1fs",
+                                                         stream_num, req_id, resp_size, t_msg)
+                                                log.debug("McpSseClient stream-%d message id=%d  raw=%.400s",
+                                                          stream_num, req_id, data_buf)
+                                                result = msg
+                                                break
+                                            else:
+                                                method_name = msg.get("method", "?")
+                                                log.debug("McpSseClient stream-%d message id=%s method=%s  (%.1fs) -- skipped",
+                                                          stream_num, msg_id, method_name, t_msg)
+                                                events_seen.append("msg:{}@{:.1f}s".format(method_name, t_msg))
+                                        except json.JSONDecodeError:
+                                            log.debug("McpSseClient stream-%d non-JSON data ignored: %.80s",
+                                                      stream_num, data_buf)
+                                    else:
+                                        log.debug("McpSseClient stream-%d event type=%s data=%.120s",
+                                                  stream_num, event_type, data_buf)
+                                        events_seen.append("{}@{:.1f}s".format(event_type, time.time()-t_start))
+                                event_type = "message"
+                                data_buf = None
+                            elif line.startswith("event:"):
+                                event_type = line[6:].strip()
+                            elif line.startswith("data:"):
+                                data_buf = line[5:].strip()
+                    finally:
+                        elapsed = time.time() - t_start
+                        log.info("McpSseClient stream-%d closed  id=%d  lines=%d  events=%s  elapsed=%.1fs  result=%s",
+                                 stream_num, req_id, lines_read,
+                                 ",".join(events_seen) if events_seen else "none",
+                                 elapsed,
+                                 "ok" if result is not None else ("posted" if posted else "no-post"))
+                        resp.close()
+                        try:
+                            _open_resps.remove(resp)
+                        except ValueError:
+                            pass
+                    return post_url, result, posted
+
+                # --- First SSE connection ---
+                try:
+                    resp1 = self._session.get(sse_url, stream=True,
+                                              timeout=(10, None), verify=self._verify)
+                    resp1.raise_for_status()
+                    resp1.raw.decode_content = True
+                except Exception as exc:
+                    raise RuntimeError("McpSseClient SSE connect failed: {}".format(exc)) from exc
+
+                post_url, result, did_post = _sse_loop(resp1, already_posted=False, stream_num=1)
+
+                # Check timeout before acting on the result
+                if _timed_out[0]:
+                    raise TimeoutError(
+                        "McpSseClient: call id={} timed out after {}s".format(
+                            req_id, MCP_CALL_TIMEOUT_S))
+
+                if post_url is None:
+                    raise TimeoutError("McpSseClient: no SSE endpoint from {}".format(sse_url))
+
+                if result is not None:
+                    return result  # single-stream path (mark-demo style)
+
+                if not did_post:
+                    raise RuntimeError(
+                        "McpSseClient: SSE stream closed before endpoint was received")
+
+                # --- Second SSE connection (Timbergrove style) ---
+                # Stream-1 closed without the response.  Open stream-2 immediately —
+                # still inside self._lock so no other call can sneak a connection in
+                # between and steal this call's response from the server.
+                log.info("McpSseClient stream-1 closed without response -- opening stream-2  id=%d", req_id)
+                try:
+                    resp2 = self._session.get(sse_url, stream=True,
+                                              timeout=(10, None), verify=self._verify)
+                    resp2.raise_for_status()
+                    resp2.raw.decode_content = True
+                except Exception as exc:
+                    raise RuntimeError(
+                        "McpSseClient SSE reconnect failed: {}".format(exc)) from exc
+
+                _, result, _ = _sse_loop(resp2, already_posted=True, stream_num=2)
+
+                if _timed_out[0]:
+                    raise TimeoutError(
+                        "McpSseClient: call id={} timed out after {}s".format(
+                            req_id, MCP_CALL_TIMEOUT_S))
+
+                if result is None:
+                    raise TimeoutError(
+                        "McpSseClient: no response for id={} method={}".format(req_id, method))
+                return result
+
+            finally:
+                if timer is not None:
+                    timer.cancel()
+
+    def call_tool(self, tool, params):
+        return self._call("tools/call", {"name": tool, "arguments": params})
+
+    def is_alive(self):
+        return True  # stateless -- each call opens its own connection
 
 
-def _spawn_mcp_proc() -> subprocess.Popen:
-    """Spawn a fresh mcp-proxy and complete the MCP initialize handshake.
-    Raises on failure — no retries."""
-    import select as _select
-    mcp_url = CFG["mcp_url"]
-    log.info("Spawning mcp-proxy → %s", mcp_url)
-
-    # Warn loudly if the URL looks like it should be HTTPS but uses http://.
-    # This is the most common cause of silent 60-second timeouts against
-    # AnyLog nodes (which default to TLS on port 32x49).
-    if mcp_url.startswith("http://") and ":320" in mcp_url:
-        log.warning(
-            "MCP URL uses http:// on what looks like an AnyLog TLS port (%s). "
-            "If the node requires HTTPS this will silently hang. "
-            "Restart with --mcp-url https://... if you see timeouts.", mcp_url
-        )
-
-    proc = subprocess.Popen(
-        [CFG["mcp_proxy"], mcp_url],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        bufsize=1,
-    )
-    try:
-        # MCP initialize handshake — done OUTSIDE _mcp_lock so we don't
-        # hold the lock for up to 30 s during a blocking readline.
-        _send_rpc(proc, "initialize", {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": {"name": "mcp-web-bridge", "version": "4.1"},
-        })
-        _send_rpc(proc, "notifications/initialized", {})
-    except Exception:
-        # Drain stderr (non-blocking) before killing so the real error
-        # (TLS mismatch, connection refused, bad URL, etc.) is visible.
-        try:
-            ready, _, _ = _select.select([proc.stderr], [], [], 1.0)
-            if ready:
-                stderr_out = proc.stderr.read(800)
-                if stderr_out:
-                    log.warning("mcp-proxy stderr during failed spawn:\n%s", stderr_out)
-        except Exception:
-            pass
-        proc.kill()
-        raise
-    return proc
+# McpSseClient is stateless (per-call connections) -- create once at first use
+_mcp_client      = None   # type: Optional[McpSseClient]
+_mcp_client_lock = threading.Lock()
 
 
-def _get_mcp_proc() -> subprocess.Popen:
-    global _mcp_proc
-    with _mcp_lock:
-        alive = _mcp_proc is not None and _mcp_proc.poll() is None
-        if alive:
-            return _mcp_proc
-
-    # Proc is dead or missing — spawn once, no retries.
-    new_proc = _spawn_mcp_proc()   # raises on failure
-    with _mcp_lock:
-        # Another thread might have raced us — accept whichever proc won.
-        if _mcp_proc is None or _mcp_proc.poll() is not None:
-            _mcp_proc = new_proc
-        else:
-            new_proc.kill()   # lost the race; discard surplus
-    return _mcp_proc
-
-
-def _send_rpc(proc: subprocess.Popen, method: str,
-              params: Dict[str, Any]) -> Optional[Dict]:
-    global _req_id
-    _req_id += 1
-    req = {"jsonrpc": "2.0", "id": _req_id, "method": method, "params": params}
-    line = json.dumps(req) + "\n"
-    proc.stdin.write(line)
-    proc.stdin.flush()
-
-    if method == "notifications/initialized":
-        return None
-
-    # Read until we get the response matching our id.
-    # Use select() with a short poll interval so we can:
-    #   1. honour the deadline without blocking the worker thread indefinitely
-    #   2. detect a dead proc early (poll() != None) and raise OSError
-    # Deadline is 30 s — well under JOB_TIMEOUT_S (60 s) so the HTTP layer
-    # always gets a clean error rather than a silent timeout.
-    import select as _select
-    deadline = time.time() + 30
-    while time.time() < deadline:
-        if proc.poll() is not None:
-            raise OSError(f"mcp-proxy exited (rc={proc.poll()}) while waiting for id={_req_id}")
-        ready, _, _ = _select.select([proc.stdout], [], [], 0.5)
-        if not ready:
-            continue
-        raw = proc.stdout.readline()
-        if not raw:
-            continue
-        try:
-            msg = json.loads(raw)
-            if msg.get("id") == _req_id:
-                return msg
-        except json.JSONDecodeError:
-            continue
-    raise TimeoutError(f"No response for id={_req_id} method={method} (30s deadline)")
+def _get_mcp_client():
+    # type: () -> McpSseClient
+    global _mcp_client
+    with _mcp_client_lock:
+        if _mcp_client is None:
+            log.info("Creating McpSseClient -> %s", CFG["mcp_url"])
+            _mcp_client = McpSseClient(
+                base_url=CFG["mcp_url"],
+                verify_ssl=CFG.get("verify_ssl", False),
+                rpc_timeout=JOB_TIMEOUT_S - 10,  # slightly under HTTP timeout
+            )
+        return _mcp_client
 
 
 def _call_mcp(tool: str, params: Dict[str, Any]) -> Any:
-    """Call an MCP tool and return parsed result. Called ONLY from worker thread."""
+    """Call an MCP tool via McpSseClient. Called ONLY from the worker thread."""
     t0 = time.time()
-    log.info("MCP ▶  tool=%-28s  params=%s", tool, json.dumps(params))
-    _log_event({
-        "kind": "mcp_req",
-        "tool": tool,
-        "params": params,
-    })
 
-    # Single attempt — no respawn on failure. If the proc is dead or the
-    # connection fails, surface the error immediately to the caller.
+    # Build the full JSON-RPC payload that will be sent to the MCP server
+    mcp_payload = {"jsonrpc": "2.0", "method": "tools/call",
+                   "params": {"name": tool, "arguments": params}}
+    payload_json = json.dumps(mcp_payload)
+    payload_chars = len(payload_json)
+
+    log.info("MCP >  tool=%-28s  params=%s", tool, json.dumps(params))
+    log.debug("MCP >  tool=%-28s  payload_chars=%d  full_json=%s",
+              tool, payload_chars, payload_json)
+    _log_event({"kind": "mcp_req", "tool": tool, "params": params})
+
     try:
-        proc = _get_mcp_proc()
-    except RuntimeError as exc:
-        raise RuntimeError(f"Cannot get mcp-proxy: {exc}") from exc
+        client = _get_mcp_client()
+    except Exception as exc:
+        raise RuntimeError("Cannot connect to MCP server: {}".format(exc)) from exc
 
-    resp = _send_rpc(proc, "tools/call", {"name": tool, "arguments": params})
+    resp = client.call_tool(tool, params)
+    ms_total = int((time.time() - t0) * 1000)
+
+    # Log the raw JSON response at DEBUG level
+    log.debug("MCP <  tool=%-28s  total_ms=%d  raw_resp=%s",
+              tool, ms_total, json.dumps(resp) if resp is not None else "None")
 
     if resp is None:
-        log.warning("MCP ◀  tool=%-28s  → None response", tool)
-        _log_event({"kind": "mcp_resp", "tool": tool, "ms": int((time.time()-t0)*1000),
-                    "status": "none", "result": None})
+        log.warning("MCP <  tool=%-28s  -> None response  (%dms)", tool, ms_total)
+        _log_event({"kind": "mcp_resp", "tool": tool,
+                    "ms": ms_total, "status": "none", "result": None})
         return None
 
     if "error" in resp:
         err_msg = resp["error"].get("message", str(resp["error"]))
-        log.error("MCP ✗  tool=%-28s  → error: %s", tool, err_msg)
-        _log_event({"kind": "mcp_resp", "tool": tool, "ms": int((time.time()-t0)*1000),
-                    "status": "error", "error": err_msg})
+        log.error("MCP x  tool=%-28s  -> error: %s  (%dms)", tool, err_msg, ms_total)
+        _log_event({"kind": "mcp_resp", "tool": tool,
+                    "ms": ms_total, "status": "error", "error": err_msg})
         raise RuntimeError(err_msg)
 
     result = resp.get("result", {})
@@ -511,40 +809,48 @@ def _call_mcp(tool: str, params: Dict[str, Any]) -> Any:
                 if c.get("type") == "text":
                     err_text = c["text"]
                     break
-            # isError with no message text often means the AnyLog node rejected
-            # the query (bad SQL, unknown table, etc).  Make that explicit.
             if not err_text:
-                err_text = "(AnyLog returned isError=true with no message — check SQL/table name)"
-            log.error("MCP ✗  tool=%-28s  → isError: %s", tool, err_text)
-            _log_event({"kind": "mcp_resp", "tool": tool, "ms": int((time.time()-t0)*1000),
-                        "status": "isError", "error": err_text})
-            raise RuntimeError(f"MCP tool error: {err_text}")
+                err_text = "(AnyLog returned isError=true with no message -- check SQL/table name)"
+            log.error("MCP x  tool=%-28s  -> isError: %s  (%dms)", tool, err_text, ms_total)
+            _log_event({"kind": "mcp_resp", "tool": tool,
+                        "ms": ms_total, "status": "isError", "error": err_text})
+            raise RuntimeError("MCP tool error: {}".format(err_text))
+
         texts = [c["text"] for c in result["content"] if c.get("type") == "text"]
         combined = "\n".join(texts)
+        resp_chars = len(combined)
         try:
             parsed = json.loads(combined)
             row_count = len(parsed) if isinstance(parsed, list) else "dict"
-            ms = int((time.time() - t0) * 1000)
-            log.info("MCP ◀  tool=%-28s  → %s rows  (%dms)", tool, row_count, ms)
-            _log_event({"kind": "mcp_resp", "tool": tool, "ms": ms,
-                        "status": "ok", "row_count": row_count,
-                        "result": parsed})
+            # Show first row at DEBUG for data inspection
+            if isinstance(parsed, list) and parsed:
+                log.debug("MCP <  tool=%-28s  first_row=%s",
+                          tool, json.dumps(parsed[0]))
+            elif isinstance(parsed, dict):
+                log.debug("MCP <  tool=%-28s  result_keys=%s",
+                          tool, list(parsed.keys()))
+            log.info("MCP <  tool=%-28s  -> %s rows  resp_chars=%d  total_ms=%d",
+                     tool, row_count, resp_chars, ms_total)
+            _log_event({"kind": "mcp_resp", "tool": tool, "ms": ms_total,
+                        "status": "ok", "row_count": row_count, "result": parsed})
             return parsed
         except json.JSONDecodeError:
-            ms = int((time.time() - t0) * 1000)
-            log.info("MCP ◀  tool=%-28s  → text (%d chars)  (%dms)", tool, len(combined), ms)
-            _log_event({"kind": "mcp_resp", "tool": tool, "ms": ms,
+            log.info("MCP <  tool=%-28s  -> text  resp_chars=%d  total_ms=%d",
+                     tool, resp_chars, ms_total)
+            log.debug("MCP <  tool=%-28s  text_preview=%.200s", tool, combined)
+            _log_event({"kind": "mcp_resp", "tool": tool, "ms": ms_total,
                         "status": "ok", "result": combined})
             return combined
 
-    ms = int((time.time() - t0) * 1000)
-    log.info("MCP ◀  tool=%-28s  → raw result  (%dms)", tool, ms)
-    _log_event({"kind": "mcp_resp", "tool": tool, "ms": ms,
+    resp_chars = len(json.dumps(result))
+    log.info("MCP <  tool=%-28s  -> raw result  resp_chars=%d  total_ms=%d",
+             tool, resp_chars, ms_total)
+    log.debug("MCP <  tool=%-28s  raw=%s", tool, json.dumps(result)[:500])
+    _log_event({"kind": "mcp_resp", "tool": tool, "ms": ms_total,
                 "status": "ok", "result": result})
     return result
 
 
-# ---------------------------------------------------------------------------
 # UNS database discovery
 # ---------------------------------------------------------------------------
 def _discover_databases_from_uns() -> List[str]:
@@ -552,6 +858,13 @@ def _discover_databases_from_uns() -> List[str]:
     Query all UNS policies for this MCP connector and collect the unique set
     of database names referenced. Falls back to listNetworkDatabases if UNS
     has no 'dbms' fields.
+
+    IMPORTANT: this function is called from a Job that runs inside the worker
+    thread.  It must NOT call _call_mcp() directly (that would be a re-entrant
+    call on the worker) nor submit jobs to the queue (deadlock: worker waiting
+    on itself).  Instead it calls _call_mcp() directly — which is safe here
+    because we ARE the worker.  All serialization is enforced by the fact that
+    only one Job runs at a time.
     """
     dbs = set()
 
@@ -569,6 +882,7 @@ def _discover_databases_from_uns() -> List[str]:
                          for p in policy_types_raw["policies"])
 
         if has_uns:
+            time.sleep(CALL_DELAY_S)   # respect inter-call pacing
             uns_raw = _call_mcp("listPolicies", {"policyType": "uns"})
             policies = []
             if isinstance(uns_raw, list):
@@ -591,6 +905,7 @@ def _discover_databases_from_uns() -> List[str]:
 
     # 2. Fallback: listNetworkDatabases
     try:
+        time.sleep(CALL_DELAY_S)       # respect inter-call pacing
         raw = _call_mcp("listNetworkDatabases", {})
         if isinstance(raw, list):
             for item in raw:
@@ -718,30 +1033,19 @@ def api_uns_databases():
         return jsonify({"databases": cached, "source": "cache",
                         "mcp_url": CFG.get("mcp_url")})
 
-    # Run discovery in worker context by using a custom job
+    # Submit discovery as a single opaque job so ALL MCP sub-calls inside
+    # _discover_databases_from_uns run inside the worker thread and are
+    # therefore serialized with every other job.  The side-thread approach
+    # used in v4.x allowed _call_mcp() to run concurrently with the worker.
     job = Job(
         tool="__uns_discover_databases__",
         params={},
         cache_key=cache_key,
         cache_ttl=CACHE_TTL_S,
     )
-
-    def _run():
-        try:
-            dbs = _discover_databases_from_uns()
-            job.result = dbs
-            cache_set(cache_key, dbs)
-        except Exception as exc:
-            job.error = str(exc)
-        finally:
-            job.done.set()
-
-    # Run directly in a short-lived thread so it uses the same _call_mcp path
-    # but still respects CALL_DELAY_S via the worker queue for each sub-call.
-    # We enqueue the individual sub-calls inside _discover_databases_from_uns
-    # so they all go through the single-worker queue.
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
+    with _pending_lock:
+        _pending_jobs[cache_key] = job
+    _job_queue.put(job)
     if not job.done.wait(timeout=JOB_TIMEOUT_S * 2):
         return jsonify({"error": "timeout during UNS database discovery"}), 504
     if job.error:
@@ -845,21 +1149,76 @@ def api_query_increment():
     log.info("api_query_increment  dbms=%s  table=%s  where=%.80s",
              body["dbms"], body["table"], body.get("where", ""))
 
-    params = {
-        "dbms":           body["dbms"],
-        "table":          body["table"],
-        "timeColumn":     body["timeColumn"],
-        "startTime":      body["startTime"],
-        "endTime":        body["endTime"],
-        "intervalLength": int(body["intervalLength"]),
-        "timeUnit":       body["timeUnit"],
-        "projections":    body["projections"],
-    }
-    # Forward optional WHERE clause (e.g. rig_id filter from dashboard)
-    if body.get("where"):
-        params["where"] = body["where"]
+    dbms         = body["dbms"]
+    table        = body["table"]
+    time_col     = body["timeColumn"]
+    start_time   = body["startTime"]
+    end_time     = body["endTime"]
+    interval_len = int(body["intervalLength"])
+    time_unit    = body["timeUnit"]
+    projections  = body["projections"]
+    where        = body.get("where", "")
 
-    result, err = _run_job("queryWithIncrement", params, ttl=DATA_TTL_S)
+    # Try queryWithIncrement first; fall back to executeQuery with increments()
+    # AnyLog SQL syntax for time-bucketed aggregation:
+    #   SELECT increments(<unit>, <len>, <timecol>), <agg_cols>
+    #   FROM <table> WHERE <timecol> >= <start> AND <timecol> <= <end> [AND <where>]
+    params_inc = {
+        "dbms": dbms, "table": table, "timeColumn": time_col,
+        "startTime": start_time, "endTime": end_time,
+        "intervalLength": interval_len, "timeUnit": time_unit,
+        "projections": projections,
+    }
+    if where:
+        params_inc["where"] = where
+
+    # Track per-URL whether queryWithIncrement is supported.
+    # Avoids a wasted round-trip on every call when the tool is unavailable.
+    _qwi_supported = CFG.get("queryWithIncrement_supported", True)
+
+    result, err = None, None
+    if _qwi_supported:
+        result, err = _run_job("queryWithIncrement", params_inc, ttl=DATA_TTL_S)
+        if err and ("Unable to process" in err or "not found" in err.lower()
+                    or "unknown" in err.lower()):
+            log.warning("queryWithIncrement not supported on %s -- disabling for this session",
+                        CFG.get("mcp_url", "?"))
+            CFG["queryWithIncrement_supported"] = False
+            err = None  # trigger fallback below
+    else:
+        log.debug("queryWithIncrement disabled for this session -- using increments() SQL directly")
+
+    if result is None and err is None:
+        # Build an increments() SQL query via executeQuery
+        agg_cols = ", ".join(projections)
+        # AnyLog increments() WHERE: only lower bound needed; upper bound is implicit
+        where_clause = "WHERE {tc} >= {st}".format(tc=time_col, st=start_time)
+        if where:
+            where_clause += " AND {}".format(where)
+        sql = ("SELECT increments({unit}, {length}, {tc}), {cols} "
+               "FROM {table} {where}").format(
+            unit=time_unit, length=interval_len, tc=time_col,
+            cols=agg_cols, table=table, where=where_clause)
+        log.info("increment SQL: %s", sql)
+        result, err = _run_job("executeQuery", {"dbms": dbms, "sql": sql},
+                               ttl=DATA_TTL_S)
+
+    if result is None and err:
+        # increments() also failed -- fall back to raw data query and
+        # return it; the dashboard will handle aggregation client-side
+        log.warning("increments() SQL failed (%s) -- falling back to raw SELECT", err)
+        agg_cols_raw = ", ".join(
+            c for c in projections
+            if not any(c.startswith(fn) for fn in ("avg(", "min(", "max(", "sum(", "count("))
+        ) or time_col
+        raw_sql = ("SELECT {cols} FROM {table} WHERE {tc} >= {st}{where_extra} "
+                   "ORDER BY {tc} DESC LIMIT 500").format(
+            cols=agg_cols_raw, table=table, tc=time_col, st=start_time,
+            where_extra=" AND {}".format(where) if where else "")
+        log.info("raw fallback SQL: %s", raw_sql)
+        result, err = _run_job("executeQuery", {"dbms": dbms, "sql": raw_sql},
+                               ttl=DATA_TTL_S)
+
     if err:
         return jsonify({"error": err}), 500
     rows = result if isinstance(result, list) else result.get("results", []) if isinstance(result, dict) else []
@@ -1231,7 +1590,7 @@ def index():
             with open(path) as f:
                 return f.read()
     return (
-        "<h1>MCP Web Bridge v4.2</h1>"
+        "<h1>MCP Web Bridge v5.2</h1>"
         "<p>MCP: <code>" + CFG.get("mcp_url", "?") + "</code></p>"
         "<p>Endpoints: /api/status  /api/uns/databases  /api/uns/discover  "
         "/api/uns/policies  /api/tables  /api/columns  /api/databases  "
@@ -1247,20 +1606,18 @@ def index():
 def main() -> None:
     # global must be declared before CALL_DELAY_S is assigned in this scope
     global CALL_DELAY_S
+    global JOB_TIMEOUT_S
+    global MCP_CALL_TIMEOUT_S
+    global DEBUG_LEVEL
 
     parser = argparse.ArgumentParser(
-        description="MCP Web Bridge v4.2 — HTTP ↔ AnyLog MCP SSE proxy",
+        description="MCP Web Bridge v5.2 -- HTTP <-> AnyLog MCP SSE proxy (strict single-call serialization)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "--mcp-url",
         default=DEFAULT_MCP_SERVER_URL,
         help="MCP SSE server URL to connect to (e.g. https://172.79.89.206:32049/mcp/sse)",
-    )
-    parser.add_argument(
-        "--mcp-proxy",
-        default=DEFAULT_MCP_PROXY_PATH,
-        help="Path to the mcp-proxy binary",
     )
     parser.add_argument(
         "--port", "-p",
@@ -1280,9 +1637,39 @@ def main() -> None:
         help="Seconds to pause between MCP calls (prevents SSE server overload)",
     )
     parser.add_argument(
+        "--job-timeout",
+        type=int,
+        default=JOB_TIMEOUT_S,
+        help="Seconds an HTTP request will wait for the MCP worker (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--mcp-timeout",
+        type=float,
+        default=None,
+        metavar="SECS",
+        help=(
+            "Hard kill timeout (seconds) for each individual MCP call.  "
+            "If the MCP server does not respond within this many seconds the "
+            "SSE socket is closed and the call fails with a TimeoutError.  "
+            "Omit (default) to wait indefinitely for a response.  "
+            "Should be less than --job-timeout."
+        ),
+    )
+    parser.add_argument(
         "--debug",
-        action="store_true",
-        help="Enable Flask debug mode and verbose logging (overrides --quiet)",
+        type=int,
+        nargs="?",
+        const=1,
+        default=0,
+        metavar="LEVEL",
+        help=(
+            "Debug level.  --debug or --debug 1: enable Python DEBUG logging "
+            "and verbose MCP payload output.  --debug 2: all of level 1 plus "
+            "step-through mode — the worker pauses before each executeQuery / "
+            "queryWithIncrement and waits for Enter on stdin before sending the "
+            "call (press 's' to skip the wait, 'q' to disable stepping).  "
+            "Default: 0 (INFO logging)."
+        ),
     )
     parser.add_argument(
         "--quiet", "-q",
@@ -1329,14 +1716,16 @@ def main() -> None:
 
     # Populate runtime config
     CFG["mcp_url"]    = args.mcp_url
-    CFG["mcp_proxy"]  = args.mcp_proxy
     CFG["port"]       = args.port
     CFG["host"]       = args.host
 
-    CALL_DELAY_S = args.call_delay
+    CALL_DELAY_S       = args.call_delay
+    JOB_TIMEOUT_S      = args.job_timeout
+    MCP_CALL_TIMEOUT_S = args.mcp_timeout
+    DEBUG_LEVEL        = args.debug if args.debug is not None else 0
 
     # Apply logging configuration (quiet / debug / log-file)
-    _configure_logging(quiet=args.quiet, log_file=args.log_file, debug=args.debug)
+    _configure_logging(quiet=args.quiet, log_file=args.log_file, debug_level=DEBUG_LEVEL)
 
     # ── Resolve TLS certificate ───────────────────────────────────────────────
     ssl_context = None
@@ -1362,33 +1751,38 @@ def main() -> None:
         log.info("TLS enabled: cert=%s  key=%s", cert_path, key_path)
 
     scheme = "https" if use_ssl else "http"
-    log_level_label = "DEBUG" if args.debug else ("WARNING (quiet)" if args.quiet else "INFO")
+    _debug_labels = {0: "INFO", 1: "DEBUG (verbose)", 2: "DEBUG-2 (step-through on query calls)"}
+    log_level_label = _debug_labels.get(DEBUG_LEVEL, f"DEBUG-{DEBUG_LEVEL}")
+    if args.quiet and DEBUG_LEVEL == 0:
+        log_level_label = "WARNING (quiet)"
 
     print("=" * 65, file=sys.stderr)
-    print("MCP Web Bridge  v4.3  (single-worker, all MCP calls serialised)",
+    print("MCP Web Bridge  v5.2  (strict single-call serialization, direct SSE client)",
           file=sys.stderr)
     print("=" * 65, file=sys.stderr)
     print(f"  MCP URL   : {CFG['mcp_url']}",  file=sys.stderr)
-    print(f"  MCP Proxy : {CFG['mcp_proxy']}", file=sys.stderr)
     print(f"  Listen    : {scheme}://{CFG['host']}:{CFG['port']}", file=sys.stderr)
     if use_ssl:
         print(f"  TLS cert  : {cert_path}", file=sys.stderr)
         print(f"  TLS key   : {key_path}",  file=sys.stderr)
     print(f"  Call delay: {CALL_DELAY_S}s between MCP calls", file=sys.stderr)
-    print(f"  Job timeout: {JOB_TIMEOUT_S}s per HTTP request", file=sys.stderr)
+    print(f"  Job timeout: {JOB_TIMEOUT_S}s per HTTP request  (SSE endpoint + query latency)", file=sys.stderr)
+    mcp_to_label = f"{MCP_CALL_TIMEOUT_S}s" if MCP_CALL_TIMEOUT_S is not None else "disabled"
+    print(f"  MCP timeout: {mcp_to_label} per individual MCP call (--mcp-timeout)", file=sys.stderr)
     print(f"  Log level : {log_level_label}", file=sys.stderr)
     if args.log_file:
         print(f"  Log file  : {args.log_file}", file=sys.stderr)
     print("=" * 65, file=sys.stderr)
     print(file=sys.stderr)
 
-    _status(conn=CFG["mcp_url"].split("/mcp",1)[0])
+    _get_status(conn=CFG['mcp_url'].split("/mcp")[0])
     start_worker()
     app.run(
         host=CFG["host"],
         port=CFG["port"],
-        debug=args.debug,
+        debug=(DEBUG_LEVEL >= 1),
         threaded=True,
+        use_reloader=False,
         ssl_context=ssl_context,   # None → plain HTTP; SSLContext → HTTPS
     )
 

@@ -12,7 +12,6 @@
 # KEY OPTIONS
 # -----------
 #   --mcp-url  <url>     MCP SSE server URL  (overrides BRIDGE_MCP_URL)
-#   --mcp-proxy <path>   mcp-proxy binary    (overrides BRIDGE_MCP_PROXY)
 #   --port     <n>       HTTP port           (default 8080)
 #   --host     <addr>    bind interface      (default 0.0.0.0)
 #   --call-delay <s>     pause between MCP calls (default 1.5)
@@ -21,7 +20,6 @@
 # ENVIRONMENT OVERRIDES  (used when no CLI arg is supplied)
 # ----------------------------------------------------------
 #   BRIDGE_MCP_URL       MCP SSE server URL
-#   BRIDGE_MCP_PROXY     path to mcp-proxy binary
 #   BRIDGE_PORT          HTTP listen port
 #   BRIDGE_HOST          bind interface
 #   BRIDGE_CALL_DELAY    seconds between MCP calls
@@ -55,7 +53,6 @@ BRIDGE_SCRIPT="${SCRIPT_DIR}/mcp_web_bridge.py"
 # Defaults (can be overridden by env vars)
 # ---------------------------------------------------------------------------
 : "${BRIDGE_MCP_URL:=http://66.175.217.145:32349/mcp/sse}"
-: "${BRIDGE_MCP_PROXY:=./venv/bin/mcp-proxy}"
 : "${BRIDGE_PORT:=8080}"
 : "${BRIDGE_HOST:=0.0.0.0}"
 : "${BRIDGE_CALL_DELAY:=1.5}"
@@ -93,7 +90,6 @@ fi
 # ---------------------------------------------------------------------------
 DEFAULT_ARGS=(
     "--mcp-url"    "${BRIDGE_MCP_URL}"
-    "--mcp-proxy"  "${BRIDGE_MCP_PROXY}"
     "--port"       "${BRIDGE_PORT}"
     "--host"       "${BRIDGE_HOST}"
     "--call-delay" "${BRIDGE_CALL_DELAY}"
