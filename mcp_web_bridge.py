@@ -68,7 +68,14 @@ from flask_cors import CORS
 # ---------------------------------------------------------------------------
 # Defaults (all overridable via CLI)
 # ---------------------------------------------------------------------------
-DEFAULT_MCP_PROXY_PATH = "/Users/mdavidson58/Documents/AnyLog/Prove-IT/venv/bin/mcp-proxy"
+
+DEFAULT_MCP_PROXY_PATH = os.path.join(
+    os.path.dirname(__file__),
+    "venv",
+    "Scripts" if sys.platform == "win32" else "bin",
+    "mcp-proxy.exe"
+)
+# DEFAULT_MCP_PROXY_PATH = "/Users/mdavidson58/Documents/AnyLog/Prove-IT/venv/bin/mcp-proxy"
 DEFAULT_MCP_SERVER_URL = "https://172.79.89.206:32049/mcp/sse"
 DEFAULT_PORT           = 8080
 DEFAULT_HOST           = "0.0.0.0"
@@ -89,6 +96,20 @@ LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT, stream=sys.stderr)
 log = logging.getLogger("mcp_bridge")
 
+def _status(conn):
+    import requests
+    import json
+
+    try:
+        response = requests.post(url=conn, headers={"Content-Type": "application/json"},
+                                 data=json.dumps({
+                                     "command": "get status where format=json",
+                                     "User-Agent": "AnyLog/1.23"
+                                 }))
+        response.raise_for_status()
+        print(response.json())
+    except Exception as error:
+        raise Exception(f"Failed to execute `get status` (Error :{error})")
 
 def _configure_logging(quiet: bool, log_file: Optional[str], debug: bool) -> None:
     """
@@ -1361,6 +1382,7 @@ def main() -> None:
     print("=" * 65, file=sys.stderr)
     print(file=sys.stderr)
 
+    _status(conn=CFG["mcp_url"].split("/mcp",1)[0])
     start_worker()
     app.run(
         host=CFG["host"],
