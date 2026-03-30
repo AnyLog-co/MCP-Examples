@@ -117,7 +117,7 @@ MCP_CALL_TIMEOUT_S   = None  # type: Optional[float]  per-call hard kill timer (
 DEBUG_LEVEL          = 0     # 0=INFO  1=DEBUG (--debug)  2=DEBUG+step (--debug 2)
 CACHE_TTL_S          = 300   # 5 min — metadata (tables, UNS, status)
 DATA_TTL_S           = 30    # 30 s  — query results
-
+DEFAULT_MCP_SERVER_URL = "http://127.0.0.1:32349/mcp/sse"
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -137,7 +137,7 @@ def _get_status(conn:str):
                                      "User-Agent": "AnyLog/1.23"
                                  }))
         response.raise_for_status()
-        print(not response.json())
+        print(response.json())
     except Exception as error:
         raise Exception(f"Failed to connect to AnygLog conn: {conn} (Error: {error}")
 
