@@ -99,7 +99,14 @@ from flask_cors import CORS
 # ---------------------------------------------------------------------------
 # Defaults (all overridable via CLI)
 # ---------------------------------------------------------------------------
-DEFAULT_MCP_SERVER_URL = "https://172.79.89.206:32049/mcp/sse"
+DEFAULT_MCP_PROXY_PATH = os.path.join(
+    os.path.dirname(__file__),
+    "venv",
+    "Scripts" if sys.platform == "win32" else "bin",
+    "mcp-proxy.exe"
+)
+
+# DEFAULT_MCP_PROXY_PATH = "/Users/mdavidson58/Documents/AnyLog/Prove-IT/venv/bin/mcp-proxy"
 DEFAULT_PORT           = 8080
 DEFAULT_HOST           = "0.0.0.0"
 
@@ -110,7 +117,7 @@ MCP_CALL_TIMEOUT_S   = None  # type: Optional[float]  per-call hard kill timer (
 DEBUG_LEVEL          = 0     # 0=INFO  1=DEBUG (--debug)  2=DEBUG+step (--debug 2)
 CACHE_TTL_S          = 300   # 5 min — metadata (tables, UNS, status)
 DATA_TTL_S           = 30    # 30 s  — query results
-
+DEFAULT_MCP_SERVER_URL = "http://127.0.0.1:32349/mcp/sse"
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -120,6 +127,19 @@ LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 # A minimal stderr handler is set here so any import-time messages are visible.
 logging.basicConfig(level=logging.INFO, format=LOG_FORMAT, stream=sys.stderr)
 log = logging.getLogger("mcp_bridge")
+
+def _get_status(conn:str):
+    try:
+        response = requests.post(url=conn,
+                                 headers={"Content-Type": "application/json"},
+                                 data=json.dumps({
+                                     "command": "get status where format=json",
+                                     "User-Agent": "AnyLog/1.23"
+                                 }))
+        response.raise_for_status()
+        print(response.json())
+    except Exception as error:
+        raise Exception(f"Failed to connect to AnygLog conn: {conn} (Error: {error}")
 
 
 def _configure_logging(quiet: bool, log_file: Optional[str], debug_level: int) -> None:
@@ -1755,6 +1775,7 @@ def main() -> None:
     print("=" * 65, file=sys.stderr)
     print(file=sys.stderr)
 
+    _get_status(conn=CFG['mcp_url'].split("/mcp")[0])
     start_worker()
     app.run(
         host=CFG["host"],

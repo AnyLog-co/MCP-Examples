@@ -1,6 +1,9 @@
 # Python virtual environment
-myenv/
 .idea/
+myenv/
+venv/
+
+>>>>>>> origin/ms-dev
 # Bytecode + cache
 __pycache__/
 *.pyc
