@@ -56,15 +56,23 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .rbadge.on{border-color:var(--green);color:var(--green);background:rgba(34,197,94,.08)}
 .rbadge:hover{border-color:var(--cyan);color:var(--cyan)}
 
+/* mode chip in header */
+.mode-chip{font-family:var(--ff-mono);font-size:8px;letter-spacing:.12em;text-transform:uppercase;
+  padding:2px 8px;border-radius:2px;border:1px solid var(--bdr2);color:var(--dim);
+  background:var(--surf);transition:all .3s}
+.mode-chip.direct{border-color:#22d3ee55;color:var(--cyan);background:rgba(34,211,238,.06)}
+.mode-chip.nginx {border-color:#22c55e55;color:var(--green);background:rgba(34,197,94,.06)}
+.mode-chip.proxy {border-color:#f59e0b55;color:var(--amber);background:rgba(245,158,11,.06)}
+
 /* ─── CONTROL BAR ────────────────────────────────────── */
-.ctrl{height:50px;background:var(--bg2);border-bottom:1px solid var(--bdr);
+.ctrl{min-height:50px;background:var(--bg2);border-bottom:1px solid var(--bdr);
   display:flex;align-items:center;gap:12px;padding:0 20px;flex-wrap:wrap}
 .cl{font-family:var(--ff-mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.14em;white-space:nowrap}
 .ci{background:var(--surf);border:1px solid var(--bdr2);border-radius:3px;
   color:var(--txt);font-family:var(--ff-mono);font-size:11px;padding:5px 8px;outline:none;
   transition:border-color .2s}
 .ci:focus{border-color:var(--amber);box-shadow:0 0 0 2px rgba(245,158,11,.12)}
-.ci.w{width:220px}.ci.n{width:72px}.ci.m{width:105px}
+.ci.w{width:220px}.ci.n{width:72px}.ci.m{width:105px}.ci.s{width:88px}
 .csep{width:1px;height:28px;background:var(--bdr);flex-shrink:0}
 .btn{font-family:var(--ff-title);font-size:13px;font-weight:700;letter-spacing:.1em;
   text-transform:uppercase;padding:6px 16px;border-radius:3px;border:none;cursor:pointer;
@@ -76,6 +84,11 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 .btn-ref{background:var(--surf2);color:var(--dim);border:1px solid var(--bdr2)}
 .btn-ref:hover{border-color:var(--cyan);color:var(--cyan)}
 .ctrl-r{margin-left:auto;font-family:var(--ff-mono);font-size:10px;color:var(--muted)}
+
+/* nginx/proxy URL row — shown only when mode != direct */
+.proxy-row{display:none;align-items:center;gap:12px;padding:6px 20px;
+  background:rgba(0,0,0,.25);border-bottom:1px solid var(--bdr);flex-wrap:wrap}
+.proxy-row.visible{display:flex}
 
 /* CORS warning banner */
 .cors-banner{display:none;background:#2d1a00;border:1px solid var(--amber);border-radius:6px;
@@ -228,6 +241,8 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
     <div class="dot" id="dot"></div>
     <span id="statusTxt">Offline</span>
   </div>
+  <!-- mode chip — updates dynamically -->
+  <span class="mode-chip direct" id="modeChip">DIRECT</span>
   <div class="rig-badges" id="rigBadges"></div>
   <div class="hdr-clock" id="clock">--:--:--</div>
 </header>
@@ -237,6 +252,16 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
   <div style="display:flex;align-items:center;gap:7px">
     <span class="cl">Node URL</span>
     <input class="ci w" id="nodeHost" value="http://66.175.217.145:32349" placeholder="http://host:port">
+  </div>
+  <div class="csep"></div>
+  <!-- ── CONNECTION MODE ── -->
+  <div style="display:flex;align-items:center;gap:7px">
+    <span class="cl">Mode</span>
+    <select class="ci s" id="connMode" onchange="onModeChange()">
+      <option value="direct">Direct</option>
+      <option value="nginx">nginx</option>
+      <option value="proxy">Flask Proxy</option>
+    </select>
   </div>
   <div class="csep"></div>
   <div style="display:flex;align-items:center;gap:7px">
@@ -271,12 +296,20 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
   <div class="ctrl-r">Last: <span id="lastUpd">—</span></div>
 </div>
 
-<!-- CORS Warning Banner (shown on network errors) -->
+<!-- PROXY / NGINX URL ROW — visible only when mode ≠ direct -->
+<div class="proxy-row" id="proxyRow">
+  <span class="cl" id="proxyUrlLabel">nginx URL</span>
+  <input class="ci w" id="proxyUrl" value="http://localhost" placeholder="http://localhost">
+  <span class="cl" style="color:var(--dim);font-size:8px" id="proxyHint">
+    Dashboard POSTs to <code id="proxyEndpoint">http://localhost/api/query</code> — nginx proxies to the AnyLog node
+  </span>
+</div>
+
+<!-- CORS Warning Banner (shown on network errors in direct mode) -->
 <div class="cors-banner" id="corsBanner">
   ⚠ <b>Network / CORS Error</b> — The browser could not reach the AnyLog node directly.
   This usually means the node does not have <code>Access-Control-Allow-Origin: *</code> set, or is unreachable from this browser.
-  <br>Options: (1) Run a Flask proxy (<code>anylog_proxy.py</code>) or nginx reverse-proxy that adds CORS headers, then point the Node URL to the proxy.
-  (2) Open the AnyLog node URL in the same browser tab to confirm it is reachable. (3) Check firewall / VPN.
+  <br>Switch <b>Mode → nginx</b> or <b>Flask Proxy</b> above and set the proxy URL, or check firewall / VPN.
 </div>
 
 <!-- PAGE -->
@@ -327,8 +360,26 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
 <script>
 /*
  * ═══════════════════════════════════════════════════════════════════
- *  ANYLOG CONNECTION — Direct POST (no bridge)
+ *  ANYLOG CONNECTION — Three Modes
  * ═══════════════════════════════════════════════════════════════════
+ *
+ *  Mode 1: DIRECT (default)
+ *    Browser POSTs directly to the AnyLog query node.
+ *    Works when the node has CORS enabled or browser security is relaxed.
+ *    URL: value of #nodeHost input
+ *
+ *  Mode 2: NGINX
+ *    Browser POSTs to nginx at #proxyUrl + "/api/query".
+ *    nginx strips the /api/query path and forwards to the AnyLog node.
+ *    No cert handling needed in the browser.
+ *    URL: {nginxUrl}/api/query
+ *    nginx.conf key: proxy_pass http://<node>/;  (trailing slash strips the path)
+ *
+ *  Mode 3: FLASK PROXY (anylog_proxy.py)
+ *    Browser POSTs to {proxyUrl}/api/query.
+ *    The "url" field in the body tells the proxy where to forward.
+ *    The proxy holds mTLS certs server-side.
+ *    URL: {proxyUrl}/api/query  — body includes { url: nodeUrl, ...headers }
  *
  *  POST body shapes
  *  ─────────────────
@@ -338,32 +389,93 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
  *      "command":     "sql {dbms} format=json:list and stat=false  {sql}",
  *      "destination": "network"
  *    }
+ *    Direct/nginx: body sent as-is.
+ *    Flask proxy:  body also includes "url": "<anylog-node-url>" (stripped by proxy).
  *
  *    • "format=json:list and stat=false" — returns a plain JSON array.
- *      Plain "format=json" appends a row-count metadata object that
- *      breaks array parsing; we avoid it by using json:list + stat=false.
- *    • "destination: network" — fans the query out to all operator nodes
- *      that hold the relevant data; without it the query node itself would
- *      try to execute the SQL locally (no data there).
+ *    • "destination: network" — fans the query out to all operator nodes.
  *
  *  Blockchain / node commands (processed locally by the query node):
  *    {
  *      "User-Agent": "AnyLog/1.23",
  *      "command":    "get status where format=json"
- *                 // "blockchain get uns where namespace = wits/record01"
- *                 // "test network"
  *    }
- *    No "destination" key — these run on the query node itself.
- *
- *  Increment (time-bucket) queries use AnyLog's increments() SQL function:
- *    SELECT increments(minute, {N}, timestamp), min(timestamp) as timestamp,
- *           avg(col) as avg_col, min(col) as min_col, max(col) as max_col, ...
- *    FROM {table}
- *    WHERE rig_id='{id}' AND timestamp >= NOW() - {H} hours
- *    ORDER BY timestamp
+ *    No "destination" key — run on the query node itself.
  *
  * ═══════════════════════════════════════════════════════════════════
  */
+
+/* ─── MODE HELPERS ───────────────────────────────────── */
+function getMode()    { return document.getElementById('connMode').value; }
+function nodeBase()   {
+  const h = document.getElementById('nodeHost').value.trim();
+  return h.startsWith('http') ? h : `http://${h}`;
+}
+function proxyBase()  {
+  const p = document.getElementById('proxyUrl').value.trim();
+  return (p || 'http://localhost').replace(/\/$/, '');
+}
+
+/** Central fetch dispatcher — routes to direct node, nginx proxy, or Flask proxy. */
+function anylogFetch(bodyObj, timeoutMs) {
+  const mode = getMode();
+  let url, body;
+
+  if (mode === 'nginx') {
+    // nginx strips /api/query and forwards to the AnyLog node
+    url  = `${proxyBase()}/api/query`;
+    body = bodyObj;                         // same body shape as direct
+  } else if (mode === 'proxy') {
+    // Flask proxy: add "url" field so the proxy knows where to forward
+    url  = `${proxyBase()}/api/query`;
+    body = { url: nodeBase(), ...bodyObj }; // proxy strips "url" before forwarding
+  } else {
+    // Direct: POST straight to the AnyLog node
+    url  = nodeBase();
+    body = bodyObj;
+  }
+
+  return fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+    signal:  AbortSignal.timeout(timeoutMs || 50000),
+  });
+}
+
+function onModeChange() {
+  const mode = getMode();
+  const row   = document.getElementById('proxyRow');
+  const label = document.getElementById('proxyUrlLabel');
+  const hint  = document.getElementById('proxyHint');
+  const ep    = document.getElementById('proxyEndpoint');
+  const chip  = document.getElementById('modeChip');
+
+  // Show proxy row for nginx and flask proxy modes
+  row.classList.toggle('visible', mode !== 'direct');
+
+  if (mode === 'nginx') {
+    label.textContent = 'nginx URL';
+    hint.innerHTML    = 'Dashboard POSTs to <code id="proxyEndpoint">' + proxyBase() + '/api/query</code> — nginx proxies to the AnyLog node';
+    chip.className    = 'mode-chip nginx';
+    chip.textContent  = 'NGINX';
+  } else if (mode === 'proxy') {
+    label.textContent = 'Proxy URL';
+    hint.innerHTML    = 'Dashboard POSTs to <code id="proxyEndpoint">' + proxyBase() + '/api/query</code> — Flask proxy adds mTLS and forwards';
+    chip.className    = 'mode-chip proxy';
+    chip.textContent  = 'PROXY';
+  } else {
+    chip.className   = 'mode-chip direct';
+    chip.textContent = 'DIRECT';
+  }
+
+  showCors(false);
+}
+
+// Update the endpoint hint when the proxy URL field changes
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('proxyUrl').addEventListener('input', onModeChange);
+});
 
 /* ═══════════════════════════════════════════════════
    UNS — sourced directly from Timbergrove MCP
@@ -462,37 +574,28 @@ function clearLog(){
 }
 
 /* ═══════════════════════════════════════════════════
-   ANYLOG DIRECT CALLS
-   All calls POST to the AnyLog query node URL.
-   SQL queries use "destination":"network" to fan out.
-   Blockchain/node commands omit "destination".
+   ANYLOG CALLS — use anylogFetch() for all requests
 ═══════════════════════════════════════════════════ */
-function nodeBase(){
-  const h = document.getElementById('nodeHost').value.trim();
-  return h.startsWith('http') ? h : `http://${h}`;
-}
 
 /** Execute a SQL query against the AnyLog network.
  *  Uses format=json:list (plain array) + stat=false (no trailing row-count object).
  *  Requires destination:"network" so the query fans out to operator nodes.
  */
 async function callQuery(sql, rigId){
-  const url = nodeBase();
   const command = `sql ${UNS.dbms} format=json:list and stat=false  ${sql}`;
+  const effectiveUrl = getMode()==='direct' ? nodeBase() : `${proxyBase()}/api/query`;
   const t0 = Date.now(); LOG.rest++;
-  logInfo(`▶ POST ${url}`, `${rigId||'fleet'} · ${sql.substring(0,70)}…`);
+  logInfo(`▶ POST [${getMode().toUpperCase()}] ${effectiveUrl}`, `${rigId||'fleet'} · ${sql.substring(0,70)}…`);
 
   let resp;
   try{
-    resp = await fetch(url, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({'User-Agent':'AnyLog/1.23', command, destination:'network'}),
-      signal: AbortSignal.timeout(50000)
-    });
+    resp = await anylogFetch(
+      {'User-Agent':'AnyLog/1.23', command, destination:'network'},
+      50000
+    );
   }catch(e){
     const ms=Date.now()-t0; LOG.err++;
-    logEntry('POST',0,ms,url,`${rigId||'fleet'}: ${e.message}`,null);
+    logEntry('POST',0,ms,effectiveUrl,`${rigId||'fleet'}: ${e.message}`,null);
     syncLogUI(); setDot('err');
     showCors(true);
     return null;
@@ -503,36 +606,27 @@ async function callQuery(sql, rigId){
 
   if(!resp.ok){
     LOG.err++;
-    logEntry('POST',resp.status,ms,url,`${rigId||'fleet'}: HTTP ${resp.status}`,null);
+    logEntry('POST',resp.status,ms,effectiveUrl,`${rigId||'fleet'}: HTTP ${resp.status}`,null);
     syncLogUI(); return null;
   }
 
   let data;
   try{ data = await resp.json(); }catch(e){
     LOG.err++;
-    logEntry('POST',resp.status,ms,url,`${rigId||'fleet'}: JSON parse error — ${e.message}`,null);
+    logEntry('POST',resp.status,ms,effectiveUrl,`${rigId||'fleet'}: JSON parse error — ${e.message}`,null);
     syncLogUI(); return null;
   }
 
-  // AnyLog format=json:list → plain array; fall back gracefully
   const rows = Array.isArray(data) ? data : (data.Query||data.results||[]);
   const rc = rows.length;
   LOG.ok++; LOG.totalRows+=rc;
   if(rigId) LOG.perRig[rigId]=(LOG.perRig[rigId]||0)+rc;
-  logEntry('POST',resp.status,ms,url,sql.substring(0,75),rc);
+  logEntry('POST',resp.status,ms,effectiveUrl,sql.substring(0,75),rc);
   syncLogUI();
   return rows;
 }
 
-/** Execute a time-bucket (increments) query using AnyLog's increments() SQL function.
- *  Returns rows with keys: timestamp, avg_{col}, min_{col}, max_{col}
- *
- *  AnyLog increments syntax:
- *    SELECT increments(minute, N, timestamp), min(timestamp) as timestamp,
- *           avg(col) as avg_col, min(col) as min_col, max(col) as max_col
- *    FROM table WHERE rig_id='...' AND timestamp >= NOW() - H hours
- *    ORDER BY timestamp
- */
+/** Execute a time-bucket (increments) query using AnyLog's increments() SQL function. */
 async function callIncrement(rigId, hours, bucketMin){
   const INCR_COLS = ['rop','wob','rpm','torque','standpipe_pressure','choke_pressure','flow_rate','bit_depth','hole_depth','total_gas'];
   const projs = INCR_COLS.flatMap(c=>[
@@ -547,23 +641,21 @@ async function callIncrement(rigId, hours, bucketMin){
     `WHERE rig_id='${rigId}' AND timestamp >= NOW() - ${hours} hours ` +
     `ORDER BY timestamp`;
 
-  const url = nodeBase();
   const command = `sql ${UNS.dbms} format=json:list and stat=false  ${sql}`;
+  const effectiveUrl = getMode()==='direct' ? nodeBase() : `${proxyBase()}/api/query`;
   const detail = `${rigId} · ${hours}h window · ${bucketMin}min bucket`;
   const t0 = Date.now(); LOG.rest++;
-  logInfo(`▶ POST ${url} [increments]`, detail);
+  logInfo(`▶ POST [${getMode().toUpperCase()}] ${effectiveUrl} [increments]`, detail);
 
   let resp;
   try{
-    resp = await fetch(url, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({'User-Agent':'AnyLog/1.23', command, destination:'network'}),
-      signal: AbortSignal.timeout(60000)
-    });
+    resp = await anylogFetch(
+      {'User-Agent':'AnyLog/1.23', command, destination:'network'},
+      60000
+    );
   }catch(e){
     const ms=Date.now()-t0; LOG.err++;
-    logEntry('POST',0,ms,url,`${rigId} increments: ${e.message}`,null);
+    logEntry('POST',0,ms,effectiveUrl,`${rigId} increments: ${e.message}`,null);
     syncLogUI(); return null;
   }
 
@@ -571,14 +663,14 @@ async function callIncrement(rigId, hours, bucketMin){
 
   if(!resp.ok){
     LOG.err++;
-    logEntry('POST',resp.status,ms,url,`${rigId} increments: HTTP ${resp.status}`,null);
+    logEntry('POST',resp.status,ms,effectiveUrl,`${rigId} increments: HTTP ${resp.status}`,null);
     syncLogUI(); return null;
   }
 
   let data;
   try{ data = await resp.json(); }catch(e){
     LOG.err++;
-    logEntry('POST',resp.status,ms,url,`${rigId} increments JSON error: ${e.message}`,null);
+    logEntry('POST',resp.status,ms,effectiveUrl,`${rigId} increments JSON error: ${e.message}`,null);
     syncLogUI(); return null;
   }
 
@@ -586,7 +678,7 @@ async function callIncrement(rigId, hours, bucketMin){
   const rc = rows.length;
   LOG.ok++; LOG.totalRows+=rc;
   if(rigId) LOG.perRig[rigId]=(LOG.perRig[rigId]||0)+rc;
-  logEntry('POST',resp.status,ms,url,detail,rc);
+  logEntry('POST',resp.status,ms,effectiveUrl,detail,rc);
   syncLogUI();
   return rows;
 }
@@ -608,7 +700,7 @@ async function fetchAll(){
   const hours=parseInt(document.getElementById('windowHr').value)||24;
   const bucket=parseInt(document.getElementById('bucketMin').value)||5;
   setDot('loading');
-  logInfo('═══ Fetch cycle start ═══',`window=${hours}h bucket=${bucket}min node=${nodeBase()}`);
+  logInfo('═══ Fetch cycle start ═══',`mode=${getMode().toUpperCase()} window=${hours}h bucket=${bucket}min`);
 
   for(const rig of UNS.rigs){
     await fetchRig(rig, hours, bucket);
@@ -640,8 +732,6 @@ async function fetchRig(rig, hours, bucket){
     UNS.sensors.filter(s=>!['activity','status'].includes(s.col)).forEach(s=>{
       ser[s.col] = serRows.map(r=>{
         const t = r.timestamp || r.time || r.interval_start || '';
-        // AnyLog increments() returns keys as avg_col / min_col / max_col
-        // (or avg(col) / min(col) / max(col) — handle both)
         const v  = r[`avg_${s.col}`] ?? r[`avg(${s.col})`] ?? null;
         const mn = r[`min_${s.col}`] ?? r[`min(${s.col})`] ?? null;
         const mx = r[`max_${s.col}`] ?? r[`max(${s.col})`] ?? null;
@@ -980,7 +1070,7 @@ function buildMetrics(rig, d, ser){
       <div class="ts-wrap"><canvas id="TS-${rig.id}-flow_rate"></canvas></div>
     </div>
     <div class="ts-card">
-      <div class="ts-title"><span>Total Gas</span><span style="font-size:7px;color:var(--dim)">units</span></div>
+      <div class="ts-title"><span>Total Gas</span><span style="font-size:7px;color:var(--dim)">gpm</span></div>
       <div class="ts-wrap"><canvas id="TS-${rig.id}-total_gas"></canvas></div>
     </div>
   </div>`;
@@ -1072,7 +1162,7 @@ function startPolling(){
   _timer=setInterval(fetchAll, sec*1000);
   document.getElementById('btnStart').style.display='none';
   document.getElementById('btnStop').style.display='';
-  logInfo(`Polling started — interval ${sec}s · node ${nodeBase()}`);
+  logInfo(`Polling started — mode=${getMode().toUpperCase()} interval=${sec}s`);
 }
 function stopPolling(){
   if(_timer){clearInterval(_timer);_timer=null;}
@@ -1093,14 +1183,18 @@ setInterval(()=>{
 
 window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('clock').textContent=new Date().toLocaleTimeString('en',{hour12:false});
-  logInfo('Timbergrove Interval Dashboard ready — AnyLog Direct Mode');
+  // Wire up the proxyUrl input live-update after DOM is ready
+  document.getElementById('proxyUrl').addEventListener('input', onModeChange);
+  logInfo('Timbergrove Interval Dashboard ready');
+  logInfo('Mode','DIRECT — change Mode selector to nginx or Flask Proxy as needed');
   logInfo('Node',nodeBase());
-  logInfo('Database',`${UNS.dbms}.${UNS.table} · UNS: wits/record01`);
+  logInfo('Database',`${UNS.dbms}.${UNS.table}`);
   logInfo('UNS loaded',`${UNS.rigs.length} rigs · ${UNS.sensors.length} sensors`);
   UNS.rigs.forEach(r=>logInfo(`  ${r.id}`,`${r.name} · ${r.zone} · ${r.ns}`));
-  logInfo('Configure Node URL above and click ▶ Start');
+  logInfo('Configure Node URL and Mode above, then click ▶ Start');
   logInfo('SQL format','format=json:list and stat=false · destination:network');
-  logInfo('Increments','SELECT increments(minute, N, timestamp) … FROM rig_data WHERE rig_id=… AND timestamp >= NOW() - H hours');
+  logInfo('nginx mode','POST → {nginxUrl}/api/query → nginx → AnyLog node (no CORS issues)');
+  logInfo('proxy mode','POST → {proxyUrl}/api/query → Flask anylog_proxy.py → AnyLog node (mTLS)');
   syncLogUI();
 });
 </script>
