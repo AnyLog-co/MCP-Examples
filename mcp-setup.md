@@ -91,7 +91,7 @@ http://HOST:PORT/mcp/sse
 ```
 
 All MCP clients connect to this URL. The same endpoint is used by `anylog_proxy.py`
-in MCP mode (see [`proxy-generic/README.md`](../proxy-generic/README.md)).
+in MCP mode (see [`proxy-generic/README.md`](proxy-generic/README.md)).
 
 ---
 
@@ -229,7 +229,7 @@ format varies by client — update this section as new clients are validated.
 Once Claude Desktop is connected:
 
 1. Open a new conversation
-2. Paste a prompt from [`prompts/`](../prompts/) with your parameters filled in:
+2. Paste a prompt from [`prompts/`](prompts/) with your parameters filled in:
    ```
    DATA_TYPE      = "Power Plant"
    QUERY_NODE     = "24.5.219.50:32349"
@@ -238,7 +238,7 @@ Once Claude Desktop is connected:
    UNS_NAMESPACE  = "Smart_City"
    ```
 3. Claude discovers the live schema and generates a single `.html` file
-4. Save the file into [`html/`](../html/) and open it via either proxy
+4. Save the file into [`html/`](html/) and open it via either proxy
 
 ---
 
