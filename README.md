@@ -1,422 +1,241 @@
-# AnyLog Dashboard Generation Guide
+# AnyLog REST Proxy — Dashboard & Proxy Suite
 
-## Overview
-
-This guide explains how to use an LLM (Claude) connected to the AnyLog MCP server to generate a production-quality HTML dashboard that queries live data from an AnyLog network. Three connection modes are supported:
-
-| Mode | Description | Use When |
-|---|---|---|
-| **Direct POST** | AnyLog command delivered as JSON in the POST body, called directly from the browser | Node is accessible over HTTP and has CORS enabled, or browser launched with `--disable-web-security` |
-| **Flask Proxy** | Browser POSTs to `anylog_proxy.py` which holds the user's mTLS certs and forwards to AnyLog server-side | Node requires HTTPS / mTLS, or browser CORS is not allowed — developer or single-user setup |
-| **nginx** | Browser POSTs to nginx which proxies directly to the AnyLog node — TLS and mTLS configured server-side by the admin at deploy time | Production deployments, shared/multi-user access, or domain-based serving |
-
-> **Important on CORS:** Browsers block cross-origin requests that use custom headers unless the server explicitly permits them via CORS. Direct mode only works when the AnyLog node has CORS configured, or the browser is launched with `--disable-web-security`. For all other cases, use the Flask proxy or nginx — they make requests server-side where CORS does not apply.
-
-> **Flask proxy vs nginx:** These are independent alternatives — use one or the other, not both. The Flask proxy is a Python process each user runs locally. nginx is a system-level service the admin deploys once for all users.
-
-Details on using the MCP to generate dashboards and applications can be found in the [documentation](https://github.com/AnyLog-co/documentation/blob/master/dashboard%20generation.md).
+Browser-based dashboards for [AnyLog](https://anylog.co) distributed edge networks.
+Includes sample dashboards, two proxy options, and prompt templates for generating
+custom dashboards with Claude + AnyLog MCP.
 
 ---
 
-## File Structure
+## Repository Layout
 
 ```
 rest-proxy/
-├── prompt.md                    ← Sample prompt with configurable parameters
-├── anylog_proxy.py              ← Flask-based reverse proxy (handles mTLS) — alternative to nginx
-├── anylog-proxy.service         ← Sample service file for anylog_proxy.py 
-├── setup_nginx.sh               ← Script to install and configure nginx — alternative to Flask proxy
-├── dashboard-node-status.html   ← Sample dashboard for getting node / network status
-├── dashboard-power-plant.html   ← Sample dashboard (Smart City Power Plant)
-└── dashboard-power-plant2.html   ← Sample dashboard (Smart City Power Plant) but using CNS (custome human-readable column value naming logic for `monitor_id`)
+├── README.md                        ← this file
+│
+├── html/                            ← ready-to-use HTML dashboards
+│   ├── dashboard-node-status.html   ← AnyLog node & network health inspector
+│   ├── dashboard-power-plant.html   ← Smart City Power Plant monitor
+│   └── rig_data.html                ← Oil rig interval monitor (Timbergrove)
+│
+├── prompts/                         ← LLM prompt templates for generating dashboards
+│   ├── node_status.md
+│   ├── power_plant.md
+│   └── rig_data.md
+│
+├── proxy-nginx/                     ← nginx Docker proxy (recommended for production)
+│   ├── docker-compose.yaml
+│   ├── nginx.conf
+│   └── README.md
+│
+└── proxy-generic/                   ← Python Flask proxy (REST + MCP modes)
+    ├── anylog_proxy.py
+    ├── requirements.txt
+    ├── Dockerfile
+    ├── docker-compose.yaml
+    └── README.md
 ```
 
 ---
 
-## Python Requirements (Flask proxy only)
+## Connection Modes
 
-The Flask proxy (`anylog_proxy.py`) requires Python 3 and the following packages. Not needed if using nginx.
+Browsers cannot POST directly to AnyLog nodes in most environments due to CORS.
+Choose one of three connection modes:
 
-```
-flask
-flask-cors
-requests
-urllib3
-```
-
-Install with:
-
-```bash
-pip install flask flask-cors requests urllib3
-```
-
----
-
-## Certificate Setup
-
-AnyLog uses mutual TLS (mTLS) to authenticate both the server node and the connecting client. The node admin must generate **two sets of certificates**: one for the node itself, and one per user or application that will connect to the network.
-
-### What the node admin creates
-
-Using the AnyLog certificate utilities, the node admin generates:
-
-**1. Node certificates** — identify the AnyLog node to connecting clients:
-- `server-<node-name>-public-key.crt` — node's public certificate
-- `server-<node-name>-private-key.key` — node's private key
-- `ca-anylog-public-key.crt` — the Certificate Authority cert that signed the node cert
-
-**2. User / client certificates** — per user or application that will build or run dashboards:
-- `client-<username>-public-key.crt` — client's public certificate
-- `client-<username>-private-key.key` — client's private key
-
-These files are stored inside the AnyLog node's Docker volume:
-
-```
-anylog-[node-type]-anylog/   ← Docker named volume
-└── data/
-    └── pem/
-        ├── server-<node-name>-public-key.crt
-        ├── server-<node-name>-private-key.key
-        ├── ca-anylog-public-key.crt
-        ├── client-<username>-public-key.crt
-        └── client-<username>-private-key.key
-```
-
-### Who receives the certificates
-
-Certificates are only needed when connecting to an AnyLog node over HTTPS/mTLS. How they are used depends on which proxy option you choose:
-
-**Flask proxy users** — each user runs their own proxy and needs the three files below. The node admin distributes them securely:
-
-| File | Purpose |
-|---|---|
-| `client-<username>-public-key.crt` | Proves the client's identity to the AnyLog node |
-| `client-<username>-private-key.key` | Signs the client's TLS handshake (keep private) |
-| `ca-anylog-public-key.crt` | Verifies the AnyLog node's certificate is legitimate |
-
-The user passes them when starting the proxy:
-
-```bash
-python anylog_proxy.py \
-    --cert   /path/to/client-<username>-public-key.crt \
-    --key    /path/to/client-<username>-private-key.key \
-    --cacert /path/to/ca-anylog-public-key.crt \
-    --node   24.5.219.50:7849
-```
-
-Or via the dashboard's **⚙ Settings** drawer when using Proxy mode — cert file paths are sent to the proxy's `/api/configure` endpoint and applied without restarting.
-
-**nginx admin** — the admin configures the same three files once at deploy time via `setup_nginx.sh`. Individual dashboard users never handle certificates — they only need the nginx URL.
-
----
-
-## Components
-
-### 1. Deploy an AnyLog Node
-
-Follow the standard deployment guide using Docker Compose:
-[https://github.com/AnyLog-co/docker-compose](https://github.com/AnyLog-co/docker-compose)
-
-After deployment, note:
-- The **REST port** of your query node (e.g. `24.5.219.50:32349` for HTTP, `24.5.219.50:7849` for HTTPS)
-- The **database name** and **table name** you want to query
-- The **UNS namespace** if your deployment uses the Unified Namespace
-
----
-
-### 2. Deploy the Proxy
-
-Choose **one** option — Flask proxy and nginx are independent alternatives. Do not use both.
-
-#### Option A — Flask proxy (local or single-user)
-
-Suitable for local development or a per-user setup. Each user runs their own proxy with their own client certificates.
-
-```bash
-# Without mTLS (plain HTTP node):
-python anylog_proxy.py --node 24.5.219.50:32349
-
-# With mTLS:
-python anylog_proxy.py \
-    --node   24.5.219.50:7849 \
-    --cert   /path/to/client.crt \
-    --key    /path/to/client.key \
-    --cacert /path/to/ca.crt
-```
-
-The proxy starts at `http://localhost:5000`. Open the dashboard, click ⚙ Settings, select **Flask Proxy** mode, and set the Proxy URL to `http://localhost:5000`.
-
-**All CLI options:**
-
-| Flag | Default | Description |
+| Mode | How it works | Best for |
 |---|---|---|
-| `--node` | *(required)* | AnyLog query node — `host:port` or full URL |
-| `--cert` | `$ANYLOG_CERT` | Path to client certificate (.crt) |
-| `--key` | `$ANYLOG_KEY` | Path to client private key (.key) |
-| `--cacert` | `$ANYLOG_CACERT` | Path to CA certificate — omit to skip server verification |
-| `--port` | `5000` | Port for the proxy server |
-| `--host` | `127.0.0.1` | Interface to bind — use `0.0.0.0` for all interfaces |
-| `--timeout` | `30` | Request timeout in seconds |
-| `--dashboard` | `power-plant-dashboard.html` | HTML file served at `GET /dashboard` |
+| **Direct POST** | Browser → AnyLog node | Node has CORS enabled, or dev/testing |
+| **nginx proxy** | Browser → nginx (Docker) → AnyLog node | Production, shared access, no Python needed |
+| **Flask proxy** | Browser → `anylog_proxy.py` → AnyLog node | REST or MCP mode, Docker or local |
 
-Environment variable equivalents: `ANYLOG_NODE`, `ANYLOG_CERT`, `ANYLOG_KEY`, `ANYLOG_CACERT`, `PROXY_PORT`, `PROXY_HOST`.
+**nginx** and the **Flask proxy** are independent alternatives — use one, not both.
 
-#### Option B — nginx (production / shared access)
+### Direct POST (no proxy)
 
-Suitable for shared or production deployments. nginx serves the dashboard as a static file and proxies `/api/` **directly to the AnyLog node** — no Flask or Python required. TLS termination (browser → nginx) and mTLS (nginx → AnyLog node) are both configured by the admin at deploy time.
+Works when the AnyLog node responds with `Access-Control-Allow-Origin: *`, or when
+the browser is launched with `--disable-web-security`.
+
+Open any dashboard HTML file directly in a browser, set Mode → `direct` in the
+config bar, and enter the node URL.
+
+### nginx proxy
 
 ```bash
-# Basic — HTTP, no mTLS:
-sudo bash setup_nginx.sh \
-    --node      24.5.219.50:32349 \
-    --dashboard /path/to/my-dashboard.html
-
-# With mTLS to the AnyLog node:
-sudo bash setup_nginx.sh \
-    --node      24.5.219.50:7849 \
-    --dashboard /path/to/my-dashboard.html \
-    --cert      /etc/anylog/client.crt \
-    --key       /etc/anylog/client.key \
-    --cacert    /etc/anylog/ca.crt
-
-# With self-signed TLS (browser → proxy-generic-nginx):
-sudo bash setup_nginx.sh \
-    --node      24.5.219.50:7849 \
-    --dashboard /path/to/my-dashboard.html \
-    --cert      /etc/anylog/client.crt \
-    --key       /etc/anylog/client.key \
-    --cacert    /etc/anylog/ca.crt \
-    --tls \
-    --domain    dashboard.example.com
+cd proxy-nginx
+# Set ANYLOG_NODE_URL in docker-compose.yaml, then:
+docker compose up -d
 ```
 
-**What the script does:**
-1. Installs nginx and openssl
-2. Copies the dashboard HTML to `/var/www/anylog/`
-3. Copies mTLS client certificates to `/etc/nginx/ssl/anylog/` (if provided)
-4. Writes an nginx site config that serves the dashboard at `/` and proxies `/api/` directly to the AnyLog node using `proxy_ssl_certificate` directives
-5. Adds CORS headers and handles `OPTIONS` preflight requests
-6. Optionally generates a self-signed TLS certificate for the browser-facing side
+Open a dashboard, set Mode → `nginx`, nginx URL → `http://localhost`.
+See [`proxy-nginx/README.md`](proxy-nginx/README.md) for full setup.
 
-**After setup:**
+### Flask proxy
 
-```
-Dashboard:   http(s)://<domain>/
-nginx logs:  tail -f /var/log/nginx/anylog_error.log
+```bash
+cd proxy-generic
 
-Service control:
-  systemctl reload nginx
-  systemctl status nginx
+# REST mode (direct pass-through, like nginx but Python)
+python3 anylog_proxy.py --anylog-url http://HOST:PORT --html-dir ../html
 
-Files installed:
-  /var/www/anylog/<dashboard>.html
-  /etc/nginx/ssl/anylog/          ← mTLS certs (if provided)
-  /etc/nginx/sites-available/anylog-dashboard
+# MCP mode (auto-detected from /mcp/sse suffix)
+python3 anylog_proxy.py --anylog-url http://HOST:PORT/mcp/sse --html-dir ../html
+
+# Or via Docker
+docker compose up -d
 ```
 
-> **Certificate note for nginx:** The admin provides certificates at deploy time via `--cert/--key/--cacert`. Dashboard users only need to enter the nginx URL — they never handle certificate files directly.
+Open a dashboard, set Mode → `proxy`, Proxy URL → `http://localhost:8080`.
+See [`proxy-generic/README.md`](proxy-generic/README.md) for full setup.
 
 ---
 
-### 3. Configure the Dashboard
+## Dashboards
 
-The dashboard has a **⚙ Settings** drawer (top-right of the header) where all connection settings are configured at runtime without editing the HTML file.
+### `dashboard-node-status.html`
 
-#### Connection mode: Direct POST
+AnyLog node and network health inspector. No database or SQL queries — fires three
+diagnostic commands in parallel:
 
-Use when the AnyLog node is accessible over HTTP and CORS is enabled on the node (or browser launched with `--disable-web-security`).
+| Command | Response | Panel |
+|---|---|---|
+| `get status where format=json` | JSON object | Node Status (key-value grid) |
+| `test node` | Pipe-delimited text | Node Test (pass/fail table) |
+| `test network` | Pipe-delimited text | Network Test (node list with type pills) |
 
-| Field | Example |
-|---|---|
-| Query Node | `24.5.219.50:32349` |
-| Database | `cos` |
-| Table | `pp_pm` |
+Direct POST only. CORS note shown if blocked.
 
-> Note: Blockchain commands (`blockchain get uns ...`) cannot be executed in Direct mode from a browser due to CORS. The Data Location panel will display a `curl` equivalent instead.
+### `dashboard-power-plant.html`
 
-#### Connection mode: Flask Proxy
-
-Use when the node requires mTLS or HTTPS.
-
-| Field | Example |
-|---|---|
-| Proxy URL | `http://localhost:5000` |
-| AnyLog Node URL | `https://24.5.219.50:7849` |
-| Database | `cos` |
-| Table | `pp_pm` |
-| Client Cert path | `/path/to/client.crt` *(sent to proxy's `/api/configure`)* |
-| Private Key path | `/path/to/client.key` |
-| CA Cert path | `/path/to/ca.crt` |
-
-#### Connection mode: nginx
-
-Use when nginx is deployed via `setup_nginx.sh`. Certificates and routing are handled server-side by the admin — the browser user only needs the nginx URL.
-
-| Field | Example |
-|---|---|
-| nginx URL | `http://localhost` or `https://dashboard.example.com` |
-| Database | `cos` |
-| Table | `pp_pm` |
-
----
-
-## Running the Sample Dashboard
-
-The sample dashboard (`power-plant-dashboard.html`) demonstrates a Smart City Power Plant monitoring interface. It works against the `cos.pp_pm` table on the `Smart City` AnyLog deployment.
-
-**To run it directly (no proxy):**
-
-```bash
-# Open in browser — will use demo data if the node is unreachable
-open dashboard-power-plant.html
-```
-
-**To run it via the Flask proxy:**
-
-```bash
-python anylog_proxy.py --node 24.5.219.50:32349
-# then open http://localhost:5000/dashboard
-```
-
-**To run it via nginx (after setup_nginx.sh):**
-
-```bash
-# Dashboard is already served at:
-open http://localhost/
-```
-
-The sample dashboard features:
-- Live KPI cards (total real power, reactive power, power factor, frequency)
+Smart City Power Plant live monitor (`cos.pp_pm` table). Features:
+- KPI cards: real power, reactive power, power factor, active monitors
 - Phase current breakdown per monitor (A / B / C)
-- Real power bar chart (active monitors, sorted descending)
-- Power trend line chart with 1H / 6H / 24H time range selector
-- Full monitor table with inline power bars and ONLINE / STANDBY status
-- Query log panel (all REST calls, duration, rows, status) with max-concurrent throttling
-- Node ping every 5 minutes (`get status where format=json`)
-- Data Location panel driven by UNS (`blockchain get uns where namespace=Smart_City/Power_Plant bring [*][loc]`)
+- Bar chart: real power by monitor
+- Line chart: power trend (1H / 6H / 24H)
+- Full monitor table with inline bars and ONLINE / STANDBY status
+- UNS panel: `blockchain get uns where namespace = Smart_City`
+- Drill-down: filter by monitor ID and time range
+- Query log panel with call deduplication and max-concurrent throttling
+- Node ping every 5 minutes
+
+### `rig_data.html`
+
+Timbergrove oil rig interval monitor (`timbergrove_rigs.rig_data` table). Features:
+- Fleet summary for 4 rigs (RIG-TX-001, RIG-TX-007, RIG-ND-012, RIG-GOM-023)
+- SVG rig diagram per unit with live sensor annotations
+- KPI cards: ROP, WOB, RPM, torque, hookload, bit depth, flow rate, total gas
+- Vertical bar charts: standpipe pressure, choke pressure, depth
+- Time-series charts: ROP/WOB, RPM/torque, flow rate, gas
+- API call log panel
+
+All dashboards support all three connection modes via the in-page config bar.
 
 ---
 
-## Generating a Custom Dashboard
+## Generating Custom Dashboards
 
-Use `prompt.md` as the starting point. Set the five parameters at the top of the file:
+Use the prompt templates in `prompts/` with Claude (AnyLog MCP connected).
 
-```
-DATA_TYPE      = "Oil Rig"                  # e.g. "Wind Turbine", "Water Plant", "Oil Rig"
-QUERY_NODE     = "10.0.0.1:32349"           # your AnyLog query node IP:Port
-DBMS           = "timbergrove_rigs"         # your database name
-TABLE          = "rig_data"                 # your primary table (blank = auto-discover)
-UNS_NAMESPACE  = "Timbergrove/RIG-TX-001"  # UNS namespace (blank if not using UNS)
-```
+### Quick start
 
-Then paste the full prompt into Claude (with the AnyLog MCP connected). Claude will:
+1. Pick the closest prompt template (or use `power_plant.md` as a base)
+2. Set the parameters at the top:
+   ```
+   DATA_TYPE      = "Wind Turbine"
+   QUERY_NODE     = "10.0.0.1:32349"
+   DBMS           = "my_database"
+   TABLE          = "my_table"
+   UNS_NAMESPACE  = "MyOrg"
+   ```
+3. Paste into Claude with the AnyLog MCP server connected
+4. Claude discovers the schema via MCP, then generates a single `.html` file
+5. Drop the file into `html/` — it works immediately via either proxy
 
-1. **Discover** — query the live network using MCP tools to find actual column names, data ranges, node topology, and POST body shapes
-2. **Build** — generate a single-file HTML dashboard with the correct field names, meaningful KPIs, and all connection modes pre-wired
-3. **Deliver** — output a file ready to drop into this directory and serve via either proxy option
+### Prompt templates
 
-The generated dashboard will match the same structure as the sample — same connection modes, query log, ping, and data location panel — but with content derived from your actual data.
+| File | Dashboard type | Key features |
+|---|---|---|
+| `power_plant.md` | Data dashboard | SQL queries, UNS panel, charts, drill-down, 3 connection modes |
+| `node_status.md` | Diagnostic tool | Node commands only, pipe-table parser, no SQL |
+| `rig_data.md` | Industrial monitor | Multi-rig, SVG diagram, increments() queries |
 
 ---
 
-## REST API Reference
+## AnyLog REST API Reference
 
-Both the dashboard and any other HTTP client communicate with AnyLog using two POST patterns:
+All calls use `POST` with a JSON body. Two body shapes:
 
-### SQL Queries
+### SQL queries — requires `destination: "network"`
 
 ```bash
-curl -X POST http://<query-node> \
+curl -X POST http://HOST:PORT \
   -H "Content-Type: application/json" \
   -d '{
     "User-Agent":  "AnyLog/1.23",
-    "command":     "sql <dbms> format=json SELECT * FROM <table> WHERE timestamp >= NOW() - 1 hours",
+    "command":     "sql mydb format=json:list and stat=false  SELECT * FROM mytable LIMIT 10",
     "destination": "network"
   }'
 ```
 
-`destination: network` causes the query node to fan out the SQL across all operator nodes holding the data and merge the results.
+- `destination: "network"` fans the query out to all operator nodes holding the data
+- `format=json:list and stat=false` returns a plain JSON array (suppresses the
+  trailing row-count object that plain `format=json` appends)
 
-### Blockchain / Status Commands
+### Blockchain / node commands — no `destination`
 
 ```bash
-curl -X POST http://<query-node> \
+curl -X POST http://HOST:PORT \
   -H "Content-Type: application/json" \
   -d '{
     "User-Agent": "AnyLog/1.23",
-    "command":    "blockchain get uns where namespace=Smart_City/Power_Plant bring [*][loc]"
+    "command":    "get status where format=json"
   }'
 ```
 
-No `destination` key — these commands run locally on the query node against the blockchain ledger.
+Processed locally by the query node. Examples:
+- `get status where format=json`
+- `test node` / `test network`
+- `get queries where format=json`
+- `blockchain get uns where namespace = Smart_City`
 
-### Via the Flask Proxy
+### Via the Flask proxy
+
+The proxy accepts both the AnyLog REST `{command}` format and a simpler `{dbms, sql}` shape:
 
 ```bash
-curl -X POST http://localhost:5000/api/query \
+curl -X POST http://localhost:8080/api/query \
   -H "Content-Type: application/json" \
-  -d '{
-    "url":         "https://<node>:7849",
-    "User-Agent":  "AnyLog/1.23",
-    "command":     "sql cos format=json SELECT ...",
-    "destination": "network"
-  }'
+  -d '{"dbms": "mydb", "sql": "SELECT * FROM mytable LIMIT 10"}'
 ```
 
-The proxy extracts `url` (not forwarded to AnyLog) and forwards all other keys as HTTP headers to the node, applying mTLS certificates server-side.
-
-### Hot-reload proxy certificates
-
-```bash
-curl -X POST http://localhost:5000/api/configure \
-  -H "Content-Type: application/json" \
-  -d '{
-    "cert":   "/path/to/client.crt",
-    "key":    "/path/to/client.key",
-    "cacert": "/path/to/ca.crt"
-  }'
-```
-
-### Proxy health check
-
-```bash
-curl http://localhost:5000/api/health
-```
+Response: `{"results": [...], "row_count": N, "dbms": "mydb"}`
 
 ---
 
 ## Troubleshooting
 
-**`Failed to fetch` in the browser (Direct mode)**
+**`Failed to fetch` / CORS error (Direct mode)**
+Switch Mode → `nginx` or `proxy`, or launch Chrome with
+`--disable-web-security --user-data-dir=/tmp/dev`.
 
-The browser is blocking the request due to CORS. The AnyLog node does not respond to `OPTIONS` preflight requests. Switch to **Proxy** or **nginx** mode, or launch Chrome with `--disable-web-security --user-data-dir=/tmp/dev`.
+**CORS banner persists after switching to nginx/proxy mode**
+Click ↻ Refresh — the banner clears on the next successful fetch. If it
+persists, the proxy itself can't reach the AnyLog node (check proxy logs).
 
-**Data Location panel shows CORS warning (Direct mode)**
+**`Is a directory` error on proxy startup**
+Docker auto-created a config file as a directory before it existed.
+Delete it and recreate as a file — see the relevant proxy README.
 
-Expected — `blockchain get uns ...` cannot run from a browser in Direct mode. The panel shows the equivalent `curl` command. Switch to Proxy or nginx mode to enable it.
-
-**Proxy shows `SSL/TLS error`**
-
-The client certificate is incorrect or the CA cert does not match the node's certificate. Verify the three cert files were issued by the same CA as the node. Check with:
-```bash
-openssl verify -CAfile ca-anylog-public-key.crt client-<username>-public-key.crt
+**`502 Bad Gateway` from nginx**
+nginx can't reach the AnyLog node. If AnyLog runs on the same Windows host:
+```yaml
+# docker-compose.yaml
+extra_hosts:
+  - "host.docker.internal:host-gateway"
+```
+```nginx
+proxy_pass http://host.docker.internal:PORT/;
 ```
 
-**`Connection error` from proxy**
-
-The proxy cannot reach the AnyLog node. Check the `--node` value, firewall rules, and that the node's REST port is open. Test directly:
-```bash
-curl -X GET http://<node>:<rest-port> -H "command: get status"
-```
-
-**Dashboard shows demo data**
-
-The dashboard fell back to demo data because the live query returned no results or failed. Check the **QUERIES** log panel (click `QUERIES` in the header) to see the exact error on each call.
-
-**nginx `502 Bad Gateway`**
-
-nginx cannot reach the AnyLog node. Check the node URL configured in `setup_nginx.sh` (`--node`), firewall rules, and that the node's REST port is open. Check the nginx error log:
-```bash
-tail -f /var/log/proxy-generic-nginx/anylog_error.log
-proxy-generic-nginx -t   # validate config
-```
+**SQL queries return empty, status works**
+Missing `"destination": "network"` in the SQL body. Without it the query runs
+only on the query node, which holds no operator data.
