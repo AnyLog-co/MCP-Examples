@@ -29,8 +29,8 @@ browser and query live data directly, without Claude or any LLM involved.
                                  └──────────────────┘
 ```
 
-See [`prompts/`](../prompts/) for the prompt templates and
-[`html/`](../html/) for the generated dashboard examples.
+See [`prompts/`](prompts/) for the prompt templates and
+[`html/`](html/) for the generated dashboard examples.
 
 ### 2. Conversational data queries
 
