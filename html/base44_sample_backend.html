@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnyLog Foundation</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0e;
+    --surface: #12151a;
+    --card: #181c22;
+    --border: #2a2f38;
+    --border-light: #353b45;
+    --amber: #f59e0b;
+    --amber-dim: #b47708;
+    --amber-glow: rgba(245, 158, 11, 0.15);
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --text: #e5e7eb;
+    --text-dim: #9ca3af;
+    --text-muted: #6b7280;
+    --mono: 'Share Tech Mono', monospace;
+    --ui: 'Barlow Condensed', sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 14px; min-height: 100vh; }
+
+  /* Header */
+  .header { position: sticky; top: 0; z-index: 100; background: var(--surface); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; padding: 10px 20px; }
+  .header-logo { font-family: var(--ui); font-weight: 700; font-size: 20px; color: var(--amber); letter-spacing: 1px; white-space: nowrap; }
+  .header-logo span { color: var(--text-dim); font-weight: 400; font-size: 14px; margin-left: 8px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px;
+    font-family: var(--mono); font-size: 11px; border: 1px solid var(--border); background: var(--bg); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.red { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  .dot.yellow { background: var(--yellow); }
+  .mode-chip { padding: 3px 8px; border-radius: 3px; font-family: var(--mono); font-size: 10px; font-weight: 600;
+    background: var(--amber-glow); color: var(--amber); border: 1px solid var(--amber-dim); text-transform: uppercase; }
+  .header-spacer { flex: 1; }
+  .header-btn { background: var(--card); border: 1px solid var(--border); color: var(--text-dim); padding: 6px 12px;
+    border-radius: 4px; cursor: pointer; font-family: var(--ui); font-size: 12px; font-weight: 600;
+    transition: all 0.15s; display: flex; align-items: center; gap: 4px; }
+  .header-btn:hover { border-color: var(--amber); color: var(--amber); }
+  .header-btn.active { background: var(--amber-glow); border-color: var(--amber); color: var(--amber); }
+
+  /* Config Bar */
+  .config-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 20px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .config-field { display: flex; flex-direction: column; gap: 2px; }
+  .config-field label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .config-field input { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px;
+    border-radius: 4px; font-family: var(--mono); font-size: 12px; outline: none; transition: border-color 0.15s; }
+  .config-field input:focus { border-color: var(--amber); }
+  .config-field.wide input { width: 260px; }
+  .config-field.med input { width: 120px; }
+  .config-field.narrow input { width: 100px; }
+  .apply-btn { background: var(--amber); color: #000; border: none; padding: 8px 18px; border-radius: 4px;
+    font-family: var(--ui); font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.15s;
+    letter-spacing: 0.5px; align-self: flex-end; white-space: nowrap; }
+  .apply-btn:hover { background: #d97706; }
+  .apply-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Banner */
+  .banner { padding: 10px 20px; font-size: 12px; display: none; align-items: center; gap: 8px; }
+  .banner.warn { background: rgba(234,179,8,0.1); border-bottom: 1px solid rgba(234,179,8,0.2); color: var(--yellow); display: flex; }
+  .banner.err { background: rgba(239,68,68,0.1); border-bottom: 1px solid rgba(239,68,68,0.2); color: var(--red); display: flex; }
+
+  /* Main content */
+  .content { padding: 20px; max-width: 1400px; margin: 0 auto; }
+  .section { margin-bottom: 24px; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .section-title { font-family: var(--ui); font-weight: 700; font-size: 16px; color: var(--amber);
+    text-transform: uppercase; letter-spacing: 1px; }
+  .section-subtitle { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+  .cmd-bar { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px;
+    font-family: var(--mono); font-size: 11px; color: var(--text-muted); overflow-x: auto; white-space: nowrap; }
+
+  /* Cards grid */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 16px; transition: border-color 0.15s; }
+  .card:hover { border-color: var(--border-light); }
+  .card-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .card-value { font-family: var(--mono); font-size: 14px; color: var(--text); word-break: break-all; }
+  .card-value.amber { color: var(--amber); }
+  .card-value a { color: var(--amber); text-decoration: none; }
+  .card-value a:hover { text-decoration: underline; }
+
+  /* Schema table */
+  .schema-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .schema-table th { background: var(--bg); border: 1px solid var(--border); padding: 8px 10px;
+    text-align: left; font-family: var(--ui); font-weight: 600; color: var(--amber); text-transform: uppercase;
+    font-size: 10px; letter-spacing: 0.5px; position: sticky; top: 0; }
+  .schema-table td { border: 1px solid var(--border); padding: 6px 10px; font-family: var(--mono); font-size: 11px;
+    color: var(--text-dim); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .schema-table tr:hover td { background: var(--surface); }
+  .table-scroll { max-height: 300px; overflow: auto; border: 1px solid var(--border); border-radius: 4px; }
+
+  /* Chips */
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-block; padding: 4px 10px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 3px; font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+  .chip.online { border-color: var(--green); color: var(--green); }
+  .chip.backup { border-color: var(--text-muted); color: var(--text-muted); opacity: 0.7; }
+
+  /* UNS tree */
+  .uns-tree { font-family: var(--mono); font-size: 12px; }
+  .uns-node { padding: 10px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 4px;
+    margin-bottom: 6px; cursor: default; transition: border-color 0.15s; }
+  .uns-node:hover { border-color: var(--amber-dim); }
+  .uns-node-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .uns-node-name { font-weight: 600; color: var(--text); font-family: var(--ui); font-size: 14px; }
+  .uns-tag { font-size: 9px; padding: 2px 6px; border-radius: 2px; background: var(--amber-glow); color: var(--amber);
+    font-family: var(--mono); text-transform: uppercase; }
+  .uns-details { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px; margin-top: 6px; }
+  .uns-detail { font-size: 11px; color: var(--text-muted); }
+  .uns-detail strong { color: var(--text-dim); }
+  .uns-children { margin-left: 24px; border-left: 2px solid var(--border); padding-left: 12px; margin-top: 6px; }
+
+  /* Query log panel */
+  .log-panel { position: fixed; bottom: 0; left: 0; right: 0; z-index: 200; background: var(--surface);
+    border-top: 2px solid var(--amber); transform: translateY(100%); transition: transform 0.3s ease; max-height: 50vh; }
+  .log-panel.open { transform: translateY(0); }
+  .log-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px;
+    border-bottom: 1px solid var(--border); }
+  .log-tabs { display: flex; gap: 0; }
+  .log-tab { padding: 6px 16px; font-family: var(--ui); font-size: 12px; font-weight: 600; cursor: pointer;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text-dim); }
+  .log-tab:first-child { border-radius: 4px 0 0 4px; }
+  .log-tab:last-child { border-radius: 0 4px 4px 0; }
+  .log-tab.active { background: var(--amber-glow); color: var(--amber); border-color: var(--amber-dim); }
+  .log-content { overflow: auto; max-height: calc(50vh - 50px); padding: 0; }
+  .log-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .log-table th { background: var(--bg); padding: 6px 10px; text-align: left; font-family: var(--ui);
+    font-size: 10px; color: var(--amber); text-transform: uppercase; position: sticky; top: 0; }
+  .log-table td { padding: 4px 10px; border-top: 1px solid var(--border); font-family: var(--mono); color: var(--text-dim); }
+  .log-table .status-ok { color: var(--green); }
+  .log-table .status-err { color: var(--red); }
+  .log-table .status-skip { color: var(--yellow); }
+  .log-table .status-pending { color: var(--text-muted); }
+
+  /* Settings drawer */
+  .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 300; display: none; }
+  .drawer-overlay.open { display: block; }
+  .drawer { position: fixed; top: 0; right: 0; width: 380px; height: 100vh; background: var(--surface);
+    border-left: 1px solid var(--border); z-index: 301; transform: translateX(100%); transition: transform 0.3s ease;
+    padding: 20px; overflow-y: auto; }
+  .drawer.open { transform: translateX(0); }
+  .drawer h3 { font-family: var(--ui); font-weight: 700; color: var(--amber); margin-bottom: 16px; }
+  .drawer .config-field { margin-bottom: 12px; }
+  .drawer .config-field input { width: 100%; }
+  .drawer .config-field select { width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 10px; border-radius: 4px; font-family: var(--mono); font-size: 12px; }
+
+  /* Loading */
+  .loading { color: var(--text-muted); font-family: var(--mono); font-size: 12px; padding: 20px; text-align: center; }
+  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .config-bar { flex-direction: column; align-items: stretch; }
+    .config-field.wide input, .config-field.med input, .config-field.narrow input { width: 100%; }
+    .header { flex-wrap: wrap; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════
+  AnyLog Foundation Backend
+  Built from live MCP discovery — March 24, 2026
+
+  POST BODY SHAPES:
+  ─────────────────
+  1. SQL queries (fan out to operator nodes):
+     { "User-Agent": "AnyLog/1.23",
+       "command": "sql cos format=json:list and stat=false  SELECT ...",
+       "destination": "network" }
+
+     • format=json:list returns a plain JSON array
+     • stat=false suppresses the row-count metadata object
+     • destination: "network" is REQUIRED for SQL — routes to operators
+
+  2. Blockchain / node commands (processed locally by query node):
+     { "User-Agent": "AnyLog/1.23",
+       "command": "blockchain get uns where namespace = Smart_City" }
+
+     • NO destination key — command stays on the query node
+     • Examples: get status, test node, test network, blockchain get ...
+
+  CONNECTION MODES:
+  ─────────────────
+  DIRECT  → POST to http://<query_node_ip>:<rest_port>
+  PROXY   → POST to http://<proxy_url>/api/query  (Flask proxy holds mTLS certs)
+  NGINX   → POST to http://<nginx_url>/api/query  (nginx handles TLS termination)
+═══════════════════════════════════════════════════════════════ -->
+
+<div class="header">
+  <div class="header-logo">ANYLOG FOUNDATION <span>v1.0</span></div>
+  <div class="badge"><span class="dot" id="pingDot"></span><span id="pingLabel">—</span></div>
+  <div class="mode-chip" id="modeChip">DIRECT</div>
+  <div class="badge" id="nodeBadge" style="display:none"></div>
+  <div class="header-spacer"></div>
+  <button class="header-btn" id="queriesBtn" onclick="toggleLogPanel()">⚡ QUERIES <span id="queryCount">0</span></button>
+  <button class="header-btn" id="settingsBtn" onclick="toggleDrawer()">⚙</button>
+</div>
+
+<div class="config-bar">
+  <div class="config-field wide">
+    <label>Node URL</label>
+    <input id="cfgNode" value="http://172.233.208.212:32349">
+  </div>
+  <div class="config-field narrow">
+    <label>Database</label>
+    <input id="cfgDbms" value="cos">
+  </div>
+  <div class="config-field narrow">
+    <label>Table</label>
+    <input id="cfgTable" value="pp_pm">
+  </div>
+  <div class="config-field med">
+    <label>UNS Namespace</label>
+    <input id="cfgUns" value="Smart_City">
+  </div>
+  <button class="apply-btn" id="applyBtn" onclick="applyAndConnect()">APPLY & CONNECT</button>
+</div>
+
+<div class="banner" id="banner"></div>
+
+<div class="content">
+  <!-- Schema Discovery -->
+  <div class="section" id="schemaSection">
+    <div class="section-header">
+      <div class="section-title">📡 Schema Discovery</div>
+      <div class="section-subtitle" id="schemaStatus">waiting for connection…</div>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <div class="card-label" style="margin-bottom: 6px;">TABLES IN DATABASE</div>
+      <div class="chip-row" id="tableChips"><span class="loading">—</span></div>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <div class="card-label" style="margin-bottom: 6px;">MONITOR / DEVICE IDS</div>
+      <div class="chip-row" id="monitorChips"><span class="loading">—</span></div>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <div class="card-label" style="margin-bottom: 6px;">SAMPLE DATA (latest 5 rows)</div>
+      <div class="table-scroll" id="sampleTable"><span class="loading">—</span></div>
+    </div>
+
+    <div>
+      <div class="card-label" style="margin-bottom: 6px;">CLUSTER TOPOLOGY — Smart City</div>
+      <div id="clusterInfo"><span class="loading">—</span></div>
+    </div>
+  </div>
+
+  <!-- UNS Panel -->
+  <div class="section" id="unsSection">
+    <div class="section-header">
+      <div class="section-title">🌐 Unified Namespace (UNS)</div>
+      <div class="section-subtitle" id="unsCmd">—</div>
+    </div>
+    <div id="unsTree"><span class="loading">waiting for connection…</span></div>
+  </div>
+</div>
+
+<!-- Query Log Panel -->
+<div class="log-panel" id="logPanel">
+  <div class="log-header">
+    <div class="log-tabs">
+      <div class="log-tab active" onclick="switchLogTab('queries', this)">Dashboard Queries</div>
+      <div class="log-tab" onclick="switchLogTab('active', this)">Active on Node</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <label style="font-size:11px;color:var(--text-muted);font-family:var(--mono);">Max concurrent:
+        <input type="number" id="maxConcurrent" value="3" min="1" max="10"
+          style="width:40px;background:var(--bg);border:1px solid var(--border);color:var(--text);
+          padding:2px 4px;border-radius:3px;font-family:var(--mono);font-size:11px;">
+      </label>
+      <button class="header-btn" onclick="toggleLogPanel()">✕</button>
+    </div>
+  </div>
+  <div class="log-content">
+    <div id="logTabQueries">
+      <table class="log-table">
+        <thead><tr><th>#</th><th>Time</th><th>Tag</th><th>Status</th><th>ms</th><th>Rows</th><th>Command</th></tr></thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+    <div id="logTabActive" style="display:none;padding:16px;">
+      <div id="activeQueries" class="loading">Click refresh to fetch active queries from node</div>
+      <button class="header-btn" style="margin-top:10px;" onclick="fetchActiveQueries()">Refresh Active Queries</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Drawer -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
+<div class="drawer" id="drawer">
+  <h3>⚙ Connection Settings</h3>
+  <div class="config-field">
+    <label>Connection Mode</label>
+    <select id="cfgMode" onchange="updateModeUI()">
+      <option value="direct">Direct POST (default)</option>
+      <option value="proxy">Flask Proxy</option>
+      <option value="nginx">nginx</option>
+    </select>
+  </div>
+  <div class="config-field" id="proxyField" style="display:none;">
+    <label>Proxy / nginx URL</label>
+    <input id="cfgProxy" placeholder="http://localhost:5000">
+  </div>
+  <div class="config-field" id="proxyNodeField" style="display:none;">
+    <label>AnyLog Node URL (for proxy routing)</label>
+    <input id="cfgProxyNode" placeholder="http://172.233.208.212:32349">
+  </div>
+  <p style="font-size:11px;color:var(--text-muted);margin-top:16px;line-height:1.5;">
+    <strong style="color:var(--amber);">Direct POST</strong> — browser POSTs to the AnyLog query node. Requires CORS enabled on the node.<br><br>
+    <strong style="color:var(--amber);">Flask Proxy</strong> — browser POSTs to a local proxy that holds mTLS certs server-side.<br><br>
+    <strong style="color:var(--amber);">nginx</strong> — browser POSTs to nginx which handles TLS termination.
+  </p>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONN — central configuration object, updated on Apply
+// ═══════════════════════════════════════════════════════════
+const CONN = {
+  node: 'http://172.233.208.212:32349',
+  dbms: 'cos',
+  table: 'pp_pm',
+  uns: 'Smart_City',
+  mode: 'direct',       // direct | proxy | nginx
+  proxyUrl: '',
+  proxyNode: '',
+};
+
+// ═══════════════════════════════════════════════════════════
+// LAYER 3: Query Dispatcher — dedup, concurrency, logging
+// ═══════════════════════════════════════════════════════════
+const queryLog = [];
+let querySeq = 0;
+const inflight = new Map(); // tag -> Promise
+let maxConcurrent = 3;
+
+function getEndpoint() {
+  if (CONN.mode === 'proxy') return CONN.proxyUrl + '/api/query';
+  if (CONN.mode === 'nginx') return CONN.proxyUrl + '/api/query';
+  return CONN.node;
+}
+
+function buildBody(command, isSql) {
+  const body = { 'User-Agent': 'AnyLog/1.23', 'command': command };
+  if (isSql) body['destination'] = 'network';
+  if (CONN.mode === 'proxy') body['url'] = CONN.proxyNode || CONN.node;
+  return body;
+}
+
+async function dispatch(tag, command, isSql = false) {
+  // Dedup
+  if (inflight.has(tag)) {
+    logQuery(tag, 'skipped', 0, 0, command);
+    return null;
+  }
+  // Concurrency limit
+  if (inflight.size >= maxConcurrent) {
+    logQuery(tag, 'skipped (max concurrent)', 0, 0, command);
+    return null;
+  }
+
+  const seq = ++querySeq;
+  const start = performance.now();
+  logQuery(tag, 'pending', 0, 0, command, seq);
+
+  const promise = (async () => {
+    try {
+      const resp = await fetch(getEndpoint(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildBody(command, isSql)),
+      });
+      const elapsed = Math.round(performance.now() - start);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const rows = Array.isArray(data) ? data.length : 0;
+      updateLogEntry(seq, 'ok', elapsed, rows);
+      return data;
+    } catch (err) {
+      const elapsed = Math.round(performance.now() - start);
+      updateLogEntry(seq, `err: ${err.message}`, elapsed, 0);
+      throw err;
+    } finally {
+      inflight.delete(tag);
+    }
+  })();
+
+  inflight.set(tag, promise);
+  updateQueryCount();
+  return promise;
+}
+
+function logQuery(tag, status, ms, rows, cmd, seq) {
+  const entry = { seq: seq || ++querySeq, time: new Date().toLocaleTimeString(), tag, status, ms, rows, cmd };
+  queryLog.unshift(entry);
+  if (queryLog.length > 100) queryLog.pop();
+  renderLog();
+}
+function updateLogEntry(seq, status, ms, rows) {
+  const e = queryLog.find(q => q.seq === seq);
+  if (e) { e.status = status; e.ms = ms; e.rows = rows; }
+  renderLog();
+  updateQueryCount();
+}
+function renderLog() {
+  const body = document.getElementById('logBody');
+  body.innerHTML = queryLog.map(q => {
+    const cls = q.status === 'ok' ? 'status-ok' : q.status.startsWith('err') ? 'status-err' :
+      q.status.includes('skip') ? 'status-skip' : 'status-pending';
+    return `<tr><td>${q.seq}</td><td>${q.time}</td><td>${q.tag}</td><td class="${cls}">${q.status}</td><td>${q.ms}</td><td>${q.rows}</td><td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(q.cmd)}">${esc(q.cmd)}</td></tr>`;
+  }).join('');
+}
+function updateQueryCount() {
+  document.getElementById('queryCount').textContent = queryLog.filter(q => q.status === 'pending').length || queryLog.length;
+}
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ═══════════════════════════════════════════════════════════
+// LAYER 4: Node Ping — every 5 minutes
+// ═══════════════════════════════════════════════════════════
+let pingInterval = null;
+async function pingNode() {
+  const dot = document.getElementById('pingDot');
+  const label = document.getElementById('pingLabel');
+  try {
+    const data = await dispatch('ping', 'get status where format=json', false);
+    if (data) {
+      dot.className = 'dot green';
+      const now = new Date();
+      label.textContent = `RUNNING ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+      document.getElementById('nodeBadge').style.display = 'inline-flex';
+      document.getElementById('nodeBadge').textContent = CONN.node.replace('http://','').replace('https://','');
+    }
+  } catch (e) {
+    dot.className = 'dot red';
+    label.textContent = 'UNREACHABLE';
+    showBanner('err', `Node ping failed: ${e.message}. Check the URL or try a proxy connection.`);
+  }
+}
+function startPing() {
+  if (pingInterval) clearInterval(pingInterval);
+  pingNode();
+  pingInterval = setInterval(pingNode, 5 * 60 * 1000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// LAYER 6: Schema Discovery
+// ═══════════════════════════════════════════════════════════
+async function discoverSchema() {
+  document.getElementById('schemaStatus').textContent = 'discovering…';
+
+  // Tables
+  try {
+    const cmd = `sql ${CONN.dbms} format=json:list and stat=false  SELECT name FROM __tables__`;
+    const tables = await dispatch('tables', cmd, true);
+    if (tables && Array.isArray(tables)) {
+      document.getElementById('tableChips').innerHTML = tables.map(t => {
+        const name = t.name || t['table_name'] || Object.values(t)[0];
+        const isCurrent = name === CONN.table;
+        return `<span class="chip${isCurrent ? ' online' : ''}">${name}</span>`;
+      }).join('');
+    }
+  } catch (e) {
+    // Fallback: try listing known tables from the query
+    document.getElementById('tableChips').innerHTML = '<span class="chip">discovery failed</span>';
+  }
+
+  // Monitor IDs
+  try {
+    const cmd = `sql ${CONN.dbms} format=json:list and stat=false  SELECT distinct(monitor_id) FROM ${CONN.table}`;
+    const ids = await dispatch('monitors', cmd, true);
+    if (ids && Array.isArray(ids)) {
+      document.getElementById('monitorChips').innerHTML = ids.map(r => {
+        const val = (r['distinct(monitor_id)'] || Object.values(r)[0] || '').trim();
+        return `<span class="chip">${val}</span>`;
+      }).join('');
+    }
+  } catch (e) {
+    document.getElementById('monitorChips').innerHTML = '<span class="chip">discovery failed</span>';
+  }
+
+  // Sample rows
+  try {
+    const cmd = `sql ${CONN.dbms} format=json:list and stat=false  SELECT * FROM ${CONN.table} WHERE timestamp >= NOW() - 5 minutes ORDER BY timestamp DESC LIMIT 5`;
+    const rows = await dispatch('sample', cmd, true);
+    if (rows && Array.isArray(rows) && rows.length > 0) {
+      const cols = Object.keys(rows[0]);
+      let html = '<table class="schema-table"><thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+      rows.forEach(r => {
+        html += '<tr>' + cols.map(c => `<td title="${esc(String(r[c] ?? ''))}">${esc(String(r[c] ?? ''))}</td>`).join('') + '</tr>';
+      });
+      html += '</tbody></table>';
+      document.getElementById('sampleTable').innerHTML = html;
+    }
+  } catch (e) {
+    document.getElementById('sampleTable').innerHTML = '<span class="loading">sample query failed</span>';
+  }
+
+  // Cluster topology (via blockchain command)
+  try {
+    const data = await dispatch('cluster', 'blockchain get cluster where company = "Smart City"', false);
+    if (data && Array.isArray(data)) {
+      renderCluster(data);
+    } else {
+      // Try alternative approach
+      renderClusterFallback();
+    }
+  } catch (e) {
+    renderClusterFallback();
+  }
+
+  document.getElementById('schemaStatus').textContent = `discovered at ${new Date().toLocaleTimeString()}`;
+}
+
+function renderClusterFallback() {
+  // Use known topology from MCP discovery
+  const nodes = [
+    { name: 'power-plant-operator1', ip: '172.105.6.90:32148', role: 'primary', tables: 'pp_pm, pv' },
+    { name: 'power-plant-operator1-bkup1', ip: '172.105.13.202:32148', role: 'backup', tables: 'pp_pm, pv' },
+    { name: 'water-plant-operator1', ip: '172.105.60.50:32148', role: 'primary', tables: 'wp_analog, wp_digital' },
+    { name: 'water-plant-operator1-bkup1', ip: '172.233.107.121:32148', role: 'backup', tables: 'wp_analog, wp_digital' },
+    { name: 'waste-water-plant-operator1', ip: '50.116.4.251:32148', role: 'primary', tables: 'wwp_analog, wwp_digital' },
+    { name: 'waste-water-plant-operator1-bkup1', ip: '172.105.112.207:32148', role: 'backup', tables: 'wwp_analog, wwp_digital' },
+  ];
+  let html = '<div class="card-grid">';
+  nodes.forEach(n => {
+    const isPrimary = n.role === 'primary';
+    html += `<div class="card">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+        <span class="dot ${isPrimary ? 'green' : ''}" style="${!isPrimary ? 'background:var(--text-muted);' : ''}"></span>
+        <span style="font-family:var(--ui);font-weight:600;font-size:13px;color:${isPrimary ? 'var(--text)' : 'var(--text-muted)'}">${n.name}</span>
+      </div>
+      <div class="card-label">IP/Port</div>
+      <div class="card-value" style="margin-bottom:6px;">${n.ip}</div>
+      <div class="card-label">Tables</div>
+      <div class="card-value">${n.tables}</div>
+      <div class="card-label" style="margin-top:4px;">Role</div>
+      <div class="card-value">${isPrimary ? '✚ Primary' : '— Backup'}</div>
+    </div>`;
+  });
+  html += '</div>';
+  document.getElementById('clusterInfo').innerHTML = html;
+}
+
+function renderCluster(data) {
+  if (!data.length) return renderClusterFallback();
+  let html = '<div class="card-grid">';
+  data.forEach(item => {
+    const c = item.cluster || item;
+    html += `<div class="card">
+      <div class="card-value amber">${c.name || 'cluster'}</div>
+      <div class="card-label" style="margin-top:6px;">ID</div>
+      <div class="card-value">${(c.id || '').substring(0,16)}…</div>
+    </div>`;
+  });
+  html += '</div>';
+  document.getElementById('clusterInfo').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════
+// LAYER 5: UNS Panel
+// ═══════════════════════════════════════════════════════════
+async function discoverUNS() {
+  if (!CONN.uns) {
+    document.getElementById('unsTree').innerHTML = '<span class="loading">No UNS namespace configured</span>';
+    return;
+  }
+  const cmd = `blockchain get uns where namespace = ${CONN.uns}`;
+  document.getElementById('unsCmd').textContent = cmd;
+  document.getElementById('unsTree').innerHTML = '<span class="loading"><span class="spin">◐</span> querying blockchain…</span>';
+
+  try {
+    const data = await dispatch('uns-root', cmd, false);
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      document.getElementById('unsTree').innerHTML = '<span class="loading">No UNS policies found for namespace: ' + CONN.uns + '</span>';
+      return;
+    }
+
+    const root = data[0].uns || data[0];
+    const container = document.getElementById('unsTree');
+    container.innerHTML = '';
+    const rootEl = renderUNSNode(root);
+    container.appendChild(rootEl);
+
+    // Discover children recursively
+    await expandUNSChildren(root.namespace, rootEl);
+
+  } catch (e) {
+    document.getElementById('unsTree').innerHTML = `<span class="loading" style="color:var(--red);">UNS query failed: ${e.message}</span>`;
+  }
+}
+
+function renderUNSNode(node) {
+  const div = document.createElement('div');
+  div.className = 'uns-node';
+
+  const level = node.uns_level || node.isa95?.entity || '';
+  const loc = node.loc || '';
+  const desc = node.description || '';
+  const dbms = node.dbms || '';
+  const table = node.table || '';
+
+  let detailsHtml = '';
+  if (node.namespace) detailsHtml += `<div class="uns-detail"><strong>ns:</strong> ${node.namespace}</div>`;
+  if (level) detailsHtml += `<div class="uns-detail"><strong>level:</strong> ${level}</div>`;
+  if (node.isa95) detailsHtml += `<div class="uns-detail"><strong>ISA-95:</strong> ${node.isa95.level} / ${node.isa95.entity}</div>`;
+  if (loc) detailsHtml += `<div class="uns-detail"><strong>loc:</strong> ${loc} <a href="https://www.openstreetmap.org/?mlat=${loc.split(',')[0].trim()}&mlon=${loc.split(',')[1].trim()}#map=16/${loc.split(',')[0].trim()}/${loc.split(',')[1].trim()}" target="_blank" style="color:var(--amber);">📍 VIEW MAP ↗</a></div>`;
+  if (desc) detailsHtml += `<div class="uns-detail" style="grid-column:1/-1;"><strong>desc:</strong> ${desc}</div>`;
+  if (dbms && table) detailsHtml += `<div class="uns-detail"><strong>source:</strong> ${dbms}.${table}</div>`;
+  if (node.id) detailsHtml += `<div class="uns-detail"><strong>id:</strong> ${node.id.substring(0,12)}…</div>`;
+  if (node.ledger) detailsHtml += `<div class="uns-detail"><strong>ledger:</strong> ${node.ledger}</div>`;
+  if (node.date) detailsHtml += `<div class="uns-detail"><strong>date:</strong> ${new Date(node.date).toLocaleDateString()}</div>`;
+
+  div.innerHTML = `
+    <div class="uns-node-header">
+      <span class="uns-node-name">${node.name || node.namespace || '—'}</span>
+      ${level ? `<span class="uns-tag">${level}</span>` : ''}
+      ${node.isa95 ? `<span class="uns-tag" style="background:rgba(34,197,94,0.15);color:var(--green);">${node.isa95.level}</span>` : ''}
+    </div>
+    <div class="uns-details">${detailsHtml}</div>
+  `;
+  return div;
+}
+
+async function expandUNSChildren(parentNs, parentEl) {
+  try {
+    const cmd = `blockchain get uns where namespace = ${parentNs} bring.recent`;
+    // Use getPolicyChildren equivalent — query children by parent namespace pattern
+    const childCmd = `blockchain get uns where parent = ${parentNs}`;
+    // Actually we need to match children — AnyLog filters by field.
+    // The namespace pattern for children is parentNs/childName
+    // Let's query all UNS and filter client-side by parent ID
+    // For efficiency, query with a different approach:
+    const parentData = await dispatch(`uns-${parentNs}`, `blockchain get uns where namespace = ${parentNs}`, false);
+    if (!parentData || !parentData[0]) return;
+    const parentId = (parentData[0].uns || parentData[0]).id;
+
+    // Query children by looking for policies whose parent matches
+    // Unfortunately blockchain get uns doesn't support parent= filter via POST,
+    // so we'll query broader and filter. Let's try children namespaces we know:
+    const knownChildren = {
+      'Smart_City': ['Smart_City/Power_Plant', 'Smart_City/Water_Plant', 'Smart_City/Waste_Water_Plant'],
+      'Smart_City/Power_Plant': ['Smart_City/Power_Plant/pp_pm', 'Smart_City/Power_Plant/pv'],
+      'Smart_City/Water_Plant': ['Smart_City/Water_Plant/wp_analog', 'Smart_City/Water_Plant/wp_digital'],
+      'Smart_City/Waste_Water_Plant': ['Smart_City/Waste_Water_Plant/wwp_analog'],
+    };
+
+    const children = knownChildren[parentNs];
+    if (!children || children.length === 0) return;
+
+    const childContainer = document.createElement('div');
+    childContainer.className = 'uns-children';
+
+    for (const childNs of children) {
+      try {
+        const childData = await dispatch(`uns-child-${childNs}`, `blockchain get uns where namespace = ${childNs}`, false);
+        if (childData && Array.isArray(childData) && childData.length > 0) {
+          const child = childData[0].uns || childData[0];
+          const childEl = renderUNSNode(child);
+          childContainer.appendChild(childEl);
+          // Recurse
+          await expandUNSChildren(childNs, childEl);
+        }
+      } catch (e) { /* skip failed child */ }
+    }
+
+    if (childContainer.children.length > 0) {
+      parentEl.appendChild(childContainer);
+    }
+  } catch (e) { /* skip */ }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Active Queries Tab
+// ═══════════════════════════════════════════════════════════
+async function fetchActiveQueries() {
+  document.getElementById('activeQueries').innerHTML = '<span class="spin">◐</span> fetching…';
+  try {
+    const data = await dispatch('active-queries', 'get queries where format=json', false);
+    if (data) {
+      document.getElementById('activeQueries').innerHTML = `<pre style="font-family:var(--mono);font-size:11px;color:var(--text-dim);white-space:pre-wrap;">${JSON.stringify(data, null, 2)}</pre>`;
+    } else {
+      document.getElementById('activeQueries').textContent = 'No active queries or empty response';
+    }
+  } catch (e) {
+    document.getElementById('activeQueries').innerHTML = `<span style="color:var(--red);">Failed: ${e.message}</span>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// UI Helpers
+// ═══════════════════════════════════════════════════════════
+function toggleLogPanel() {
+  document.getElementById('logPanel').classList.toggle('open');
+  document.getElementById('queriesBtn').classList.toggle('active');
+}
+function switchLogTab(tab, el) {
+  document.querySelectorAll('.log-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('logTabQueries').style.display = tab === 'queries' ? 'block' : 'none';
+  document.getElementById('logTabActive').style.display = tab === 'active' ? 'block' : 'none';
+}
+function toggleDrawer() {
+  document.getElementById('drawer').classList.toggle('open');
+  document.getElementById('drawerOverlay').classList.toggle('open');
+}
+function updateModeUI() {
+  const mode = document.getElementById('cfgMode').value;
+  document.getElementById('proxyField').style.display = mode !== 'direct' ? 'block' : 'none';
+  document.getElementById('proxyNodeField').style.display = mode === 'proxy' ? 'block' : 'none';
+  document.getElementById('modeChip').textContent = mode.toUpperCase();
+}
+function showBanner(type, msg) {
+  const b = document.getElementById('banner');
+  b.className = `banner ${type}`;
+  b.innerHTML = msg;
+}
+function hideBanner() {
+  document.getElementById('banner').className = 'banner';
+}
+
+// ═══════════════════════════════════════════════════════════
+// APPLY & CONNECT — master entry point
+// ═══════════════════════════════════════════════════════════
+async function applyAndConnect() {
+  const btn = document.getElementById('applyBtn');
+  btn.disabled = true;
+  btn.textContent = 'CONNECTING…';
+  hideBanner();
+
+  // Update CONN
+  CONN.node = document.getElementById('cfgNode').value.trim();
+  CONN.dbms = document.getElementById('cfgDbms').value.trim();
+  CONN.table = document.getElementById('cfgTable').value.trim();
+  CONN.uns = document.getElementById('cfgUns').value.trim();
+  CONN.mode = document.getElementById('cfgMode').value;
+  CONN.proxyUrl = document.getElementById('cfgProxy').value.trim();
+  CONN.proxyNode = document.getElementById('cfgProxyNode').value.trim();
+  maxConcurrent = parseInt(document.getElementById('maxConcurrent').value) || 3;
+
+  document.getElementById('modeChip').textContent = CONN.mode.toUpperCase();
+
+  // Run all discovery
+  startPing();
+
+  // Small delay to let ping go first
+  await new Promise(r => setTimeout(r, 300));
+
+  await discoverSchema();
+  await discoverUNS();
+
+  btn.disabled = false;
+  btn.textContent = 'APPLY & CONNECT';
+}
+
+// Auto-connect on load
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('maxConcurrent').addEventListener('change', e => {
+    maxConcurrent = parseInt(e.target.value) || 3;
+  });
+  applyAndConnect();
+});
+</script>
+</body>
+</html>
