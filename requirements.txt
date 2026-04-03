@@ -1,4 +1,0 @@
-mcp_proxy
-flask
-flask_cors
-requests

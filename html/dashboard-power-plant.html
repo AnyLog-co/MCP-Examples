@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart City — Power Plant Monitor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0a0c0e;
+    --surface:   #111418;
+    --border:    #1e2428;
+    --amber:     #f59e0b;
+    --amber-dim: #78490a;
+    --green:     #22c55e;
+    --red:       #ef4444;
+    --blue:      #38bdf8;
+    --purple:    #a78bfa;
+    --text:      #e2e8f0;
+    --muted:     #64748b;
+    --font-mono: 'Share Tech Mono', monospace;
+    --font-ui:   'Barlow Condensed', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 15px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 100;
+    gap: 12px; flex-wrap: wrap;
+  }
+
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 34px; height: 34px;
+    background: var(--amber);
+    clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    animation: pulse-hex 3s ease-in-out infinite;
+  }
+  @keyframes pulse-hex { 0%,100%{opacity:1} 50%{opacity:.6} }
+  .logo-text .co   { font-size: 10px; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; }
+  .logo-text .name { font-size: 18px; font-weight: 700; letter-spacing: 1px; color: var(--amber); }
+
+  .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+  .ping-badge {
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border); padding: 3px 9px; border-radius: 3px;
+    display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .ping-dot { font-size: 9px; color: var(--muted); }
+  .ping-dot.ok  { color: var(--green); animation: blink 4s infinite; }
+  .ping-dot.err { color: var(--red); animation: none; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .node-badge {
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border); padding: 4px 10px; border-radius: 3px;
+  }
+  .status-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green); margin-right: 6px; animation: blink 2s infinite;
+  }
+  .status-dot.error { background: var(--red); animation: none; }
+
+  select, button {
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    padding: 6px 12px; font-family: var(--font-ui); font-size: 13px;
+    font-weight: 600; letter-spacing: .5px; cursor: pointer; border-radius: 3px; outline: none;
+  }
+  button:hover { border-color: var(--amber); color: var(--amber); }
+  button.active { background: var(--amber); color: #000; border-color: var(--amber); }
+
+  .queries-btn { font-size: 11px; letter-spacing: 1.5px; padding: 5px 12px; display: flex; align-items: center; gap: 7px; }
+  .queries-badge {
+    background: var(--amber-dim); color: var(--amber);
+    font-family: var(--font-mono); font-size: 10px;
+    padding: 1px 5px; border-radius: 10px; min-width: 18px; text-align: center;
+  }
+  .queries-badge.active { background: var(--amber); color: #000; animation: pulse-badge .8s ease-in-out infinite; }
+  @keyframes pulse-badge { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+  /* ── CONFIG BAR ── */
+  .config-bar {
+    background: #0d1014;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 28px;
+    display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+  }
+  .cfg-group { display: flex; flex-direction: column; gap: 4px; }
+  .cfg-group label {
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .cfg-group input {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 3px; color: var(--text);
+    font-family: var(--font-mono); font-size: 12px;
+    padding: 6px 10px; outline: none; min-width: 200px;
+    transition: border-color .2s;
+  }
+  .cfg-group input:focus { border-color: var(--amber); }
+  .cfg-group input.sm { min-width: 90px; }
+  .apply-cfg-btn {
+    padding: 7px 18px; background: var(--amber); color: #000;
+    border: none; font-family: var(--font-ui); font-size: 12px;
+    font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+    cursor: pointer; border-radius: 3px; white-space: nowrap; align-self: flex-end;
+  }
+  .apply-cfg-btn:hover { opacity: .85; color: #000; border: none; }
+
+  /* ── MAIN ── */
+  main { padding: 24px 28px; max-width: 1600px; margin: 0 auto; }
+
+  .section-label {
+    font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--amber); margin-bottom: 14px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── KPI GRID ── */
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 16px; margin-bottom: 28px;
+  }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-top: 2px solid var(--amber-dim);
+    padding: 18px 20px; position: relative; overflow: hidden;
+    transition: border-top-color .3s;
+  }
+  .kpi-card:hover { border-top-color: var(--amber); }
+  .kpi-card::before {
+    content: ''; position: absolute; top: 0; right: 0;
+    width: 60px; height: 60px;
+    background: radial-gradient(circle at top right,rgba(245,158,11,.06),transparent 70%);
+  }
+  .kpi-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .kpi-value { font-family: var(--font-mono); font-size: 32px; color: var(--amber); line-height: 1; margin-bottom: 4px; }
+  .kpi-unit  { font-size: 12px; color: var(--muted); letter-spacing: 1px; }
+
+  /* ── UNS PANEL ── */
+  .uns-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    margin-bottom: 28px; overflow: hidden;
+  }
+  .uns-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    background: rgba(245,158,11,.03);
+  }
+  .uns-cmd { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+  .uns-cmd span { color: var(--amber); }
+  .uns-body { padding: 16px 20px; display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .uns-field { display: flex; flex-direction: column; gap: 3px; }
+  .uns-field-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+  .uns-field-value { font-family: var(--font-mono); font-size: 12px; color: var(--blue); }
+  .uns-field-value.name { color: var(--amber); font-size: 15px; font-weight: bold; }
+  .uns-map-link {
+    margin-left: auto; font-family: var(--font-mono); font-size: 10px;
+    color: var(--blue); text-decoration: none;
+    border: 1px solid #1e3a4a; padding: 4px 12px; border-radius: 2px; white-space: nowrap;
+    align-self: center;
+  }
+  .uns-map-link:hover { color: var(--amber); border-color: var(--amber); }
+  .uns-loading { font-family: var(--font-mono); font-size: 12px; color: var(--muted); padding: 16px 20px; }
+
+  /* ── PHASE CARDS ── */
+  .phase-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 28px; }
+  .phase-card { background: var(--surface); border: 1px solid var(--border); padding: 18px; text-align: center; }
+  .phase-label { font-size: 28px; font-weight: 900; color: var(--amber); opacity: .3; line-height: 1; }
+  .phase-name  { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .phase-value { font-family: var(--font-mono); font-size: 28px; color: var(--text); }
+  .phase-sub   { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* ── CHARTS ROW ── */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); padding: 20px; }
+  .chart-title {
+    font-size: 13px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--text); margin-bottom: 4px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .chart-subtitle { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+  .chart-wrap { position: relative; height: 220px; }
+
+  /* ── TABLE ── */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); overflow-x: auto; margin-bottom: 28px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: rgba(245,158,11,.06); border-bottom: 1px solid var(--amber-dim); }
+  th { padding: 10px 14px; font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--amber); text-align: left; white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+  tbody tr:hover { background: rgba(255,255,255,.02); }
+  tbody tr.highlight { background: rgba(245,158,11,.04); }
+  td { padding: 9px 14px; font-family: var(--font-mono); font-size: 12px; color: var(--text); white-space: nowrap; }
+  td.monitor-id { color: var(--amber); font-weight: bold; font-size: 13px; cursor: pointer; }
+  td.monitor-id:hover { text-decoration: underline; }
+  .bar-cell { display: flex; align-items: center; gap: 8px; }
+  .mini-bar { height: 6px; background: var(--amber); border-radius: 2px; min-width: 2px; max-width: 120px; transition: width .5s ease; }
+  .status-ok  { color: var(--green); }
+  .status-off { color: var(--muted); }
+
+  /* ── DRILL-DOWN PANEL ── */
+  .drilldown-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    margin-bottom: 28px; overflow: hidden;
+  }
+  .drilldown-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    background: rgba(167,139,250,.04); gap: 12px; flex-wrap: wrap;
+  }
+  .drilldown-title {
+    font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--purple);
+  }
+  .drill-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .drill-controls label {
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted); margin-right: 2px;
+  }
+  .drill-controls select, .drill-controls input[type="datetime-local"] {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 3px; color: var(--text);
+    font-family: var(--font-mono); font-size: 12px;
+    padding: 5px 10px; outline: none;
+  }
+  .drill-controls select:focus, .drill-controls input:focus { border-color: var(--purple); }
+  .drill-quick { display: flex; gap: 5px; }
+  .drill-quick button {
+    padding: 4px 9px; font-size: 11px; letter-spacing: 1px;
+    border-color: rgba(167,139,250,.3); color: var(--purple);
+  }
+  .drill-quick button:hover, .drill-quick button.active {
+    background: rgba(167,139,250,.15); border-color: var(--purple); color: var(--purple);
+  }
+  .drill-fetch-btn {
+    padding: 6px 16px; background: rgba(167,139,250,.15);
+    border: 1px solid var(--purple); color: var(--purple);
+    font-weight: 700; letter-spacing: 1px; font-size: 12px; border-radius: 3px;
+  }
+  .drill-fetch-btn:hover { background: rgba(167,139,250,.3); color: var(--purple); border-color: var(--purple); }
+  .drill-sql-preview {
+    padding: 10px 20px; background: rgba(0,0,0,.3);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono); font-size: 10px; color: var(--muted);
+    white-space: nowrap; overflow-x: auto;
+  }
+  .drill-sql-preview span { color: var(--purple); }
+  .drilldown-body { padding: 20px; }
+  .drill-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .drill-chart-wrap { position: relative; height: 200px; }
+  .drill-empty {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 120px; color: var(--muted);
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 1px;
+    text-transform: uppercase; opacity: .6;
+  }
+  .drill-stats {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    margin-bottom: 14px; padding: 10px 14px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
+  }
+  .drill-stat { text-align: center; }
+  .drill-stat .num { font-family: var(--font-mono); font-size: 20px; font-weight: 700; color: var(--purple); }
+  .drill-stat .lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; margin-top: 2px; }
+
+  /* ── LOADING / ERROR ── */
+  .loading-overlay {
+    position: fixed; inset: 0; background: rgba(10,12,14,.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999; flex-direction: column; gap: 16px;
+  }
+  .spinner { width: 48px; height: 48px; border: 3px solid var(--border); border-top-color: var(--amber); border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-family: var(--font-mono); font-size: 13px; color: var(--amber); letter-spacing: 2px; }
+  .error-banner { background: rgba(239,68,68,.1); border: 1px solid var(--red); color: var(--red); padding: 12px 20px; font-family: var(--font-mono); font-size: 12px; margin-bottom: 20px; display: none; }
+  .cors-note { background: rgba(56,189,248,.07); border: 1px solid #0ea5e9; color: #7dd3fc; padding: 12px 18px; font-size: 12px; margin-bottom: 20px; line-height: 1.6; display: none; }
+
+  /* ── TIMESTAMP BAR ── */
+  .timestamp-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .last-updated { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  .time-controls { display: flex; gap: 6px; }
+  .time-btn { padding: 4px 10px; font-size: 11px; letter-spacing: 1px; }
+  .time-btn.active { background: var(--amber); color: #000; border-color: var(--amber); }
+
+  /* ── FOOTER ── */
+  footer { text-align: center; padding: 16px; font-size: 11px; color: var(--muted); letter-spacing: 1px; border-top: 1px solid var(--border); font-family: var(--font-mono); }
+
+  /* ── QUERY LOG PANEL ── */
+  .qlog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 300; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .qlog-overlay.open { opacity: 1; pointer-events: all; }
+  .qlog-panel { position: fixed; bottom: 0; left: 0; right: 0; height: 380px; background: #0d1014; border-top: 1px solid var(--border); z-index: 301; transform: translateY(100%); transition: transform .3s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; }
+  .qlog-panel.open { transform: translateY(0); }
+  .qlog-header { display: flex; align-items: center; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .qlog-tab { padding: 12px 20px; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); cursor: pointer; border-right: 1px solid var(--border); border-bottom: 2px solid transparent; transition: all .15s; white-space: nowrap; }
+  .qlog-tab:hover { color: var(--text); }
+  .qlog-tab.active { color: var(--amber); border-bottom-color: var(--amber); }
+  .qlog-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; padding: 0 16px; }
+  .qlog-close { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; line-height: 1; padding: 2px 6px; }
+  .qlog-close:hover { color: var(--text); border: none; }
+  .qlog-body { flex: 1; overflow-y: auto; overflow-x: auto; }
+  .qlog-table { width: 100%; border-collapse: collapse; }
+  .qlog-table th { padding: 8px 14px; font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--amber); background: rgba(245,158,11,.04); border-bottom: 1px solid var(--amber-dim); text-align: left; white-space: nowrap; position: sticky; top: 0; }
+  .qlog-table td { padding: 7px 14px; font-family: var(--font-mono); font-size: 11px; color: var(--text); border-bottom: 1px solid var(--border); white-space: nowrap; max-width: 420px; overflow: hidden; text-overflow: ellipsis; }
+  .qlog-table td.cmd { color: var(--muted); font-size: 10px; max-width: 500px; }
+  .qlog-table td.pend { color: var(--amber); }
+  .qlog-table td.ok   { color: var(--green); }
+  .qlog-table td.err  { color: var(--red); }
+  .qlog-table td.skip { color: var(--muted); opacity: .6; }
+  .qlog-empty { text-align: center; padding: 40px; font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2,1fr); }
+    .charts-row { grid-template-columns: 1fr; }
+    .drill-charts { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">CONNECTING TO NODE...</div>
+</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div class="logo-text">
+      <div class="co">Smart City Infrastructure</div>
+      <div class="name">POWER PLANT MONITOR</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="node-badge">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="nodeLabel">—</span>
+    </div>
+    <div class="ping-badge" id="pingBadge" title="Node ping">
+      <span class="ping-dot" id="pingDot">●</span>
+      <span id="pingLabel">PING —</span>
+    </div>
+    <select id="monitorSelect" onchange="onMonitorChange()">
+      <option value="">— select monitor —</option>
+    </select>
+    <button onclick="fetchData()" style="color:var(--amber);border-color:var(--amber-dim);">↻ REFRESH</button>
+    <button class="queries-btn" onclick="openQueryLog()" title="Query Log">
+      QUERIES <span class="queries-badge" id="queriesBadge">0</span>
+    </button>
+  </div>
+</header>
+
+<!-- ── CONFIG BAR ── -->
+<div class="config-bar">
+  <div class="cfg-group">
+    <label>Node URL</label>
+    <input type="text" id="cfg-node" placeholder="http://24.5.219.50:32349" value="http://24.5.219.50:32349">
+  </div>
+  <div class="cfg-group">
+    <label>Database</label>
+    <input type="text" id="cfg-dbms" class="sm" placeholder="cos" value="cos">
+  </div>
+  <div class="cfg-group">
+    <label>Table</label>
+    <input type="text" id="cfg-table" class="sm" placeholder="pp_pm" value="pp_pm">
+  </div>
+  <div class="cfg-group">
+    <label>UNS Namespace</label>
+    <input type="text" id="cfg-uns" placeholder="Smart_City" value="Smart_City">
+  </div>
+  <button class="apply-cfg-btn" onclick="applyConfig()">Apply &amp; Connect</button>
+</div>
+
+<main>
+  <div class="error-banner" id="errorBanner"></div>
+  <div class="cors-note" id="corsNote">
+    ⚠ CORS restriction detected. AnyLog must respond with <code>Access-Control-Allow-Origin: *</code>
+    for direct browser POST to work. Alternatively, use the Python proxy version.
+  </div>
+
+  <!-- timestamp / time range -->
+  <div class="timestamp-bar">
+    <div class="last-updated">LAST UPDATE: <span id="lastUpdated">—</span></div>
+    <div class="time-controls">
+      <button class="time-btn active" onclick="setTimeRange(1,this)">1H</button>
+      <button class="time-btn" onclick="setTimeRange(6,this)">6H</button>
+      <button class="time-btn" onclick="setTimeRange(24,this)">24H</button>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="section-label">Real-Time Metrics</div>
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Real Power</div>
+      <div class="kpi-value" id="kpiRealPower">—</div>
+      <div class="kpi-unit">kW (active monitors)</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Total Reactive Power</div>
+      <div class="kpi-value" id="kpiReactivePower">—</div>
+      <div class="kpi-unit">kVAR</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Avg Power Factor</div>
+      <div class="kpi-value" id="kpiPowerFactor">—</div>
+      <div class="kpi-unit">% (active monitors)</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Active Monitors</div>
+      <div class="kpi-value" id="kpiActive">—</div>
+      <div class="kpi-unit">of <span id="kpiTotal">—</span> total</div>
+    </div>
+  </div>
+
+  <!-- UNS -->
+  <div class="section-label">Unified Namespace</div>
+  <div class="uns-panel">
+    <div class="uns-toolbar">
+      <div class="uns-cmd">POST → <span id="unsCmd">blockchain get uns where namespace = Smart_City</span></div>
+      <button onclick="fetchUNS()" style="font-size:10px;padding:3px 10px;letter-spacing:1px;">↻ REFRESH</button>
+    </div>
+    <div id="unsBody"><div class="uns-loading">Loading UNS…</div></div>
+  </div>
+
+  <!-- Phase Currents -->
+  <div class="section-label">Phase Currents — <span id="phaseMonitorLabel">—</span></div>
+  <div class="phase-row">
+    <div class="phase-card">
+      <div class="phase-label">A</div>
+      <div class="phase-name">Phase A Current</div>
+      <div class="phase-value" id="phaseA">—</div>
+      <div class="phase-sub">Amperes</div>
+    </div>
+    <div class="phase-card">
+      <div class="phase-label">B</div>
+      <div class="phase-name">Phase B Current</div>
+      <div class="phase-value" id="phaseB">—</div>
+      <div class="phase-sub">Amperes</div>
+    </div>
+    <div class="phase-card">
+      <div class="phase-label">C</div>
+      <div class="phase-name">Phase C Current</div>
+      <div class="phase-value" id="phaseC">—</div>
+      <div class="phase-sub">Amperes</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="section-label">Power Analysis</div>
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">Real Power by Monitor <span style="font-size:11px;color:var(--muted);font-weight:400">latest</span></div>
+      <div class="chart-subtitle">Active monitors sorted by output</div>
+      <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Power Trend <span id="trendLabel" style="font-size:11px;color:var(--amber);font-weight:400">—</span></div>
+      <div class="chart-subtitle">Real power + reactive power over time</div>
+      <div class="chart-wrap"><canvas id="lineChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- All Monitors Table -->
+  <div class="section-label">All Monitors</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Monitor ID</th>
+          <th>Real Power (kW)</th>
+          <th>Reactive (kVAR)</th>
+          <th>Power Factor (%)</th>
+          <th>Frequency</th>
+          <th>A Current</th>
+          <th>B Current</th>
+          <th>C Current</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="monitorTable"></tbody>
+    </table>
+  </div>
+
+  <!-- ── DRILL-DOWN ── -->
+  <div class="section-label">Drill-Down by Monitor &amp; Time Range</div>
+  <div class="drilldown-panel">
+    <div class="drilldown-toolbar">
+      <div class="drilldown-title">⬇ Monitor Drill-Down</div>
+      <div class="drill-controls">
+        <label>Monitor</label>
+        <select id="drillMonitorSel" onchange="updateDrillPreview()">
+          <option value="">— select —</option>
+        </select>
+
+        <label>From</label>
+        <input type="datetime-local" id="drillFrom" onchange="updateDrillPreview()">
+
+        <label>To</label>
+        <input type="datetime-local" id="drillTo" onchange="updateDrillPreview()">
+
+        <div class="drill-quick">
+          <button onclick="setDrillQuick(1,this)">1H</button>
+          <button onclick="setDrillQuick(6,this)">6H</button>
+          <button class="active" onclick="setDrillQuick(24,this)">24H</button>
+          <button onclick="setDrillQuick(168,this)">7D</button>
+        </div>
+
+        <button class="drill-fetch-btn" onclick="fetchDrill()">▶ QUERY</button>
+      </div>
+    </div>
+    <div class="drill-sql-preview" id="drillPreview">
+      Select a monitor and time range to preview the SQL query
+    </div>
+    <div class="drilldown-body" id="drillBody">
+      <div class="drill-empty">Select a monitor and click QUERY to drill down</div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  AnyLog Network · <span id="footerInfo">Direct POST · v1.23</span> · Auto-refresh 30s
+</footer>
+
+<!-- ── QUERY LOG PANEL ── -->
+<div class="qlog-overlay" id="qlogOverlay" onclick="closeQueryLog()"></div>
+<div class="qlog-panel" id="qlogPanel">
+  <div class="qlog-header">
+    <div class="qlog-tab active" id="qtab-dashboard" onclick="switchQTab('dashboard')">Dashboard Queries</div>
+    <div class="qlog-tab" id="qtab-node" onclick="switchQTab('node')">Active on Node</div>
+    <div class="qlog-actions">
+      <button onclick="clearQueryLog()" style="font-size:11px;padding:4px 10px;letter-spacing:1px;">CLEAR</button>
+      <button class="qlog-close" onclick="closeQueryLog()">✕</button>
+    </div>
+  </div>
+  <div class="qlog-body">
+    <div id="qpanel-dashboard">
+      <table class="qlog-table">
+        <thead><tr><th>#</th><th>Time</th><th>Tag</th><th>Status</th><th>Duration</th><th>Rows</th><th>Command</th></tr></thead>
+        <tbody id="qlogTableBody"></tbody>
+      </table>
+      <div class="qlog-empty" id="qlogEmpty">No queries sent yet.</div>
+    </div>
+    <div id="qpanel-node" style="display:none">
+      <table class="qlog-table">
+        <thead><tr><th>Query ID</th><th>Start Time</th><th>Status</th><th>Nodes</th><th>SQL</th></tr></thead>
+        <tbody id="nodeQueryBody"></tbody>
+      </table>
+      <div class="qlog-empty" id="nodeQueryEmpty">Click tab to refresh active node queries.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+let CONN = {
+  node:        'http://24.5.219.50:32349',
+  dbms:        'cos',
+  table:       'pp_pm',
+  destination: 'network',
+  userAgent:   'AnyLog/1.23',
+  uns:         'Smart_City',
+};
+
+let timeRangeHours = 1;
+let latestData     = [];
+let historyData    = [];
+let cnsMap         = {};   // raw monitor_id → human-readable name from CNS policies
+let barChart, lineChart, drillLineChart, drillBarChart;
+let refreshTimer, pingTimer;
+
+// ── CNS helper — returns human name if available, raw id otherwise ─────────────
+function cnsName(rawId) {
+  const key = (rawId || '').trim();
+  return cnsMap[key] || key;
+}
+
+// ── QUERY THROTTLE & LOG ──────────────────────────────────────────────────────
+const inFlight = new Set();
+const queryLog = [];
+let querySeq = 0;
+const maxConcurrent = 5;
+
+// ── CORE POST ─────────────────────────────────────────────────────────────────
+async function _post(command, withDestination) {
+  const body = { 'User-Agent': CONN.userAgent, 'command': command };
+  if (withDestination) body['destination'] = CONN.destination;
+  const resp = await fetch(CONN.node, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const text = await resp.text();
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed.Query)          return parsed.Query;
+    if (parsed.error)          throw new Error(parsed.error);
+    return parsed;
+  } catch(e) {
+    if (e.message.startsWith('HTTP') || e.message.includes('error')) throw e;
+    return text.trim() || [];
+  }
+}
+
+async function _throttle(tag, command, fn) {
+  if (inFlight.has(tag)) { _logSkip(tag, command); return null; }
+  if (inFlight.size >= maxConcurrent) { _logSkip(tag, command + ' [max]'); return null; }
+  const id = ++querySeq;
+  const sentAt = new Date();
+  inFlight.add(tag);
+  _logAdd(id, tag, command, sentAt);
+  updateQueryBadge();
+  try {
+    const data = await fn();
+    _logUpdate(id, 'ok', Date.now() - sentAt, Array.isArray(data) ? data.length : '—');
+    return data;
+  } catch(err) {
+    _logUpdate(id, 'err:' + err.message, Date.now() - sentAt, 0);
+    throw err;
+  } finally {
+    inFlight.delete(tag);
+    updateQueryBadge();
+  }
+}
+
+// SQL query (with destination=network to fan out to operators)
+async function sqlQuery(sql, tag) {
+  const command = `sql ${CONN.dbms} format=json:list and stat=false ${sql}`;
+  return _throttle(tag || 'sql', command, () => _post(command, true));
+}
+
+// Local node command (no destination)
+async function nodeCmd(command, tag) {
+  return _throttle(tag || 'cmd', command, () => _post(command, false));
+}
+
+// ── FETCH CNS MAPPINGS ────────────────────────────────────────────────────────
+// Loads blockchain get cns where dbms=cos and table=pp_pm on startup.
+// Builds cnsMap: { "KPL": "Evergy", "BF1": "West Feeder", ... }
+async function fetchCNS() {
+  try {
+    const data = await nodeCmd(
+      `blockchain get cns where dbms=${CONN.dbms} and table=${CONN.table}`,
+      'cns'
+    );
+    if (!data || !Array.isArray(data)) return;
+    cnsMap = {};
+    data.forEach(item => {
+      const c = item.cns || item;
+      if (c.orig_value && c.new_value) {
+        cnsMap[c.orig_value.trim()] = c.new_value.trim();
+      }
+    });
+  } catch(e) {
+    console.warn('CNS fetch failed — using raw IDs:', e.message);
+  }
+}
+
+// ── CONFIG APPLY ──────────────────────────────────────────────────────────────
+function applyConfig() {
+  CONN.node  = document.getElementById('cfg-node').value.trim() || CONN.node;
+  CONN.dbms  = document.getElementById('cfg-dbms').value.trim() || CONN.dbms;
+  CONN.table = document.getElementById('cfg-table').value.trim() || CONN.table;
+  CONN.uns   = document.getElementById('cfg-uns').value.trim()  || CONN.uns;
+
+  document.getElementById('nodeLabel').textContent = CONN.node;
+  document.getElementById('footerInfo').textContent = `${CONN.dbms}.${CONN.table} · Direct POST · ${CONN.node}`;
+  document.getElementById('unsCmd').textContent = `blockchain get uns where namespace = ${CONN.uns}`;
+  updateDrillPreview();
+
+  clearInterval(refreshTimer);
+  clearInterval(pingTimer);
+  inFlight.clear();
+  cnsMap = {};   // reset CNS map so it reloads for the new dbms/table
+
+  fetchAll();
+  refreshTimer = setInterval(fetchData, 30000);
+  pingTimer    = setInterval(pingNode, 5 * 60 * 1000);
+}
+
+// ── FETCH ALL ─────────────────────────────────────────────────────────────────
+function fetchAll() {
+  fetchCNS().then(() => {
+    fetchData();
+    fetchDistinctMonitors();
+  });
+  fetchUNS();
+  pingNode();
+}
+
+// ── PING ──────────────────────────────────────────────────────────────────────
+async function pingNode() {
+  const dot   = document.getElementById('pingDot');
+  const label = document.getElementById('pingLabel');
+  try {
+    const data = await nodeCmd('get status where format=json', 'ping');
+    dot.className = 'ping-dot ok';
+    const st = data?.status || data?.Status || 'running';
+    label.textContent = st.toUpperCase() + ' ' + new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+    document.getElementById('statusDot').className = 'status-dot';
+  } catch(e) {
+    dot.className = 'ping-dot err';
+    label.textContent = 'UNREACHABLE';
+    document.getElementById('statusDot').className = 'status-dot error';
+  }
+}
+
+// ── FETCH DATA ────────────────────────────────────────────────────────────────
+async function fetchData() {
+  try {
+    const raw = await sqlQuery(
+      `SELECT timestamp, monitor_id, realpower, reactivepower, powerfactor, frequency, a_current, b_current, c_current
+       FROM ${CONN.table}
+       WHERE timestamp >= NOW() - ${timeRangeHours} hours
+       ORDER BY timestamp DESC`,
+      'data'
+    );
+
+    if (raw === null) return;
+
+    // Newest row per monitor
+    const seen = {};
+    latestData = [];
+    raw.forEach(r => {
+      const id = (r.monitor_id || '').trim();
+      if (!seen[id]) { seen[id] = true; latestData.push(r); }
+    });
+
+    // Full history ASC for trend chart
+    historyData = [...raw].reverse();
+
+    setConnected(true);
+    hideError();
+    updateKPIs();
+    updatePhaseCards();
+    updateTable();
+    renderCharts();
+    populateMonitorSelect();
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+  } catch(err) {
+    setConnected(false);
+    if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.message.includes('CORS')) {
+      document.getElementById('corsNote').style.display = 'block';
+    } else {
+      showError('Query failed: ' + err.message);
+    }
+  } finally {
+    document.getElementById('loadingOverlay').style.display = 'none';
+  }
+}
+
+// ── FETCH UNS ─────────────────────────────────────────────────────────────────
+async function fetchUNS() {
+  const body = document.getElementById('unsBody');
+  body.innerHTML = '<div class="uns-loading">Loading UNS…</div>';
+  try {
+    const data = await nodeCmd(`blockchain get uns where namespace = ${CONN.uns}`, 'uns');
+    renderUNS(data);
+  } catch(e) {
+    body.innerHTML = `<div class="uns-loading" style="color:var(--red)">Error: ${e.message}</div>`;
+  }
+}
+
+function renderUNS(data) {
+  const body = document.getElementById('unsBody');
+  if (!data || (Array.isArray(data) && data.length === 0)) {
+    body.innerHTML = '<div class="uns-loading">No UNS data found.</div>';
+    return;
+  }
+
+  // Normalize: data may be [{uns:{...}}] or [{...}]
+  const items = Array.isArray(data) ? data : [data];
+  const fields = [];
+
+  items.forEach(item => {
+    const uns = item.uns || item;
+    if (uns.name)       fields.push({ label: 'Name',       value: uns.name,       cls: 'name' });
+    if (uns.namespace)  fields.push({ label: 'Namespace',  value: uns.namespace });
+    if (uns.uns_level)  fields.push({ label: 'Level',      value: uns.uns_level });
+    if (uns.loc)        fields.push({ label: 'Location',   value: uns.loc });
+    if (uns.ledger)     fields.push({ label: 'Ledger',     value: uns.ledger });
+    if (uns.date)       fields.push({ label: 'Updated',    value: uns.date?.split('T')[0] });
+    if (uns.id)         fields.push({ label: 'ID',         value: uns.id });
+  });
+
+  // Build location link if available
+  const locItem = items.find(i => (i.uns || i).loc);
+  const loc = locItem ? (locItem.uns || locItem).loc : null;
+  let mapLink = '';
+  if (loc) {
+    const [lat, lng] = loc.split(',').map(s => s.trim());
+    mapLink = `<a class="uns-map-link" href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=14/${lat}/${lng}" target="_blank">📍 VIEW MAP ↗</a>`;
+  }
+
+  body.innerHTML = `<div class="uns-body">
+    ${fields.map(f => `<div class="uns-field">
+      <div class="uns-field-label">${f.label}</div>
+      <div class="uns-field-value ${f.cls || ''}">${f.value}</div>
+    </div>`).join('')}
+    ${mapLink}
+  </div>`;
+}
+
+// ── FETCH DISTINCT MONITOR IDs ─────────────────────────────────────────────────
+async function fetchDistinctMonitors() {
+  try {
+    const data = await sqlQuery(
+      `SELECT distinct(monitor_id) FROM ${CONN.table}`,
+      'distinct-monitors'
+    );
+    if (!data) return;
+    const ids = data.map(r => {
+      const val = r['distinct(monitor_id)'] || r.monitor_id || '';
+      return val.trim();
+    }).filter(Boolean).sort();
+
+    const drillSel = document.getElementById('drillMonitorSel');
+    const current  = drillSel.value;
+    drillSel.innerHTML = '<option value="">— select monitor —</option>' +
+      ids.map(id => `<option value="${id}" ${id===current?'selected':''}>${cnsName(id)}</option>`).join('');
+  } catch(e) {
+    console.warn('distinct monitors:', e.message);
+  }
+}
+
+// ── POPULATE MONITOR SELECT (overview) ────────────────────────────────────────
+function populateMonitorSelect() {
+  const sel     = document.getElementById('monitorSelect');
+  const current = sel.value;
+  const ids     = [...new Set(latestData.map(r => (r.monitor_id || '').trim()))].sort();
+  const active  = latestData.filter(r => r.realpower > 0).map(r => (r.monitor_id || '').trim());
+  sel.innerHTML = '<option value="">— select monitor —</option>' +
+    ids.map(id => `<option value="${id}" ${id===current?'selected':''}>${cnsName(id)}${active.includes(id)?' ⚡':''}</option>`).join('');
+
+  // Default to first active
+  if (!current && active.length) sel.value = active[0];
+  onMonitorChange();
+}
+
+function onMonitorChange() {
+  updatePhaseCards();
+  renderLineChart();
+}
+
+// ── KPIs ──────────────────────────────────────────────────────────────────────
+function updateKPIs() {
+  const active = latestData.filter(r => r.realpower > 0);
+  const totalRP = latestData.reduce((s, r) => s + (r.realpower || 0), 0);
+  const totalRQ = latestData.reduce((s, r) => s + (r.reactivepower || 0), 0);
+  const avgPF   = active.length ? Math.round(active.reduce((s,r) => s + (r.powerfactor||0), 0) / active.length) : 0;
+  document.getElementById('kpiRealPower').textContent     = totalRP.toLocaleString();
+  document.getElementById('kpiReactivePower').textContent = totalRQ.toLocaleString();
+  document.getElementById('kpiPowerFactor').textContent   = avgPF;
+  document.getElementById('kpiActive').textContent        = active.length;
+  document.getElementById('kpiTotal').textContent         = latestData.length;
+}
+
+// ── PHASE CARDS ───────────────────────────────────────────────────────────────
+function updatePhaseCards() {
+  const monId = document.getElementById('monitorSelect').value;
+  document.getElementById('phaseMonitorLabel').textContent = monId ? cnsName(monId) : '—';
+  const row = latestData.find(r => (r.monitor_id || '').trim() === monId);
+  document.getElementById('phaseA').textContent = row ? row.a_current : '—';
+  document.getElementById('phaseB').textContent = row ? row.b_current : '—';
+  document.getElementById('phaseC').textContent = row ? row.c_current : '—';
+}
+
+// ── TABLE ─────────────────────────────────────────────────────────────────────
+function updateTable() {
+  const maxPower = Math.max(...latestData.map(r => r.realpower || 0), 1);
+  const tbody    = document.getElementById('monitorTable');
+  const sorted   = [...latestData].sort((a, b) => (b.realpower||0) - (a.realpower||0));
+
+  tbody.innerHTML = sorted.map(r => {
+    const id     = (r.monitor_id || '').trim();
+    const active = (r.realpower || 0) > 0;
+    const barW   = Math.round(((r.realpower||0) / maxPower) * 110);
+    const label  = cnsName(id);
+    return `<tr class="${active ? 'highlight' : ''}">
+      <td class="monitor-id" onclick="drillTo('${id}')" title="${id} — click to drill down">${label}</td>
+      <td><div class="bar-cell"><div class="mini-bar" style="width:${barW}px"></div>${(r.realpower||0).toLocaleString()}</div></td>
+      <td>${(r.reactivepower||0).toLocaleString()}</td>
+      <td>${r.powerfactor||0}</td>
+      <td>${r.frequency||0}</td>
+      <td>${r.a_current||0}</td>
+      <td>${r.b_current||0}</td>
+      <td>${r.c_current||0}</td>
+      <td class="${active?'status-ok':'status-off'}">${active?'● ONLINE':'○ STANDBY'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── CHARTS ────────────────────────────────────────────────────────────────────
+function renderCharts() { renderBarChart(); renderLineChart(); }
+
+function renderBarChart() {
+  const active = [...latestData].filter(r => (r.realpower||0) > 0).sort((a,b) => b.realpower - a.realpower).slice(0,12);
+  if (barChart) barChart.destroy();
+  const ctx = document.getElementById('barChart').getContext('2d');
+  barChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: active.map(r => cnsName((r.monitor_id||'').trim())),
+      datasets: [{
+        label: 'Real Power (kW)',
+        data: active.map(r => r.realpower),
+        backgroundColor: active.map((_,i) => i===0 ? 'rgba(245,158,11,.85)' : 'rgba(245,158,11,.35)'),
+        borderColor: 'rgba(245,158,11,.6)', borderWidth: 1, borderRadius: 2,
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color:'#94a3b8', font:{family:"'Share Tech Mono'",size:10} }, grid:{color:'#1e2428'} },
+        y: { ticks: { color:'#94a3b8', font:{family:"'Share Tech Mono'",size:10} }, grid:{color:'#1e2428'} }
+      }
+    }
+  });
+}
+
+function renderLineChart() {
+  const monId    = document.getElementById('monitorSelect').value;
+  const filtered = historyData.filter(r => (r.monitor_id||'').trim() === monId);
+  const step     = Math.max(1, Math.floor(filtered.length / 60));
+  const sampled  = filtered.filter((_,i) => i%step===0);
+  document.getElementById('trendLabel').textContent = monId ? cnsName(monId) : '—';
+
+  if (lineChart) lineChart.destroy();
+  const ctx = document.getElementById('lineChart').getContext('2d');
+  lineChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: sampled.map(r => { const d=new Date(r.timestamp); return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0'); }),
+      datasets: [
+        { label:'Real Power', data:sampled.map(r=>r.realpower), borderColor:'rgba(245,158,11,.9)', backgroundColor:'rgba(245,158,11,.08)', borderWidth:2, fill:true, tension:.3, pointRadius:0 },
+        { label:'Reactive Power', data:sampled.map(r=>r.reactivepower), borderColor:'rgba(56,189,248,.6)', backgroundColor:'transparent', borderWidth:1.5, borderDash:[4,3], fill:false, tension:.3, pointRadius:0 }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#94a3b8',font:{family:"'Barlow Condensed'",size:11},boxWidth:14}}},
+      scales:{
+        x:{ticks:{color:'#94a3b8',font:{family:"'Share Tech Mono'",size:9},maxTicksLimit:8},grid:{color:'#1e2428'}},
+        y:{ticks:{color:'#94a3b8',font:{family:"'Share Tech Mono'",size:10}},grid:{color:'#1e2428'}}
+      }
+    }
+  });
+}
+
+// ── DRILL-DOWN ────────────────────────────────────────────────────────────────
+function setDrillQuick(hours, btn) {
+  document.querySelectorAll('.drill-quick button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const now  = new Date();
+  const from = new Date(now - hours * 3600000);
+  document.getElementById('drillTo').value   = toLocalDTValue(now);
+  document.getElementById('drillFrom').value = toLocalDTValue(from);
+  updateDrillPreview();
+}
+
+function toLocalDTValue(d) {
+  // Returns YYYY-MM-DDTHH:MM for datetime-local input
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function dtLocalToAnyLog(val) {
+  // Convert datetime-local value to AnyLog timestamp format
+  return val.replace('T', ' ') + ':00';
+}
+
+function buildDrillSQL() {
+  const monId = document.getElementById('drillMonitorSel').value;
+  const from  = document.getElementById('drillFrom').value;
+  const to    = document.getElementById('drillTo').value;
+
+  if (!monId) return null;
+
+  let where = `monitor_id='${monId}'`;
+  if (from) where += ` AND timestamp >= '${dtLocalToAnyLog(from)}'`;
+  if (to)   where += ` AND timestamp <= '${dtLocalToAnyLog(to)}'`;
+
+  return `SELECT timestamp, realpower, reactivepower, powerfactor, frequency, a_current, b_current, c_current
+          FROM ${CONN.table}
+          WHERE ${where}
+          ORDER BY timestamp ASC`;
+}
+
+function updateDrillPreview() {
+  const sql = buildDrillSQL();
+  const el  = document.getElementById('drillPreview');
+  if (!sql) {
+    el.innerHTML = 'Select a monitor and time range to preview the SQL query';
+    return;
+  }
+  const monId = document.getElementById('drillMonitorSel').value;
+  const from  = document.getElementById('drillFrom').value;
+  const to    = document.getElementById('drillTo').value;
+  el.innerHTML = `<span>sql ${CONN.dbms} format=json:list and stat=false</span> SELECT timestamp, realpower, reactivepower, powerfactor, ... FROM <span>${CONN.table}</span> WHERE monitor_id='<span>${monId}</span>'${from ? ` AND timestamp &gt;= '<span>${dtLocalToAnyLog(from)}</span>'` : ''}${to ? ` AND timestamp &lt;= '<span>${dtLocalToAnyLog(to)}</span>'` : ''} ORDER BY timestamp ASC`;
+}
+
+// shortcut: click a monitor_id in the main table to jump to drill-down
+function drillTo(monId) {
+  document.getElementById('drillMonitorSel').value = monId;
+  setDrillQuick(24, document.querySelector('.drill-quick button:nth-child(3)'));
+  document.querySelector('.drilldown-panel').scrollIntoView({ behavior: 'smooth' });
+  fetchDrill();
+}
+
+async function fetchDrill() {
+  const sql = buildDrillSQL();
+  if (!sql) { alert('Select a monitor first.'); return; }
+
+  const monId = document.getElementById('drillMonitorSel').value;
+  const body  = document.getElementById('drillBody');
+  body.innerHTML = `<div class="drill-empty"><div class="spinner" style="width:28px;height:28px;border-width:2px;margin-right:10px;display:inline-block;vertical-align:middle"></div>Querying ${monId}…</div>`;
+
+  try {
+    const data = await sqlQuery(sql, 'drill-' + monId);
+    if (data === null) { body.innerHTML = '<div class="drill-empty">Query throttled — please wait</div>'; return; }
+    renderDrill(monId, data);
+  } catch(e) {
+    body.innerHTML = `<div class="drill-empty" style="color:var(--red)">Error: ${e.message}</div>`;
+  }
+}
+
+function renderDrill(monId, data) {
+  const body = document.getElementById('drillBody');
+
+  if (!data || data.length === 0) {
+    body.innerHTML = `<div class="drill-empty">No data found for <strong>${monId}</strong> in the selected time range</div>`;
+    return;
+  }
+
+  // Stats
+  const rps    = data.map(r => r.realpower || 0);
+  const avgRP  = Math.round(rps.reduce((a,b)=>a+b,0) / rps.length);
+  const maxRP  = Math.max(...rps);
+  const minRP  = Math.min(...rps);
+  const avgPF  = Math.round(data.reduce((s,r) => s + (r.powerfactor||0), 0) / data.length);
+
+  // Sample for chart
+  const step    = Math.max(1, Math.floor(data.length / 80));
+  const sampled = data.filter((_,i) => i%step===0);
+
+  const labels = sampled.map(r => {
+    const d = new Date(r.timestamp);
+    return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  });
+
+  body.innerHTML = `
+    <div class="drill-stats">
+      <div class="drill-stat"><div class="num">${data.length.toLocaleString()}</div><div class="lbl">Rows</div></div>
+      <div class="drill-stat"><div class="num">${avgRP.toLocaleString()}</div><div class="lbl">Avg kW</div></div>
+      <div class="drill-stat"><div class="num">${maxRP.toLocaleString()}</div><div class="lbl">Peak kW</div></div>
+      <div class="drill-stat"><div class="num">${minRP.toLocaleString()}</div><div class="lbl">Min kW</div></div>
+      <div class="drill-stat"><div class="num">${avgPF}</div><div class="lbl">Avg PF%</div></div>
+    </div>
+    <div class="drill-charts">
+      <div class="chart-card">
+        <div class="chart-title">Real &amp; Reactive Power <span style="font-size:11px;color:var(--purple);font-weight:400">${cnsName(monId)}</span></div>
+        <div class="drill-chart-wrap"><canvas id="drillPowerChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Phase Currents <span style="font-size:11px;color:var(--purple);font-weight:400">A / B / C — ${cnsName(monId)}</span></div>
+        <div class="drill-chart-wrap"><canvas id="drillCurrentChart"></canvas></div>
+      </div>
+    </div>
+    <div class="table-wrap" style="max-height:280px;overflow-y:auto;margin-bottom:0">
+      <table>
+        <thead><tr>
+          <th>Timestamp</th><th>Real Power (kW)</th><th>Reactive (kVAR)</th>
+          <th>Power Factor (%)</th><th>Frequency</th>
+          <th>A Current</th><th>B Current</th><th>C Current</th>
+        </tr></thead>
+        <tbody>${data.slice().reverse().slice(0,200).map(r => `<tr>
+          <td>${r.timestamp}</td>
+          <td>${(r.realpower||0).toLocaleString()}</td>
+          <td>${(r.reactivepower||0).toLocaleString()}</td>
+          <td>${r.powerfactor||0}</td>
+          <td>${r.frequency||0}</td>
+          <td>${r.a_current||0}</td>
+          <td>${r.b_current||0}</td>
+          <td>${r.c_current||0}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+
+  // Power chart
+  if (drillLineChart) drillLineChart.destroy();
+  drillLineChart = new Chart(document.getElementById('drillPowerChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label:'Real Power', data:sampled.map(r=>r.realpower||0), borderColor:'rgba(167,139,250,.9)', backgroundColor:'rgba(167,139,250,.08)', borderWidth:2, fill:true, tension:.3, pointRadius:0 },
+        { label:'Reactive Power', data:sampled.map(r=>r.reactivepower||0), borderColor:'rgba(56,189,248,.6)', backgroundColor:'transparent', borderWidth:1.5, borderDash:[4,3], fill:false, tension:.3, pointRadius:0 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#94a3b8',font:{size:11},boxWidth:14}}},
+      scales:{
+        x:{ticks:{color:'#94a3b8',font:{size:9},maxTicksLimit:8},grid:{color:'#1e2428'}},
+        y:{ticks:{color:'#94a3b8',font:{size:10}},grid:{color:'#1e2428'}}
+      }
+    }
+  });
+
+  // Phase current chart
+  if (drillBarChart) drillBarChart.destroy();
+  drillBarChart = new Chart(document.getElementById('drillCurrentChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label:'Phase A', data:sampled.map(r=>r.a_current||0), borderColor:'rgba(245,158,11,.8)', borderWidth:1.5, fill:false, tension:.3, pointRadius:0 },
+        { label:'Phase B', data:sampled.map(r=>r.b_current||0), borderColor:'rgba(34,197,94,.8)',  borderWidth:1.5, fill:false, tension:.3, pointRadius:0 },
+        { label:'Phase C', data:sampled.map(r=>r.c_current||0), borderColor:'rgba(56,189,248,.8)', borderWidth:1.5, fill:false, tension:.3, pointRadius:0 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#94a3b8',font:{size:11},boxWidth:14}}},
+      scales:{
+        x:{ticks:{color:'#94a3b8',font:{size:9},maxTicksLimit:8},grid:{color:'#1e2428'}},
+        y:{ticks:{color:'#94a3b8',font:{size:10}},grid:{color:'#1e2428'}}
+      }
+    }
+  });
+}
+
+// ── TIME RANGE ────────────────────────────────────────────────────────────────
+function setTimeRange(h, btn) {
+  timeRangeHours = h;
+  document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  fetchData();
+}
+
+// ── STATUS ────────────────────────────────────────────────────────────────────
+function setConnected(ok) {
+  document.getElementById('statusDot').className = 'status-dot' + (ok ? '' : ' error');
+}
+function showError(msg) {
+  const el = document.getElementById('errorBanner');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+function hideError() {
+  document.getElementById('errorBanner').style.display = 'none';
+  document.getElementById('corsNote').style.display = 'none';
+}
+
+// ── QUERY LOG ─────────────────────────────────────────────────────────────────
+let activeQTab = 'dashboard';
+
+function _logAdd(id, tag, command, sentAt) {
+  queryLog.unshift({ id, tag, command, sentAt, status: 'pending', duration: null, rows: null });
+  if (queryLog.length > 50) queryLog.pop();
+  if (document.getElementById('qlogPanel').classList.contains('open')) renderQueryLog();
+}
+function _logUpdate(id, status, duration, rows) {
+  const e = queryLog.find(e => e.id === id);
+  if (e) { e.status = status; e.duration = duration; e.rows = rows; }
+  if (document.getElementById('qlogPanel').classList.contains('open')) renderQueryLog();
+}
+function _logSkip(tag, command) {
+  queryLog.unshift({ id: ++querySeq, tag, command, sentAt: new Date(), status: 'skipped', duration: 0, rows: 0 });
+  if (queryLog.length > 50) queryLog.pop();
+  if (document.getElementById('qlogPanel').classList.contains('open')) renderQueryLog();
+}
+function updateQueryBadge() {
+  const badge = document.getElementById('queriesBadge');
+  const n = inFlight.size;
+  badge.textContent = n || queryLog.length;
+  badge.className = 'queries-badge' + (n > 0 ? ' active' : '');
+}
+function clearQueryLog() {
+  queryLog.length = 0; querySeq = 0;
+  renderQueryLog(); updateQueryBadge();
+}
+function openQueryLog() {
+  document.getElementById('qlogOverlay').classList.add('open');
+  document.getElementById('qlogPanel').classList.add('open');
+  renderQueryLog();
+  if (activeQTab === 'node') fetchNodeQueries();
+}
+function closeQueryLog() {
+  document.getElementById('qlogOverlay').classList.remove('open');
+  document.getElementById('qlogPanel').classList.remove('open');
+}
+function switchQTab(tab) {
+  activeQTab = tab;
+  ['dashboard','node'].forEach(t => {
+    document.getElementById(`qtab-${t}`).classList.toggle('active', t === tab);
+    document.getElementById(`qpanel-${t}`).style.display = t === tab ? 'block' : 'none';
+  });
+  if (tab === 'node') fetchNodeQueries();
+}
+function renderQueryLog() {
+  const tbody = document.getElementById('qlogTableBody');
+  const empty = document.getElementById('qlogEmpty');
+  if (!queryLog.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = queryLog.map(e => {
+    const cls = e.status==='pending'?'pend':e.status==='skipped'?'skip':e.status.startsWith('err')?'err':'ok';
+    const cmd = e.command.length > 80 ? e.command.slice(0,78)+'…' : e.command;
+    return `<tr>
+      <td>${e.id}</td>
+      <td>${e.sentAt.toLocaleTimeString('en-US',{hour12:false})}</td>
+      <td style="color:var(--amber)">${e.tag}</td>
+      <td class="${cls}">${e.status}</td>
+      <td>${e.duration!=null?e.duration+'ms':'…'}</td>
+      <td>${e.rows!=null?e.rows:'…'}</td>
+      <td class="cmd" title="${e.command.replace(/"/g,'&quot;')}">${cmd}</td>
+    </tr>`;
+  }).join('');
+}
+async function fetchNodeQueries() {
+  document.getElementById('nodeQueryEmpty').textContent = 'Fetching…';
+  document.getElementById('nodeQueryEmpty').style.display = 'block';
+  document.getElementById('nodeQueryBody').innerHTML = '';
+  try {
+    const data = await nodeCmd('get queries where format=json', 'node-queries');
+    if (!data || !data.length) { document.getElementById('nodeQueryEmpty').textContent = 'No active queries.'; return; }
+    document.getElementById('nodeQueryEmpty').style.display = 'none';
+    document.getElementById('nodeQueryBody').innerHTML = data.map(q => {
+      const sql = q.query || q.SQL || q.sql || JSON.stringify(q);
+      return `<tr>
+        <td>${q.id||'—'}</td><td>${q.start_time||q.timestamp||'—'}</td>
+        <td class="ok">${q.status||'active'}</td>
+        <td>${q.nodes||q.node||'—'}</td>
+        <td class="cmd" title="${sql}">${sql.length>80?sql.slice(0,78)+'…':sql}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('nodeQueryEmpty').textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+// Set default drill time range to last 24h
+setDrillQuick(24, document.querySelector('.drill-quick button:nth-child(3)'));
+updateDrillPreview();
+
+// Initialize header display
+document.getElementById('nodeLabel').textContent = CONN.node;
+document.getElementById('footerInfo').textContent = `${CONN.dbms}.${CONN.table} · Direct POST · ${CONN.node}`;
+
+fetchAll();
+refreshTimer = setInterval(fetchData, 30000);
+pingTimer    = setInterval(pingNode, 5 * 60 * 1000);
+// Refresh CNS mappings from blockchain every 12 minutes.
+// If CNS policies don't exist, fetchCNS() silently leaves cnsMap empty
+// and cnsName() falls back to the raw monitor_id for all display.
+setInterval(fetchCNS, 12 * 60 * 1000);
+</script>
+</body>
+</html>e
