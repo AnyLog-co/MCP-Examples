@@ -29,8 +29,8 @@ browser and query live data directly, without Claude or any LLM involved.
                                  └──────────────────┘
 ```
 
-See [`prompts/`](prompts/) for the prompt templates and
-[`html/`](html/) for the generated dashboard examples.
+See [`prompts/`](../prompts/) for the prompt templates and
+[`html/`](../html/) for the generated dashboard examples.
 
 ### 2. Conversational data queries
 
@@ -91,7 +91,7 @@ http://HOST:PORT/mcp/sse
 ```
 
 All MCP clients connect to this URL. The same endpoint is used by `anylog_proxy.py`
-in MCP mode (see [`proxy-generic/README.md`](proxy-generic/README.md)).
+in MCP mode (see [`proxy-generic/README.md`](../proxy-generic/README.md)).
 
 ---
 
@@ -218,9 +218,97 @@ format varies by client — update this section as new clients are validated.
 | Client | Status | Notes |
 |---|---|---|
 | Claude Desktop | ✅ Supported | See above |
+| Base44 | ✅ Supported | See [Base44](#base44) section below — different workflow |
 | Cursor | 🔜 Planned | |
 | Continue.dev | 🔜 Planned | |
 | Other | — | Any client that supports stdio MCP + `mcp-proxy` should work |
+
+---
+
+## Base44
+
+[Base44](https://base44.com) is an AI-native app builder. Rather than generating
+a static HTML file, Base44 produces a full hosted application with a separate
+backend service layer and frontend components. The AnyLog integration uses the
+MCP once at generation time, then the running app talks to AnyLog directly over
+REST — same principle as use case 1 above, but the output is a Base44 app instead
+of a standalone HTML file.
+
+### How it works
+
+The workflow has two phases, each producing a prompt that gets run inside Base44:
+
+```
+ Phase 1 — Backend                    Phase 2 — Frontend
+ ┌──────────────────────┐             ┌──────────────────────┐
+ │ Claude + AnyLog MCP  │             │ Claude (no MCP)      │
+ │                      │             │                      │
+ │ Discover schema,     │             │ Given: architecture  │
+ │ UNS, topology        │             │ + backend API from   │
+ │                      │             │ phase 1              │
+ │ Generate:            │             │                      │
+ │ Backend prompt →     │             │ Generate:            │
+ │ run on Base44        │             │ Frontend prompt →    │
+ └──────────────────────┘             │ run on Base44        │
+          ↓                           └──────────────────────┘
+   Base44 backend                              ↓
+   (AnyLog REST calls)               Base44 frontend
+                                     (calls backend)
+```
+
+**Phase 1 — Claude + MCP generates the backend prompt:**
+Connect Claude Desktop to AnyLog MCP. Claude discovers the live schema, UNS
+metadata, and cluster topology, then generates a prompt you paste into Base44
+to create the backend service. The backend functions POST to AnyLog using the
+standard REST format (see below).
+
+**Phase 2 — Claude generates the frontend prompt:**
+Without MCP, describe your desired UI architecture to Claude along with the
+backend API created in phase 1. Claude generates a second prompt you paste into
+Base44 to build the frontend components that call the backend.
+
+### AnyLog connection from Base44 backend
+
+The Base44 backend functions POST to the AnyLog query node directly — no proxy,
+no nginx. Base44 runs server-side so CORS is not an issue.
+
+**SQL queries** — require `destination: "network"`:
+```json
+POST http://{node_ip}:{port}
+Headers: { "User-Agent": "AnyLog/1.23", "Content-Type": "application/json" }
+Body: {
+  "command":     "sql {dbms} format=json:list and stat=false  {SQL}",
+  "destination": "network"
+}
+```
+
+**Blockchain / node commands** — no `destination`:
+```json
+POST http://{node_ip}:{port}
+Headers: { "User-Agent": "AnyLog/1.23", "Content-Type": "application/json" }
+Body: {
+  "command": "blockchain get uns where namespace = {namespace}"
+}
+```
+
+Response is always a **flat JSON array** — no nested result object. Parse with:
+```js
+const rows = Array.isArray(response) ? response : [];
+```
+
+### Generating a Base44 app via MCP
+
+Use the prompt template at [`prompts/base44.md`](prompts/base44.md).
+
+1. Connect Claude Desktop to AnyLog MCP (see [Claude Desktop](#claude-desktop) above)
+2. Fill in the parameters at the top of `base44.md`
+3. Paste into Claude — it will produce **two outputs**:
+   - **Backend prompt** → paste into Base44 to create the backend service
+   - **Frontend prompt** → paste into Base44 to create the frontend
+4. Run them in order (backend first, then frontend)
+
+See [`html/base44_sample_backend.html`](html/base44_sample_backend.html) for an
+example of what the Base44 backend layer discovers and exposes.
 
 ---
 
@@ -229,7 +317,7 @@ format varies by client — update this section as new clients are validated.
 Once Claude Desktop is connected:
 
 1. Open a new conversation
-2. Paste a prompt from [`prompts/`](prompts/) with your parameters filled in:
+2. Paste a prompt from [`prompts/`](../prompts/) with your parameters filled in:
    ```
    DATA_TYPE      = "Power Plant"
    QUERY_NODE     = "24.5.219.50:32349"
@@ -238,7 +326,7 @@ Once Claude Desktop is connected:
    UNS_NAMESPACE  = "Smart_City"
    ```
 3. Claude discovers the live schema and generates a single `.html` file
-4. Save the file into [`html/`](html/) and open it via either proxy
+4. Save the file into [`html/`](../html/) and open it via either proxy
 
 ---
 
