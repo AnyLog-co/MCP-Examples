@@ -7,9 +7,9 @@ services:
     restart: always
     container_name: rest-proxy-generic
     environment:
-      - ANYLOG_NODE_URL=http://66.175.217.145:32349
+      - ANYLOG_NODE_URL=http://66.175.217.145:32349/mcp/sse
       - PROXY_PORT=8080
-      - MODE=rest
+      - MODE=mcp
     ports:
       - "8080:8080"
     volumes:

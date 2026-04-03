@@ -6,7 +6,7 @@ COPY requirements.txt .
 
 RUN apk add --no-cache bash && \
     pip install --upgrade pip setuptools wheel && \
-    pip install --upgrade requirements.txt
+    pip install --upgrade Flask Flask-Cors requests
 
 ENTRYPOINT ["/bin/sh", "-c", \
   "python3 /app/anylog_proxy.py \
