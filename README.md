@@ -179,7 +179,7 @@ sudo bash setup_nginx.sh \
     --key       /etc/anylog/client.key \
     --cacert    /etc/anylog/ca.crt
 
-# With self-signed TLS (browser → nginx):
+# With self-signed TLS (browser → proxy-generic-nginx):
 sudo bash setup_nginx.sh \
     --node      24.5.219.50:7849 \
     --dashboard /path/to/my-dashboard.html \
@@ -417,6 +417,6 @@ The dashboard fell back to demo data because the live query returned no results 
 
 nginx cannot reach the AnyLog node. Check the node URL configured in `setup_nginx.sh` (`--node`), firewall rules, and that the node's REST port is open. Check the nginx error log:
 ```bash
-tail -f /var/log/nginx/anylog_error.log
-nginx -t   # validate config
+tail -f /var/log/proxy-generic-nginx/anylog_error.log
+proxy-generic-nginx -t   # validate config
 ```
