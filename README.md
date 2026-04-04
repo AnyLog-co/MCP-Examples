@@ -6,28 +6,53 @@ custom dashboards with Claude + AnyLog MCP.
 
 ---
 
+## Table of Contents
+
+- [Connection Modes](#connection-modes)
+  - [Direct POST](#direct-post-no-proxy)
+  - [nginx Proxy](#nginx-proxy-recommended-for-production)
+    - [Docker Deployment](proxy-nginx)
+  - [Flask Proxy](#flask-proxy)
+    - [Docker Deployment](proxy-generic)
+  - [Configuring MCP Client](mcp-setup.md)
+- [Using Claude + MCP](#using-claude--mcp)
+  - [Example 1 — Dashboard Generation](#example-1--generate-a-dashboard-recommended)
+  - [Example 2 — Conversational Queries](#example-2--conversational-data-queries)
+  - [Example 3 — MCP-backed Live Dashboard ⚠](#example-3--mcp-backed-live-dashboard--experimental)
+- [Dashboards](#dashboards)
+- [Generating Custom Dashboards](#generating-custom-dashboards)
+- [AnyLog REST API Reference](#anylog-rest-api-reference)
+- [Troubleshooting](./TROUBLESHOOTING.md)
+
+---
+
 ## Repository Layout
 
 ```
-rest-proxy/
-├── README.md                        ← this file
+MCP-Examples/
+├── README.md                  ← this file
+├── mcp-setup.md               ← how to connect Claude to AnyLog via MCP
+├── TROUBLESHOOTING.md         ← all error & debug guidance
 │
-├── html/                            ← ready-to-use HTML dashboards
-│   ├── dashboard-node-status.html   ← AnyLog node & network health inspector
-│   ├── dashboard-power-plant.html   ← Smart City Power Plant monitor
-│   └── rig_data.html                ← Oil rig interval monitor (Timbergrove)
+├── html/                      ← ready-to-use HTML dashboards
+│   ├── dashboard-node-status.html
+│   ├── dashboard-power-plant.html
+│   ├── rig_data.html
+│   └── wind_turbine_mcp.html  ← MCP-backed ⚠ experimental
 │
-├── prompts/                         ← LLM prompt templates for generating dashboards
+├── prompts/                   ← LLM prompt templates for generating dashboards
+│   ├── base44.md
 │   ├── node_status.md
 │   ├── power_plant.md
-│   └── rig_data.md
+│   ├── rig_data.md
+│   └── wind_turbine_mcp.md    ← Example 3 generation prompt
 │
-├── proxy-nginx/                     ← nginx Docker proxy (recommended for production)
+├── proxy-nginx/               ← nginx Docker proxy (recommended for production)
 │   ├── docker-compose.yaml
 │   ├── nginx.conf
 │   └── README.md
 │
-└── proxy-generic/                   ← Python Flask proxy (REST + MCP modes)
+└── proxy-generic/             ← Python Flask proxy (REST + MCP modes)
     ├── anylog_proxy.py
     ├── requirements.txt
     ├── Dockerfile
@@ -40,13 +65,21 @@ rest-proxy/
 ## Connection Modes
 
 Browsers cannot POST directly to AnyLog nodes in most environments due to CORS.
-Choose one of three connection modes:
+
+Modern browsers enforce the **Same-Origin Policy**, which prevents a web page from
+sending requests to a different domain, port, or protocol unless the target server
+explicitly allows it via **Cross-Origin Resource Sharing (CORS)** headers. AnyLog
+nodes do not expose CORS headers by default, so direct browser-to-node calls are
+blocked.
+
+The solution is to route requests through a backend service (nginx or the Flask proxy)
+that runs outside the browser's security model.
 
 | Mode | How it works | Best for |
 |---|---|---|
-| **Direct POST** | Browser → AnyLog node | Node has CORS enabled, or dev/testing |
+| **Direct POST** | Browser → AnyLog node | CORS enabled on node, or local dev/testing |
 | **nginx proxy** | Browser → nginx (Docker) → AnyLog node | Production, shared access, no Python needed |
-| **Flask proxy** | Browser → `anylog_proxy.py` → AnyLog node | REST or MCP mode, Docker or local |
+| **Flask proxy** | Browser → `anylog_proxy.py` → AnyLog node | REST pass-through or MCP bridge |
 
 **nginx** and the **Flask proxy** are independent alternatives — use one, not both.
 
@@ -55,108 +88,176 @@ Choose one of three connection modes:
 Works when the AnyLog node responds with `Access-Control-Allow-Origin: *`, or when
 the browser is launched with `--disable-web-security`.
 
-Open any dashboard HTML file directly in a browser, set Mode → `direct` in the
-config bar, and enter the node URL.
+Open any dashboard HTML file in a browser, set Mode → `direct`, enter the node URL.
 
-### nginx proxy
+### nginx proxy (recommended for production)
 
 ```bash
 cd proxy-nginx
-# Set ANYLOG_NODE_URL in docker-compose.yaml, then:
+# Edit docker-compose.yaml — set ANYLOG_NODE_URL
 docker compose up -d
 ```
 
 Open a dashboard, set Mode → `nginx`, nginx URL → `http://localhost`.
-See [`proxy-nginx/README.md`](proxy-nginx/README.md) for full setup.
+See [proxy-nginx/README.md](./proxy-nginx/README.md) for full setup.
 
 ### Flask proxy
 
 ```bash
 cd proxy-generic
-
-# REST mode (direct pass-through, like nginx but Python)
-python3 anylog_proxy.py --anylog-url http://HOST:PORT --html-dir ../html
-
-# MCP mode (auto-detected from /mcp/sse suffix)
-python3 anylog_proxy.py --anylog-url http://HOST:PORT/mcp/sse --html-dir ../html
-
-# Or via Docker
-docker compose up -d
+# Edit docker-compose.yaml — set ANYLOG_NODE_URL and MODE (rest or mcp)
+docker compose up -d --build
 ```
 
 Open a dashboard, set Mode → `proxy`, Proxy URL → `http://localhost:8080`.
-See [`proxy-generic/README.md`](proxy-generic/README.md) for full setup.
+See [proxy-generic/README.md](./proxy-generic/README.md) for full setup.
+
+---
+
+## Using Claude + MCP
+
+Claude can connect to AnyLog via the Model Context Protocol (MCP) to discover live
+schema, query data conversationally, and generate dashboards. There are three ways
+to use this — ordered from most to least recommended.
+
+### Example 1 — Generate a dashboard (recommended)
+
+Claude connects to MCP **once** to discover schema, sample data, and node topology,
+then generates a single `.html` file wired to the correct field names, KPIs, and
+query patterns. The generated dashboard runs entirely over plain REST — no MCP
+required at runtime.
+
+```
+ Generation time (once)              Runtime (ongoing)
+ ┌───────────────┐                   ┌──────────────────────┐
+ │  Claude +     │  MCP discover     │  Browser opens       │
+ │  AnyLog MCP   │ ───────────────►  │  dashboard.html      │
+ │               │  generates HTML   │                      │
+ └───────────────┘                   │  POST /api/query     │
+                                     │  → AnyLog node       │
+                                     └──────────────────────┘
+```
+
+**Use this first.** Zero runtime cost, full dashboard features, works with nginx
+or the Flask proxy in REST mode.
+
+→ See [Generating Custom Dashboards](#generating-custom-dashboards) below.
+
+### Example 2 — Conversational data queries
+
+Keep the MCP client connected to ask natural-language questions about live data:
+
+> *"What is the average wind speed across all turbines in the last 6 hours?"*
+> *"Which turbine had the highest RPM yesterday afternoon?"*
+> *"Are there any anomalies in power output for turbine 3?"*
+
+Claude translates each question into AnyLog SQL via MCP, executes it, and returns
+a plain-language answer. Works alongside a generated dashboard — the dashboard shows
+the overview, MCP chat handles ad-hoc investigation.
+
+→ See [mcp-setup.md](./mcp-setup.md) for how to connect Claude to AnyLog.
+
+### Example 3 — MCP-backed live dashboard ⚠ experimental
+
+A dashboard that routes **every data fetch** through the MCP proxy at runtime.
+
+```
+Browser → POST /api/query → anylog_proxy.py (MCP mode) → MCP/SSE → AnyLog
+```
+
+**Try Examples 1 and 2 first.** Example 3 has real costs and constraints:
+
+| Concern | Detail |
+|---|---|
+| **Cost** | Every dashboard refresh triggers LLM-mediated MCP calls — billable on every poll cycle |
+| **Latency** | MCP calls are serialized; polling every few minutes across multiple sensors will queue |
+| **Proxy required** | Requires `anylog_proxy.py` in MCP mode — nginx alone cannot do this |
+| **Query discipline** | All SQL must be bounded (`LIMIT`, narrow time windows) — never `SELECT *` |
+
+**When Example 3 makes sense:**
+- Prototyping or demos where cost and latency are not a concern
+- Low-frequency dashboards (refresh ≥ 5 minutes)
+- Deployments where the MCP endpoint is the only available access path
+- You want a built-in 🔍 Query log, ⚠ Error log (with `curl` reproduction), and 📋 Prompt evolution log
+
+→ See [html/wind_turbine_mcp.html](./html/wind_turbine_mcp.html) for a working example.
+→ See [prompts/wind_turbine_mcp.md](./prompts/wind_turbine_mcp.md) to generate your own.
 
 ---
 
 ## Dashboards
 
+| File | Description | Connection at runtime |
+|---|---|---|
+| [dashboard-node-status.html](./html/dashboard-node-status.html) | Node & network health inspector — no SQL | Direct |
+| [dashboard-power-plant.html](./html/dashboard-power-plant.html) | Smart City Power Plant monitor | Direct / nginx / proxy |
+| [rig_data.html](./html/rig_data.html) | Timbergrove oil rig interval monitor | Direct / nginx / proxy |
+| [wind_turbine_mcp.html](./html/wind_turbine_mcp.html) ⚠ | Wind turbine live dashboard (Example 3) | Flask proxy in MCP mode |
+
 ### `dashboard-node-status.html`
 
-AnyLog node and network health inspector. No database or SQL queries — fires three
-diagnostic commands in parallel:
+AnyLog node and network health inspector. No SQL — fires three diagnostic commands:
 
-| Command | Response | Panel |
-|---|---|---|
-| `get status where format=json` | JSON object | Node Status (key-value grid) |
-| `test node` | Pipe-delimited text | Node Test (pass/fail table) |
-| `test network` | Pipe-delimited text | Network Test (node list with type pills) |
-
-Direct POST only. CORS note shown if blocked.
+| Command | Panel |
+|---|---|
+| `get status where format=json` | Node status key-value grid |
+| `test node` | Node test pass/fail table |
+| `test network` | Network node list with type pills |
 
 ### `dashboard-power-plant.html`
 
-Smart City Power Plant live monitor (`cos.pp_pm` table). Features:
-- KPI cards: real power, reactive power, power factor, active monitors
-- Phase current breakdown per monitor (A / B / C)
-- Bar chart: real power by monitor
-- Line chart: power trend (1H / 6H / 24H)
-- Full monitor table with inline bars and ONLINE / STANDBY status
-- UNS panel: `blockchain get uns where namespace = Smart_City`
-- Drill-down: filter by monitor ID and time range
-- Query log panel with call deduplication and max-concurrent throttling
-- Node ping every 5 minutes
+Smart City Power Plant live monitor (`cos.pp_pm`). KPI cards (real power, reactive
+power, power factor, active monitors), phase current breakdown per monitor, bar chart
+by monitor, line chart (1H / 6H / 24H), full monitor table, UNS panel, drill-down
+by monitor and time range, query log.
 
 ### `rig_data.html`
 
-Timbergrove oil rig interval monitor (`timbergrove_rigs.rig_data` table). Features:
-- Fleet summary for 4 rigs (RIG-TX-001, RIG-TX-007, RIG-ND-012, RIG-GOM-023)
-- SVG rig diagram per unit with live sensor annotations
-- KPI cards: ROP, WOB, RPM, torque, hookload, bit depth, flow rate, total gas
-- Vertical bar charts: standpipe pressure, choke pressure, depth
-- Time-series charts: ROP/WOB, RPM/torque, flow rate, gas
-- API call log panel
+Timbergrove oil rig interval monitor (`timbergrove_rigs.rig_data`). Fleet summary
+for 4 rigs, SVG rig diagrams with live sensor annotations, KPI cards (ROP, WOB,
+RPM, torque, hookload, bit depth, flow rate, gas), bar and time-series charts, API
+call log.
 
-All dashboards support all three connection modes via the in-page config bar.
+### `wind_turbine_mcp.html` ⚠ experimental
+
+Wind turbine live dashboard (`wind_turbine` dbms, turbines 1/2/3/5). Runs in
+**Example 3 MCP mode** — every fetch goes through `anylog_proxy.py`. Fleet overview
+KPIs (last 1 hour), per-turbine metric cards with mini power trend chart, 🔍 Query
+log, ⚠ Error log with `curl` reproduction, 📋 Prompt evolution log, configurable
+refresh (5 min / 10 min / demo modes).
 
 ---
 
 ## Generating Custom Dashboards
 
-Use the prompt templates in `prompts/` with Claude (AnyLog MCP connected).
+Use the prompt templates in [prompts/](./prompts) with Claude (AnyLog MCP connected)
+to generate dashboards tailored to your data.
 
 ### Quick start
 
-1. Pick the closest prompt template (or use `power_plant.md` as a base)
-2. Set the parameters at the top:
+1. Connect Claude to your AnyLog node — see [mcp-setup.md](./mcp-setup.md)
+2. Pick the closest prompt template from [prompts/](./prompts)
+3. Fill in the parameters at the top:
    ```
    DATA_TYPE      = "Wind Turbine"
    QUERY_NODE     = "10.0.0.1:32349"
-   DBMS           = "my_database"
-   TABLE          = "my_table"
-   UNS_NAMESPACE  = "MyOrg"
+   DBMS           = "wind_turbine"
+   TABLE          = "power_output"
+   UNS_NAMESPACE  = "wind"
    ```
-3. Paste into Claude with the AnyLog MCP server connected
-4. Claude discovers the schema via MCP, then generates a single `.html` file
-5. Drop the file into `html/` — it works immediately via either proxy
+4. Paste the prompt into Claude — it discovers the live schema via MCP, then
+   generates a single `.html` file
+5. Drop the file into [html/](./html) and open it via either proxy
 
 ### Prompt templates
 
-| File | Dashboard type | Key features |
+| File | Generates | Runtime connection |
 |---|---|---|
-| `power_plant.md` | Data dashboard | SQL queries, UNS panel, charts, drill-down, 3 connection modes |
-| `node_status.md` | Diagnostic tool | Node commands only, pipe-table parser, no SQL |
-| `rig_data.md` | Industrial monitor | Multi-rig, SVG diagram, increments() queries |
+| [power_plant.md](./prompts/power_plant.md) | Data dashboard — charts, UNS panel, drill-down | Direct / nginx / proxy |
+| [node_status.md](./prompts/node_status.md) | Node diagnostic tool — no SQL | Direct |
+| [rig_data.md](./prompts/rig_data.md) | Industrial multi-unit monitor — increments() queries | Direct / nginx / proxy |
+| [wind_turbine_mcp.md](./prompts/wind_turbine_mcp.md) | MCP-backed live dashboard (Example 3) | Flask proxy in MCP mode |
+| [base44.md](./prompts/base44.md) | Hosted Base44 app (backend + frontend prompts) | Base44 backend → AnyLog REST |
 
 ---
 
@@ -176,9 +277,9 @@ curl -X POST http://HOST:PORT \
   }'
 ```
 
-- `destination: "network"` fans the query out to all operator nodes holding the data
-- `format=json:list and stat=false` returns a plain JSON array (suppresses the
-  trailing row-count object that plain `format=json` appends)
+`destination: "network"` fans the query out to all operator nodes holding the data.
+`format=json:list and stat=false` returns a plain JSON array without a trailing
+row-count object.
 
 ### Blockchain / node commands — no `destination`
 
@@ -191,15 +292,10 @@ curl -X POST http://HOST:PORT \
   }'
 ```
 
-Processed locally by the query node. Examples:
-- `get status where format=json`
-- `test node` / `test network`
-- `get queries where format=json`
-- `blockchain get uns where namespace = Smart_City`
+Examples: `get status where format=json` · `test node` · `test network` ·
+`blockchain get uns where namespace = Smart_City`
 
-### Via the Flask proxy
-
-The proxy accepts both the AnyLog REST `{command}` format and a simpler `{dbms, sql}` shape:
+### Via the Flask proxy (simple format)
 
 ```bash
 curl -X POST http://localhost:8080/api/query \
@@ -208,34 +304,3 @@ curl -X POST http://localhost:8080/api/query \
 ```
 
 Response: `{"results": [...], "row_count": N, "dbms": "mydb"}`
-
----
-
-## Troubleshooting
-
-**`Failed to fetch` / CORS error (Direct mode)**
-Switch Mode → `nginx` or `proxy`, or launch Chrome with
-`--disable-web-security --user-data-dir=/tmp/dev`.
-
-**CORS banner persists after switching to nginx/proxy mode**
-Click ↻ Refresh — the banner clears on the next successful fetch. If it
-persists, the proxy itself can't reach the AnyLog node (check proxy logs).
-
-**`Is a directory` error on proxy startup**
-Docker auto-created a config file as a directory before it existed.
-Delete it and recreate as a file — see the relevant proxy README.
-
-**`502 Bad Gateway` from nginx**
-nginx can't reach the AnyLog node. If AnyLog runs on the same Windows host:
-```yaml
-# docker-compose.yaml
-extra_hosts:
-  - "host.docker.internal:host-gateway"
-```
-```nginx
-proxy_pass http://host.docker.internal:PORT/;
-```
-
-**SQL queries return empty, status works**
-Missing `"destination": "network"` in the SQL body. Without it the query runs
-only on the query node, which holds no operator data.
