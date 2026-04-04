@@ -1,16 +1,48 @@
 # Connecting Claude to AnyLog via MCP
+ 
+AnyLog exposes a Model Context Protocol (MCP) server that Claude can connect to
+directly. This gives Claude live access to your network's schema, data, and node
+topology — without you having to write any SQL.
+ 
+---
+ 
+## Table of Contents
+ 
+- [Three Ways to Use MCP](#three-ways-to-use-mcp)
+- [MCP Endpoint](#mcp-endpoint)
+- [Supported MCP Connectors](#supported-mcp-connectors)
+- [Setup](#setup)
+  - [Claude Desktop](#claude-desktop)
+  - [Flask Proxy in MCP Mode](#flask-proxy-in-mcp-mode-example-3)
+  - [Connecting Multiple Nodes](#connecting-multiple-nodes)
+  - [Base44](#base44)
 
-AnyLog exposes a Model Context Protocol (MCP) server that Claude can connect to directly. This gives Claude live access 
-to your network's schema, data, and node topology — without you having to write any SQL. 
+--- 
+## Three Ways to Use MCP
 
-**Ways to Communicate with MCP**:
-1. [Conversational data queries](./README.md#example-2--conversational-data-queries) - Keep the MCP client connected 
-to ask natural-language questions about live data
-2. [Generating Dashboards](./README.md#example-1--generate-a-dashboard-recommended) - Claude connects to MCP **once** to 
-discover schema, sample data, and node topology, then generates a single `.html` file wired to the correct fields and 
-query patterns. 
-3. [MCP Backend - Live Dashboards](./README.md#example-3--mcp-backed-live-dashboard--experimental) - Dashboard that 
-routes **every data fetch** through the MCP proxy at runtime
+Claude can connect to AnyLog via the Model Context Protocol (MCP) to discover live
+schema, query data conversationally, and generate dashboards. There are three ways
+users can communicate between an MCP client (e.g., Claude Desktop) and AnyLog, and
+all three follow the same steps to connect an MCP client, either directly or via
+proxy, regardless of which data-gathering option is chosen.
+
+The key difference lies in the prompt content — it determines which connection logic
+applies when establishing a backend connection to AnyLog.
+
+* [Generating Dashboards](./README.md#example-1--generate-a-dashboard-recommended) —
+  Claude connects to MCP **once** to discover schema, sample data, and node topology,
+  then generates a single `.html` file wired to the correct fields and query patterns.
+* [Conversational Data Queries](./README.md#example-2--conversational-data-queries) —
+  Keep the MCP client connected to ask natural-language questions about live data.
+* [MCP-backed Live Dashboards](./README.md#example-3--mcp-backed-live-dashboard--experimental) —
+  A dashboard that routes **every data fetch** through the MCP proxy at runtime.
+
+A deep dive into each example can be found in the [Connection Modes](README.md#connection-modes)
+and [Using Claude + MCP](README.md#using-claude--mcp) sections of the _README_.
+
+> **Note:** Conversational querying (Example 2) requires no additional setup beyond
+> Example 1 — once the MCP client is connected, users can query AnyLog directly from
+> the chat interface (e.g., Claude Desktop) without any further configuration.
 
 
 ### MCP endpoint
@@ -26,13 +58,13 @@ in MCP mode.
 
 ### Supported MCP Connectors 
 
-|              Client               | Status |
-|:---------------------------------:|:---:|
-| [Claude Desktop](#Claude-Desktop) | ✅ Supported |
-|        [Based44](#Base44)         | ✅ Supported |
-|              Cursor               | 🔜 Planned |
-|           Continue.dev            | 🔜 Planned |
-|          Claude.ai (web)          | ✅ Supported via `anylog-api-mcp-proxy` |
+|              Client               |    Status    |
+|:---------------------------------:|:------------:|
+| [Claude Desktop](#Claude-Desktop) | ✅ Supported  |
+|        [Based44](#Base44)         | ✅ Supported  |
+|              Cursor               |  🔜 Planned  |
+|           Continue.dev            |  🔜 Planned  |
+|          Claude.ai (web)          | ✅ Supported  |
 
 ---
 
@@ -199,7 +231,7 @@ service. The backend functions POST to AnyLog using the standard REST format (se
 with the backend API created in phase 1. Claude generates a second prompt you paste into Base44 to build the frontend 
 components that call the backend.
 
-#### AnyLog connection from Base44 backend
+### AnyLog connection from Base44 backend
 
 The Base44 backend functions POST to the AnyLog query node directly — no proxy,
 no nginx. Base44 runs server-side so CORS is not an issue.
