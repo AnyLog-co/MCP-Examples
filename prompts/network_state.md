@@ -17,6 +17,8 @@ Build a complete, production-quality single-file HTML dashboard for inspecting t
 connectivity of an AnyLog node. The dashboard issues three diagnostic commands in parallel and
 renders each result in its own panel.
 
+Logical database and tables for monitoring database  
+
 ---
 
 ### Step 1 — Understand the commands and response shapes

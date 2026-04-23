@@ -71,7 +71,7 @@ Place this at the top of the `<script>` section:
 //  -----------------------------------------------------------------------
 //  SQL queries — must include destination:"network" to fan out to operator nodes:
 //    {
-//      "User-Agent":  "AnyLog/1.23",
+//      "AnyLog-Agent":  "AnyLog/1.23",
 //      "command":     "sql {dbms} format=json:list and stat=false  {sql}",
 //      "destination": "network"
 //    }
@@ -80,7 +80,7 @@ Place this at the top of the `<script>` section:
 //
 //  Blockchain / node commands — no destination (processed locally by the query node):
 //    {
-//      "User-Agent": "AnyLog/1.23",
+//      "AnyLog-Agent": "AnyLog/1.23",
 //      "command":    "blockchain get uns where namespace = Smart_City"
 //      //            "get status where format=json"
 //      //            "get queries where format=json"
@@ -117,13 +117,13 @@ function buildSqlBody(sql) {
     return { dbms: CONN.dbms, sql };
   }
   // DIRECT and NGINX: AnyLog REST format
-  return { 'User-Agent': 'AnyLog/1.23', command: cmd, destination: 'network' };
+  return { 'AnyLog-Agent': 'AnyLog/1.23', command: cmd, destination: 'network' };
 }
 
 function buildNodeBody(command) {
   // Blockchain / node commands — same body shape in all modes
   // In PROXY mode the proxy forwards these as-is via its /api/query endpoint
-  return { 'User-Agent': 'AnyLog/1.23', command };
+  return { 'AnyLog-Agent': 'AnyLog/1.23', command };
 }
 
 async function anylogFetch(body, timeoutMs = 50000) {

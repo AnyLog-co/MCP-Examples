@@ -72,7 +72,7 @@ runs server-side so CORS is not an issue — no proxy is needed.**
 POST http://{QUERY_NODE}
 Content-Type: application/json
 {
-  "User-Agent":  "AnyLog/1.23",
+  "AnyLog-Agent":  "AnyLog/1.23",
   "command":     "sql {dbms} format=json:list and stat=false  {SQL}",
   "destination": "network"
 }
@@ -87,7 +87,7 @@ Content-Type: application/json
 POST http://{QUERY_NODE}
 Content-Type: application/json
 {
-  "User-Agent": "AnyLog/1.23",
+  "AnyLog-Agent": "AnyLog/1.23",
   "command":    "blockchain get uns where namespace = {namespace}"
 }
 ```

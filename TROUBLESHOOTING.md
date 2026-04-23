@@ -44,10 +44,10 @@ on the query node, which holds no operator data.
 
 ```json
 // ❌ Wrong — query node only
-{"User-Agent": "AnyLog/1.23", "command": "sql mydb format=json:list and stat=false SELECT ..."}
+{"AnyLog-Agent": "AnyLog/1.23", "command": "sql mydb format=json:list and stat=false SELECT ..."}
 
 // ✅ Correct — distributed to operator nodes
-{"User-Agent": "AnyLog/1.23", "command": "sql mydb format=json:list and stat=false SELECT ...", "destination": "network"}
+{"AnyLog-Agent": "AnyLog/1.23", "command": "sql mydb format=json:list and stat=false SELECT ...", "destination": "network"}
 ```
 
 The Flask proxy in REST mode adds `destination: network` automatically.
@@ -87,7 +87,7 @@ The AnyLog node is not listening on the configured port. Verify with:
 ```bash
 curl -X POST http://HOST:PORT \
   -H "Content-Type: application/json" \
-  -d '{"User-Agent": "AnyLog/1.23", "command": "get status where format=json"}'
+  -d '{"AnyLog-Agent": "AnyLog/1.23", "command": "get status where format=json"}'
 ```
 
 ---
@@ -168,7 +168,7 @@ The AnyLog query node is unreachable. Test directly:
 ```bash
 curl -X POST http://HOST:PORT \
   -H "Content-Type: application/json" \
-  -d '{"User-Agent": "AnyLog/1.23", "command": "get status where format=json"}'
+  -d '{"AnyLog-Agent": "AnyLog/1.23", "command": "get status where format=json"}'
 ```
 
 Check IP, port, and any firewall rules between your machine and the node.

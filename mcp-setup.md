@@ -239,7 +239,7 @@ no nginx. Base44 runs server-side so CORS is not an issue.
 **SQL queries** — require `destination: "network"`:
 ```json
 POST http://{node_ip}:{port}
-Headers: { "User-Agent": "AnyLog/1.23", "Content-Type": "application/json" }
+Headers: { "AnyLog-Agent": "AnyLog/1.23", "Content-Type": "application/json" }
 Body: {
   "command":     "sql {dbms} format=json:list and stat=false  {SQL}",
   "destination": "network"
@@ -249,7 +249,7 @@ Body: {
 **Blockchain / node commands** — no `destination`:
 ```json
 POST http://{node_ip}:{port}
-Headers: { "User-Agent": "AnyLog/1.23", "Content-Type": "application/json" }
+Headers: { "AnyLog-Agent": "AnyLog/1.23", "Content-Type": "application/json" }
 Body: {
   "command": "blockchain get uns where namespace = {namespace}"
 }

@@ -271,7 +271,7 @@ All calls use `POST` with a JSON body. Two body shapes:
 curl -X POST http://HOST:PORT \
   -H "Content-Type: application/json" \
   -d '{
-    "User-Agent":  "AnyLog/1.23",
+    "AnyLog-Agent":  "AnyLog/1.23",
     "command":     "sql mydb format=json:list and stat=false  SELECT * FROM mytable LIMIT 10",
     "destination": "network"
   }'
@@ -287,7 +287,7 @@ row-count object.
 curl -X POST http://HOST:PORT \
   -H "Content-Type: application/json" \
   -d '{
-    "User-Agent": "AnyLog/1.23",
+    "AnyLog-Agent": "AnyLog/1.23",
     "command":    "get status where format=json"
   }'
 ```

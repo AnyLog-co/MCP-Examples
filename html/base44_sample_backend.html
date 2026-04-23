@@ -178,7 +178,7 @@
   POST BODY SHAPES:
   ─────────────────
   1. SQL queries (fan out to operator nodes):
-     { "User-Agent": "AnyLog/1.23",
+     { "AnyLog-Agent": "AnyLog/1.23",
        "command": "sql cos format=json:list and stat=false  SELECT ...",
        "destination": "network" }
 
@@ -187,7 +187,7 @@
      • destination: "network" is REQUIRED for SQL — routes to operators
 
   2. Blockchain / node commands (processed locally by query node):
-     { "User-Agent": "AnyLog/1.23",
+     { "AnyLog-Agent": "AnyLog/1.23",
        "command": "blockchain get uns where namespace = Smart_City" }
 
      • NO destination key — command stays on the query node
@@ -357,7 +357,7 @@ function getEndpoint() {
 }
 
 function buildBody(command, isSql) {
-  const body = { 'User-Agent': 'AnyLog/1.23', 'command': command };
+  const body = { 'AnyLog-Agent': 'AnyLog/1.23', 'command': command };
   if (isSql) body['destination'] = 'network';
   if (CONN.mode === 'proxy') body['url'] = CONN.proxyNode || CONN.node;
   return body;
