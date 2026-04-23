@@ -385,7 +385,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
  *  ─────────────────
  *  SQL queries (fan-out to operator nodes):
  *    {
- *      "User-Agent":  "AnyLog/1.23",
+ *      "AnyLog-Agent":  "AnyLog/1.23",
  *      "command":     "sql {dbms} format=json:list and stat=false  {sql}",
  *      "destination": "network"
  *    }
@@ -397,7 +397,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
  *
  *  Blockchain / node commands (processed locally by the query node):
  *    {
- *      "User-Agent": "AnyLog/1.23",
+ *      "AnyLog-Agent": "AnyLog/1.23",
  *      "command":    "get status where format=json"
  *    }
  *    No "destination" key — run on the query node itself.
@@ -590,7 +590,7 @@ async function callQuery(sql, rigId){
   let resp;
   try{
     resp = await anylogFetch(
-      {'User-Agent':'AnyLog/1.23', command, destination:'network'},
+      {'AnyLog-Agent':'AnyLog/1.23', command, destination:'network'},
       50000
     );
   }catch(e){
@@ -650,7 +650,7 @@ async function callIncrement(rigId, hours, bucketMin){
   let resp;
   try{
     resp = await anylogFetch(
-      {'User-Agent':'AnyLog/1.23', command, destination:'network'},
+      {'AnyLog-Agent':'AnyLog/1.23', command, destination:'network'},
       60000
     );
   }catch(e){

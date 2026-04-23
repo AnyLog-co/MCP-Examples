@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnyLog Node Health</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#0a0c10;--surface:#111318;--surface2:#181c24;--border:#1e2330;--border2:#252c3a;
+  --teal:#00d4aa;--teal-dim:rgba(0,212,170,.12);--teal-glow:rgba(0,212,170,.25);
+  --blue:#0088ff;--blue-dim:rgba(0,136,255,.12);
+  --purple:#a78bfa;--purple-dim:rgba(167,139,250,.12);
+  --amber:#f59e0b;--amber-dim:rgba(245,158,11,.12);
+  --green:#22c55e;--green-dim:rgba(34,197,94,.1);
+  --red:#ef4444;--red-dim:rgba(239,68,68,.1);
+  --orange:#f97316;--orange-dim:rgba(249,115,22,.1);
+  --text:#e2e8f0;--text-dim:#64748b;--text-muted:#2d3748;
+  --font:'Cascadia Code','Fira Code','Consolas','Menlo',monospace;
+  --r:12px;--rs:6px;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;line-height:1.6;min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,170,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,170,.022) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:0 20px 56px;}
+
+/* ── Header ── */
+.header{display:flex;align-items:center;gap:14px;padding:20px 0 16px;border-bottom:1px solid var(--border);margin-bottom:20px;}
+.logo{width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,var(--teal),var(--blue));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#000;letter-spacing:-.5px;box-shadow:0 0 24px var(--teal-glow),0 0 0 1px rgba(0,212,170,.3);flex-shrink:0;}
+.header-text{flex:1;}
+.header-title{font-size:15px;font-weight:600;}
+.header-sub{font-size:10px;color:var(--text-dim);margin-top:1px;}
+.conn-badge{display:flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;border:1px solid var(--border2);background:var(--surface2);font-size:11px;color:var(--text-dim);transition:all .3s;white-space:nowrap;}
+.conn-badge.connected{border-color:var(--teal);box-shadow:0 0 10px var(--teal-glow);color:var(--teal);}
+.conn-badge.error{border-color:var(--red);color:var(--red);}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--text-muted);flex-shrink:0;}
+.conn-badge.connected .conn-dot{background:var(--teal);animation:blink 2s ease-in-out infinite;}
+.conn-badge.error .conn-dot{background:var(--red);}
+
+/* ── Config ── */
+.config-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:20px;}
+.config-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+.field-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:180px;}
+.field-label{font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--text-dim);}
+input[type=text],select{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text);font-family:var(--font);font-size:12px;padding:8px 11px;outline:none;width:100%;transition:border-color .2s,box-shadow .2s;}
+input[type=text]:focus,select:focus{border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-dim);}
+select option{background:var(--surface2);}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--rs);border:none;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;transition:all .15s;white-space:nowrap;}
+.btn-primary{background:linear-gradient(135deg,var(--teal),#00b894);color:#000;}
+.btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 4px 14px var(--teal-glow);}
+.btn-primary:active{transform:none;}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;filter:none;box-shadow:none;}
+.btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border2);}
+.btn-ghost:hover{border-color:var(--border);color:var(--text);background:var(--surface2);}
+.info-strip{margin-top:12px;padding:8px 12px;background:var(--surface2);border-radius:var(--rs);border-left:2px solid var(--blue);font-size:10px;color:var(--text-dim);line-height:1.9;}
+.info-strip .lbl{color:var(--blue);text-transform:uppercase;letter-spacing:.06em;}
+code{font-family:var(--font);background:rgba(0,212,170,.07);padding:1px 4px;border-radius:3px;font-size:10px;}
+
+/* ── Fleet summary bar ── */
+.fleet-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
+.fleet-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;}
+.fc-label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:4px;}
+.fc-val{font-size:22px;font-weight:700;line-height:1;}
+.fc-sub{font-size:10px;color:var(--text-dim);margin-top:3px;}
+.fc-val.green{color:var(--green);}
+.fc-val.red{color:var(--red);}
+.fc-val.amber{color:var(--amber);}
+.fc-val.teal{color:var(--teal);}
+.fc-val.purple{color:var(--purple);}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:2px;background:var(--surface2);padding:4px;border-radius:9px;margin-bottom:16px;width:fit-content;}
+.tab{padding:6px 16px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text-dim);transition:all .15s;border:none;background:transparent;font-family:var(--font);}
+.tab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.4);}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+/* ── Operator cards grid ── */
+.op-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px;}
+.op-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;transition:border-color .2s;}
+.op-card:hover{border-color:var(--border2);}
+.op-card.has-errors{border-color:rgba(239,68,68,.3);}
+
+.op-header{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.op-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.op-dot.active{background:var(--green);animation:blink 2.5s ease-in-out infinite;}
+.op-dot.inactive{background:var(--red);}
+.op-name{flex:1;font-size:12px;font-weight:600;color:var(--teal);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.op-ip{font-size:10px;color:var(--text-dim);flex-shrink:0;}
+.op-type-badge{font-size:9px;padding:1px 7px;border-radius:999px;background:var(--blue-dim);color:var(--blue);border:1px solid rgba(0,136,255,.18);font-weight:600;flex-shrink:0;}
+
+.op-body{padding:12px 14px;}
+
+/* Mini metrics grid inside card */
+.metric-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;}
+.metric{text-align:center;padding:8px 4px;background:var(--surface2);border-radius:7px;}
+.metric-label{font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;}
+.metric-val{font-size:15px;font-weight:700;}
+.metric-val.green{color:var(--green);}
+.metric-val.amber{color:var(--amber);}
+.metric-val.red{color:var(--red);}
+.metric-val.blue{color:var(--blue);}
+.metric-val.teal{color:var(--teal);}
+.metric-val.dim{color:var(--text-dim);}
+
+/* Horizontal bar */
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.bar-label{width:110px;font-size:10px;color:var(--text-dim);flex-shrink:0;}
+.bar-track{flex:1;height:6px;background:var(--border2);border-radius:3px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:3px;transition:width .4s ease;}
+.bar-fill.green{background:var(--green);}
+.bar-fill.amber{background:var(--amber);}
+.bar-fill.red{background:var(--red);}
+.bar-fill.blue{background:var(--blue);}
+.bar-val{width:50px;text-align:right;font-size:10px;font-weight:600;flex-shrink:0;}
+
+/* Op footer */
+.op-footer{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-top:1px solid var(--border);font-size:9px;color:var(--text-dim);}
+.op-uptime{color:var(--text-dim);}
+.op-timestamp{color:var(--text-muted);}
+
+/* ── Table view (node_insight / docker_insight) ── */
+.tbl-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.tbl-panel-header{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.tbl-panel-title{font-size:12px;font-weight:600;flex:1;}
+.tbl-panel-cmd{font-size:9px;color:var(--text-dim);}
+.tbl-scroll{max-height:520px;overflow-y:auto;overflow-x:auto;}
+table.htbl{width:100%;border-collapse:collapse;font-size:11px;}
+table.htbl th{text-align:left;padding:6px 11px;background:var(--surface2);border-bottom:1px solid var(--border);color:var(--text-dim);font-size:9px;text-transform:uppercase;letter-spacing:.07em;font-weight:600;white-space:nowrap;position:sticky;top:0;z-index:1;}
+table.htbl td{padding:6px 11px;border-bottom:1px solid rgba(30,35,48,.5);vertical-align:middle;white-space:nowrap;}
+table.htbl tr:last-child td{border-bottom:none;}
+table.htbl tr:hover td{background:rgba(255,255,255,.013);}
+
+/* Filter bar */
+.filter-bar{display:flex;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface);align-items:center;flex-wrap:wrap;}
+.filter-bar input{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--rs);color:var(--text);font-family:var(--font);font-size:11px;padding:5px 9px;outline:none;width:200px;}
+.filter-bar input:focus{border-color:var(--teal);}
+.filter-count{font-size:10px;color:var(--text-dim);margin-left:auto;}
+
+/* Spinners & placeholders */
+.placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 0;gap:8px;color:var(--text-muted);font-size:11px;}
+.placeholder svg{opacity:.2;}
+.spinner-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 0;gap:10px;}
+.spinner{width:26px;height:26px;border:2px solid var(--border2);border-top-color:var(--teal);border-radius:50%;animation:spin .65s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner-lbl{font-size:10px;color:var(--text-dim);}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:999px;font-size:9px;font-weight:700;}
+.bg{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,.2);}
+.br{background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+.ba{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,158,11,.2);}
+.bx{background:rgba(100,116,139,.08);color:var(--text-dim);border:1px solid rgba(100,116,139,.15);}
+
+/* Raw toggle */
+details.raw{margin-top:12px;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+details.raw summary{padding:6px 11px;cursor:pointer;font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--text-dim);background:var(--surface2);list-style:none;display:flex;align-items:center;gap:5px;user-select:none;}
+details.raw summary::-webkit-details-marker{display:none;}
+details.raw summary::before{content:'▶';font-size:7px;transition:transform .18s;}
+details.raw[open] summary::before{transform:rotate(90deg);}
+details.raw pre{padding:10px;font-size:10px;color:var(--text-dim);overflow-x:auto;white-space:pre-wrap;word-break:break-word;background:var(--bg);max-height:240px;overflow-y:auto;}
+
+/* Error */
+.err-panel{padding:12px;background:var(--red-dim);border:1px solid rgba(239,68,68,.2);border-radius:7px;color:#fca5a5;font-size:11px;line-height:1.7;}
+.err-panel strong{color:var(--red);display:block;margin-bottom:3px;font-size:10px;}
+
+/* Footer */
+.footer{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:14px 0;margin-top:20px;border-top:1px solid var(--border);font-size:10px;color:var(--text-dim);}
+.tog-wrap{display:flex;align-items:center;gap:7px;}
+.tog{position:relative;width:34px;height:18px;cursor:pointer;}
+.tog input{opacity:0;width:0;height:0;position:absolute;}
+.tog-track{position:absolute;inset:0;border-radius:999px;background:var(--border2);transition:background .2s;}
+.tog input:checked+.tog-track{background:var(--teal);}
+.tog-thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .18s;}
+.tog input:checked~.tog-thumb{transform:translateX(16px);}
+.footer-right{margin-left:auto;color:var(--text-muted);font-size:9px;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header class="header">
+  <div class="logo">AL</div>
+  <div class="header-text">
+    <div class="header-title">AnyLog Node Health</div>
+    <div class="header-sub">Operator Fleet · node_insight · docker_insight · v1.23</div>
+  </div>
+  <div class="conn-badge" id="connBadge">
+    <span class="conn-dot"></span>
+    <span id="connLabel">Not connected</span>
+  </div>
+</header>
+
+<!-- Config -->
+<div class="config-card">
+  <div class="config-row">
+    <div class="field-group" style="flex:2;min-width:220px">
+      <div class="field-label">Node URL</div>
+      <input type="text" id="nodeUrl" placeholder="http://66.175.217.145:32349">
+    </div>
+    <div class="field-group" style="min-width:130px;flex:1">
+      <div class="field-label">DBMS</div>
+      <input type="text" id="cfgDbms" value="monitoring" placeholder="monitoring">
+    </div>
+    <div class="field-group" style="min-width:110px;flex:1">
+      <div class="field-label">Time window</div>
+      <select id="cfgWindow">
+        <option value="1">Last 1 hour</option>
+        <option value="6">Last 6 hours</option>
+        <option value="24">Last 24 hours</option>
+        <option value="168">Last 7 days</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" id="fetchBtn" onclick="fetchAll()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      Fetch
+    </button>
+    <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
+  </div>
+  <div class="info-strip">
+    <span class="lbl">▸ Commands</span> &nbsp;
+    <code>get monitored operators</code> — live fleet snapshot &nbsp;·&nbsp;
+    <code>sql monitoring … select * from node_insight where period(hour,N,now(),insert_timestamp)</code> — historical node metrics &nbsp;·&nbsp;
+    <code>sql monitoring … select * from docker_insight where period(hour,N,now(),insert_timestamp)</code> — container metrics
+  </div>
+</div>
+
+<!-- Fleet summary bar -->
+<div class="fleet-bar" id="fleetBar">
+  <div class="fleet-card"><div class="fc-label">Operators</div><div class="fc-val dim" id="fc-total">—</div><div class="fc-sub">monitored</div></div>
+  <div class="fleet-card"><div class="fc-label">Active</div><div class="fc-val green" id="fc-active">—</div><div class="fc-sub">online now</div></div>
+  <div class="fleet-card"><div class="fc-label">Avg CPU</div><div class="fc-val teal" id="fc-cpu">—</div><div class="fc-sub">% across fleet</div></div>
+  <div class="fleet-card"><div class="fc-label">Avg Free Space</div><div class="fc-val blue" id="fc-disk">—</div><div class="fc-sub">% remaining</div></div>
+  <div class="fleet-card"><div class="fc-label">Total Rows (live)</div><div class="fc-val purple" id="fc-rows">—</div><div class="fc-sub">ingested total</div></div>
+  <div class="fleet-card"><div class="fc-label">Total Errors</div><div class="fc-val" id="fc-errs">—</div><div class="fc-sub">all operators</div></div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('operators',this)">⬡ Operators</button>
+  <button class="tab" onclick="switchTab('node_insight',this)">📊 node_insight</button>
+  <button class="tab" onclick="switchTab('docker_insight',this)">🐳 docker_insight</button>
+</div>
+
+<!-- Tab: Operator cards -->
+<div class="tab-content active" id="tab-operators">
+  <div id="opGrid" class="op-grid">
+    <div class="placeholder" style="grid-column:1/-1">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      Fetch to load operator health…
+    </div>
+  </div>
+</div>
+
+<!-- Tab: node_insight -->
+<div class="tab-content" id="tab-node_insight">
+  <div class="tbl-panel">
+    <div class="tbl-panel-header">
+      <div class="tbl-panel-title">node_insight</div>
+      <div class="tbl-panel-cmd" id="niCmd">sql monitoring … select * from node_insight where period(…)</div>
+    </div>
+    <div class="filter-bar">
+      <input type="text" id="niFilter" placeholder="Filter by node name…" oninput="filterTable('ni')">
+      <span class="filter-count" id="niCount"></span>
+    </div>
+    <div class="tbl-scroll" id="niBody">
+      <div class="placeholder"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Awaiting fetch…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tab: docker_insight -->
+<div class="tab-content" id="tab-docker_insight">
+  <div class="tbl-panel">
+    <div class="tbl-panel-header">
+      <div class="tbl-panel-title">docker_insight</div>
+      <div class="tbl-panel-cmd" id="diCmd">sql monitoring … select * from docker_insight where period(…)</div>
+    </div>
+    <div class="filter-bar">
+      <input type="text" id="diFilter" placeholder="Filter by container / hostname…" oninput="filterTable('di')">
+      <span class="filter-count" id="diCount"></span>
+    </div>
+    <div class="tbl-scroll" id="diBody">
+      <div class="placeholder"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>Awaiting fetch…</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <div class="tog-wrap">
+    <label class="tog">
+      <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
+      <div class="tog-track"></div>
+      <div class="tog-thumb"></div>
+    </label>
+    <span>Auto-refresh (30s)</span>
+  </div>
+  <span id="lastFetch" style="color:var(--text-muted)">—</span>
+  <span class="footer-right">AnyLog Node Health · POST / application/json · v1.23</span>
+</div>
+
+</div><!-- /app -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  ANYLOG NODE HEALTH DASHBOARD — v1.23
+// ═══════════════════════════════════════════════════════════════
+//
+//  Commands (all POST · Content-Type: application/json):
+//
+//  1. get monitored operators
+//     Body: {"command":"get monitored operators","AnyLog-Agent":"AnyLog/1.23"}
+//     Returns: JSON object keyed by "IP:port" → operator stats object
+//     Fields: node name, status, operational time, CPU Percent,
+//             Free Space Percent, total rows, new rows, total errors,
+//             avg. rows/sec, Packets Recv/Sent, timestamp
+//
+//  2. sql monitoring format=json:list and stat=false
+//         select * from node_insight
+//         where period(hour, N, now(), insert_timestamp) limit 500
+//     Body: {"command":"…","AnyLog-Agent":"AnyLog/1.23","destination":"network"}
+//     Returns: JSON array of node health records
+//
+//  3. sql monitoring format=json:list and stat=false
+//         select * from docker_insight
+//         where period(hour, N, now(), insert_timestamp) limit 500
+//     Body: {"command":"…","AnyLog-Agent":"AnyLog/1.23","destination":"network"}
+//     Returns: JSON array of docker container process records
+// ═══════════════════════════════════════════════════════════════
+
+const UA = 'AnyLog/1.23';
+let arTimer = null;
+let niAllRows = [], diAllRows = [];
+
+// ── POST helper ───────────────────────────────────────────────
+async function post(url, command, sql = false) {
+  const body = { 'command': command, 'AnyLog-Agent': UA };
+  if (sql) body['destination'] = 'network';
+  const resp = await fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+    signal:  AbortSignal.timeout(20000),
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+  const text = await resp.text();
+  // Strip trailing Statistics line if present (AnyLog appends it)
+  const clean = text.replace(/\n?\{"Statistics":\[.*\]\}\s*$/, '').trim();
+  return clean;
+}
+
+// ── Escape HTML ───────────────────────────────────────────────
+function esc(s) {
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Format helpers ────────────────────────────────────────────
+function fmtNum(n, dec=1) {
+  const v = parseFloat(n);
+  return isNaN(v) ? '—' : v.toFixed(dec);
+}
+function fmtBytes(b) {
+  const v = parseInt(b); if (isNaN(v)) return '—';
+  if (v >= 1e9) return (v/1e9).toFixed(1)+'GB';
+  if (v >= 1e6) return (v/1e6).toFixed(1)+'MB';
+  if (v >= 1e3) return (v/1e3).toFixed(1)+'KB';
+  return v+'B';
+}
+function fmtPkts(n) {
+  const v = parseInt(n); if (isNaN(v)) return '—';
+  if (v >= 1e6) return (v/1e6).toFixed(1)+'M';
+  if (v >= 1e3) return (v/1e3).toFixed(1)+'K';
+  return String(v);
+}
+function cpuColor(v) {
+  if (v > 80) return 'red'; if (v > 50) return 'amber'; return 'green';
+}
+function diskColor(v) {
+  if (v < 10) return 'red'; if (v < 25) return 'amber'; return 'green';
+}
+function barColor(pct, invert=false) {
+  if (invert) return pct < 10 ? 'red' : pct < 25 ? 'amber' : 'green';
+  return pct > 80 ? 'red' : pct > 50 ? 'amber' : 'green';
+}
+
+// ── DOM helpers ───────────────────────────────────────────────
+function setConn(state, lbl) {
+  const b = document.getElementById('connBadge');
+  b.className = 'conn-badge'+(state?' '+state:'');
+  document.getElementById('connLabel').textContent = lbl;
+}
+function el(id) { return document.getElementById(id); }
+
+// ── Tab switching ─────────────────────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Render: fleet summary bar ─────────────────────────────────
+function renderFleet(ops) {
+  const entries = Object.values(ops);
+  const active  = entries.filter(o => (o.status||'').toLowerCase() === 'active').length;
+  const avgCpu  = entries.reduce((a,o) => a + (parseFloat(o['CPU Percent'])||0), 0) / entries.length;
+  const avgDisk = entries.reduce((a,o) => a + (parseFloat(o['Free Space Percent'])||0), 0) / entries.length;
+  const totalRows = entries.reduce((a,o) => a + (parseInt(o['total rows'])||0), 0);
+  const totalErrs = entries.reduce((a,o) => a + (parseInt(o['total errors'])||0), 0);
+
+  el('fc-total').textContent = entries.length;
+  el('fc-total').className   = 'fc-val teal';
+  el('fc-active').textContent = active;
+  el('fc-cpu').textContent   = fmtNum(avgCpu) + '%';
+  el('fc-disk').textContent  = fmtNum(avgDisk) + '%';
+  el('fc-rows').textContent  = totalRows.toLocaleString();
+  el('fc-errs').textContent  = totalErrs.toLocaleString();
+  el('fc-errs').className    = 'fc-val' + (totalErrs > 0 ? ' amber' : ' green');
+}
+
+// ── Render: operator cards ────────────────────────────────────
+function renderOperators(ops) {
+  const entries = Object.entries(ops);
+  if (!entries.length) {
+    el('opGrid').innerHTML = '<div class="placeholder" style="grid-column:1/-1">No operator data returned.</div>';
+    return;
+  }
+
+  // Sort: active first, then by name
+  entries.sort(([,a],[,b]) => {
+    const aA = (a.status||'').toLowerCase()==='active';
+    const bA = (b.status||'').toLowerCase()==='active';
+    if (aA !== bA) return aA ? -1 : 1;
+    return (a['node name']||'').localeCompare(b['node name']||'');
+  });
+
+  el('opGrid').innerHTML = entries.map(([addr, op]) => {
+    const name      = (op['node name'] || addr).split('@')[0];
+    const ipPort    = addr;
+    const status    = (op.status||'').toLowerCase();
+    const isActive  = status === 'active';
+    const cpu       = parseFloat(op['CPU Percent']) || 0;
+    const disk      = parseFloat(op['Free Space Percent']) || 0;
+    const newRows   = parseInt(op['new rows']) || 0;
+    const totRows   = parseInt(op['total rows']) || 0;
+    const newErrs   = parseInt(op['new errors']) || 0;
+    const totErrs   = parseInt(op['total errors']) || 0;
+    const avgRps    = parseFloat(op['avg. rows/sec']) || 0;
+    const pktRecv   = fmtPkts(op['Packets Recv']);
+    const pktSent   = fmtPkts(op['Packets Sent']);
+    const netErr    = parseInt(op['Network Error']) || 0;
+    const uptime    = op['operational time'] || '—';
+    const elapsed   = op['Elapsed time'] || op['elapsed time'] || '—';
+    const ts        = (op.timestamp||'').substring(0,19);
+    const hasErrors = totErrs > 0 || newErrs > 0;
+
+    const cpuC  = cpuColor(cpu);
+    const diskC = diskColor(disk);
+    const rowsC = newRows > 0 ? 'green' : 'dim';
+
+    return `<div class="op-card${hasErrors ? ' has-errors' : ''}">
+      <div class="op-header">
+        <div class="op-dot ${isActive ? 'active' : 'inactive'}"></div>
+        <div class="op-name" title="${esc(op['node name']||addr)}">${esc(name)}</div>
+        <div class="op-ip">${esc(ipPort)}</div>
+        <div class="op-type-badge">${esc(op['node type']||'operator')}</div>
+      </div>
+      <div class="op-body">
+        <div class="metric-grid">
+          <div class="metric">
+            <div class="metric-label">CPU</div>
+            <div class="metric-val ${cpuC}">${fmtNum(cpu)}%</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Free Disk</div>
+            <div class="metric-val ${diskC}">${fmtNum(disk)}%</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">rows/sec</div>
+            <div class="metric-val teal">${fmtNum(avgRps,2)}</div>
+          </div>
+        </div>
+
+        <div class="bar-row">
+          <div class="bar-label">CPU usage</div>
+          <div class="bar-track"><div class="bar-fill ${barColor(cpu)}" style="width:${Math.min(cpu,100)}%"></div></div>
+          <div class="bar-val" style="color:var(--${cpuC})">${fmtNum(cpu)}%</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">Free space</div>
+          <div class="bar-track"><div class="bar-fill ${barColor(disk,true)}" style="width:${Math.min(disk,100)}%"></div></div>
+          <div class="bar-val" style="color:var(--${diskC})">${fmtNum(disk)}%</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">New rows</div>
+          <div class="bar-track"><div class="bar-fill blue" style="width:${newRows>0?'60%':'0%'}"></div></div>
+          <div class="bar-val" style="color:var(--${rowsC})">${newRows.toLocaleString()}</div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:8px;font-size:10px;flex-wrap:wrap;">
+          <span style="color:var(--text-dim)">Total rows:</span><span style="color:var(--text)">${totRows.toLocaleString()}</span>
+          <span style="color:var(--text-dim);margin-left:8px">Errors:</span>
+          <span style="color:${totErrs>0?'var(--amber)':'var(--green)'}">${totErrs}${newErrs>0?' (+'+newErrs+' new)':''}</span>
+          <span style="color:var(--text-dim);margin-left:8px">Pkt↓</span><span style="color:var(--blue)">${pktRecv}</span>
+          <span style="color:var(--text-dim)">Pkt↑</span><span style="color:var(--purple)">${pktSent}</span>
+          ${netErr>0?`<span style="color:var(--red)">NetErr:${netErr}</span>`:''}
+        </div>
+      </div>
+      <div class="op-footer">
+        <span class="op-uptime">⏱ uptime: ${esc(uptime)} · elapsed: ${esc(elapsed)}</span>
+        <span class="op-timestamp">${esc(ts)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Render: node_insight table ────────────────────────────────
+function renderNodeInsight(rows) {
+  if (!rows.length) { el('niBody').innerHTML='<div class="placeholder">No data returned.</div>'; return; }
+  niAllRows = rows;
+
+  // Key columns to highlight
+  const SHOW = ['node_name','status','cpu_percent','free_space_percent',
+                'new_rows','total_rows','new_errors','total_errors',
+                'avg_rows_sec','operational_time','elapsed_time',
+                'packets_recv','packets_sent','network_error','insert_timestamp'];
+  const headers = SHOW.filter(k => rows[0][k] !== undefined);
+
+  const thead = `<tr>${headers.map(h=>`<th>${esc(h.replace(/_/g,' '))}</th>`).join('')}</tr>`;
+
+  el('niBody').innerHTML = buildFilteredTable('ni', headers, rows);
+  el('niCount').textContent = `${rows.length} rows`;
+}
+
+// ── Render: docker_insight table ──────────────────────────────
+function renderDockerInsight(rows) {
+  if (!rows.length) { el('diBody').innerHTML='<div class="placeholder">No data returned.</div>'; return; }
+  diAllRows = rows;
+
+  const SHOW = ['hostname','container','uptime','cpu_usage',
+                'memory_usage_bytes','disk_read_bytes','disk_write_bytes',
+                'network_rx_packets','network_tx_packets',
+                'command','insert_timestamp'];
+  const headers = SHOW.filter(k => rows[0][k] !== undefined);
+
+  el('diBody').innerHTML = buildFilteredTable('di', headers, rows);
+  el('diCount').textContent = `${rows.length} rows`;
+}
+
+function buildFilteredTable(prefix, headers, rows) {
+  const filterVal = (el(prefix+'Filter')?.value||'').toLowerCase();
+  const filtered  = filterVal
+    ? rows.filter(r => JSON.stringify(r).toLowerCase().includes(filterVal))
+    : rows;
+
+  if (!filtered.length) return '<div class="placeholder">No rows match filter.</div>';
+
+  const thead = `<tr>${headers.map(h=>`<th>${esc(h.replace(/_/g,' '))}</th>`).join('')}</tr>`;
+  const tbody = filtered.map(row => {
+    const cells = headers.map(h => {
+      const v = row[h] ?? '';
+      // Cell formatting
+      if (h === 'node_name' || h === 'hostname' || h === 'container') {
+        const name = String(v).split('@')[0];
+        return `<td style="color:var(--teal);font-weight:600">${esc(name)}</td>`;
+      }
+      if (h === 'status') return `<td>${v.toLowerCase()==='active'?'<span class="badge bg">active</span>':'<span class="badge br">'+esc(v)+'</span>'}</td>`;
+      if (h === 'cpu_percent' || h === 'cpu_usage') {
+        const pct = parseFloat(v)||0;
+        return `<td style="color:var(--${cpuColor(pct)})">${fmtNum(pct)}%</td>`;
+      }
+      if (h === 'free_space_percent') {
+        const pct = parseFloat(v)||0;
+        return `<td style="color:var(--${diskColor(pct)})">${fmtNum(pct)}%</td>`;
+      }
+      if (h.includes('bytes')) return `<td style="color:var(--text-dim)">${fmtBytes(v)}</td>`;
+      if (h.includes('packets') || h.includes('recv') || h.includes('sent')) {
+        return `<td style="color:var(--blue)">${fmtPkts(v)}</td>`;
+      }
+      if (h === 'new_errors' || h === 'total_errors' || h === 'network_error') {
+        const n = parseInt(v)||0;
+        return `<td style="color:${n>0?'var(--amber)':'var(--text-dim)'}">${n}</td>`;
+      }
+      if (h === 'new_rows' || h === 'total_rows') {
+        const n = parseInt(v)||0;
+        return `<td style="color:${n>0?'var(--green)':'var(--text-dim)'}">${n.toLocaleString()}</td>`;
+      }
+      if (h === 'command') {
+        const short = String(v).length > 40 ? String(v).substring(0,40)+'…' : v;
+        return `<td title="${esc(v)}" style="color:var(--text-dim);cursor:default">${esc(short)}</td>`;
+      }
+      if (h === 'insert_timestamp') return `<td style="color:var(--text-muted)">${esc(String(v).substring(0,19))}</td>`;
+      return `<td>${esc(v)}</td>`;
+    });
+    return `<tr>${cells.join('')}</tr>`;
+  }).join('');
+
+  return `<table class="htbl"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+}
+
+// ── Filter tables live ────────────────────────────────────────
+function filterTable(prefix) {
+  if (prefix === 'ni' && niAllRows.length) {
+    const headers = Object.keys(niAllRows[0]).filter(k =>
+      ['node_name','status','cpu_percent','free_space_percent','new_rows','total_rows',
+       'new_errors','total_errors','avg_rows_sec','operational_time','elapsed_time',
+       'packets_recv','packets_sent','network_error','insert_timestamp'].includes(k));
+    el('niBody').innerHTML = buildFilteredTable('ni', headers, niAllRows);
+    const f = (el('niFilter')?.value||'').toLowerCase();
+    const cnt = f ? niAllRows.filter(r=>JSON.stringify(r).toLowerCase().includes(f)).length : niAllRows.length;
+    el('niCount').textContent = `${cnt} / ${niAllRows.length} rows`;
+  }
+  if (prefix === 'di' && diAllRows.length) {
+    const headers = Object.keys(diAllRows[0]).filter(k =>
+      ['hostname','container','uptime','cpu_usage','memory_usage_bytes','disk_read_bytes',
+       'disk_write_bytes','network_rx_packets','network_tx_packets','command','insert_timestamp'].includes(k));
+    el('diBody').innerHTML = buildFilteredTable('di', headers, diAllRows);
+    const f = (el('diFilter')?.value||'').toLowerCase();
+    const cnt = f ? diAllRows.filter(r=>JSON.stringify(r).toLowerCase().includes(f)).length : diAllRows.length;
+    el('diCount').textContent = `${cnt} / ${diAllRows.length} rows`;
+  }
+}
+
+// ── Main fetch ────────────────────────────────────────────────
+async function fetchAll() {
+  const url    = el('nodeUrl').value.trim();
+  const dbms   = el('cfgDbms').value.trim() || 'monitoring';
+  const hours  = parseInt(el('cfgWindow').value) || 1;
+  if (!url) { alert('Please enter the Node URL.'); return; }
+
+  const btn = el('fetchBtn');
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner" style="width:13px;height:13px;border-width:2px"></div> Fetching…`;
+  setConn('','Connecting…');
+
+  // Spinner in op grid
+  el('opGrid').innerHTML = '<div class="spinner-wrap" style="grid-column:1/-1"><div class="spinner"></div><div class="spinner-lbl">Loading operator health…</div></div>';
+  el('niBody').innerHTML = '<div class="spinner-wrap"><div class="spinner"></div><div class="spinner-lbl">Loading node_insight…</div></div>';
+  el('diBody').innerHTML = '<div class="spinner-wrap"><div class="spinner"></div><div class="spinner-lbl">Loading docker_insight…</div></div>';
+
+  // Update command labels
+  const period = `period(hour, ${hours}, now(), insert_timestamp)`;
+  const sqlBase = `sql ${dbms} format=json:list and stat=false`;
+  el('niCmd').textContent = `${sqlBase} select * from node_insight where ${period} limit 500`;
+  el('diCmd').textContent = `${sqlBase} select * from docker_insight where ${period} limit 500`;
+
+  // Fire all three in parallel
+  const [r1, r2, r3] = await Promise.allSettled([
+    post(url, 'get monitored operators'),
+    post(url, `${sqlBase} select * from node_insight where ${period} limit 500`, true),
+    post(url, `${sqlBase} select * from docker_insight where ${period} limit 500`, true),
+  ]);
+
+  let connName = null, anyErr = false;
+
+  // Panel 1: get monitored operators
+  if (r1.status === 'fulfilled') {
+    try {
+      const ops = JSON.parse(r1.value);
+      renderFleet(ops);
+      renderOperators(ops);
+      // Use first node name as connection label
+      const first = Object.values(ops)[0];
+      connName = first?.['node name']?.split('@')?.[0] || null;
+    } catch(e) {
+      el('opGrid').innerHTML = `<div class="err-panel" style="grid-column:1/-1"><strong>Parse error</strong>${esc(e.message)}</div>`;
+      anyErr = true;
+    }
+  } else {
+    el('opGrid').innerHTML = `<div class="err-panel" style="grid-column:1/-1"><strong>Error</strong>${esc(r1.reason?.message||'Network error')}</div>`;
+    anyErr = true;
+  }
+
+  // Panel 2: node_insight
+  if (r2.status === 'fulfilled') {
+    try { renderNodeInsight(JSON.parse(r2.value)); }
+    catch(e) { el('niBody').innerHTML = `<div class="err-panel"><strong>Parse error</strong>${esc(e.message)}<br><pre style="font-size:10px;margin-top:8px;overflow-x:auto">${esc(r2.value.substring(0,500))}</pre></div>`; }
+  } else {
+    el('niBody').innerHTML = `<div class="err-panel"><strong>Error</strong>${esc(r2.reason?.message||'Network error')}</div>`;
+    anyErr = true;
+  }
+
+  // Panel 3: docker_insight
+  if (r3.status === 'fulfilled') {
+    try { renderDockerInsight(JSON.parse(r3.value)); }
+    catch(e) { el('diBody').innerHTML = `<div class="err-panel"><strong>Parse error</strong>${esc(e.message)}<br><pre style="font-size:10px;margin-top:8px;overflow-x:auto">${esc(r3.value.substring(0,500))}</pre></div>`; }
+  } else {
+    el('diBody').innerHTML = `<div class="err-panel"><strong>Error</strong>${esc(r3.reason?.message||'Network error')}</div>`;
+    anyErr = true;
+  }
+
+  if (anyErr && !connName) setConn('error','Connection error');
+  else setConn('connected', connName || url.replace(/^https?:\/\//,''));
+
+  el('lastFetch').textContent = 'Last fetch: '+new Date().toLocaleTimeString();
+  btn.disabled = false;
+  btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg> Fetch`;
+}
+
+// ── Clear ─────────────────────────────────────────────────────
+function clearAll() {
+  niAllRows = []; diAllRows = [];
+  el('opGrid').innerHTML = '<div class="placeholder" style="grid-column:1/-1"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Fetch to load operator health…</div>';
+  el('niBody').innerHTML = '<div class="placeholder"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Awaiting fetch…</div>';
+  el('diBody').innerHTML = '<div class="placeholder"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>Awaiting fetch…</div>';
+  ['fc-total','fc-active','fc-cpu','fc-disk','fc-rows','fc-errs'].forEach(id => { el(id).textContent='—'; el(id).className='fc-val'; });
+  el('niCount').textContent=''; el('diCount').textContent='';
+  setConn('','Not connected');
+  el('lastFetch').textContent='—';
+}
+
+// ── Auto-refresh ──────────────────────────────────────────────
+function toggleAutoRefresh() {
+  const on = el('autoRefresh').checked;
+  if (on) arTimer = setInterval(fetchAll, 30000);
+  else { clearInterval(arTimer); arTimer=null; }
+}
+
+el('nodeUrl').addEventListener('keydown', e => { if(e.key==='Enter') fetchAll(); });
+</script>
+</body>
+</html>

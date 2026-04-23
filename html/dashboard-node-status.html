@@ -407,7 +407,7 @@
         Browser → AnyLog node directly via <code>POST</code>
       </span>
       <span>Header: <code>Content-Type: application/json</code></span>
-      <span>Body: <code>{"User-Agent":"AnyLog/1.23","command":"..."}</code></span>
+      <span>Body: <code>{"AnyLog-Agent":"AnyLog/1.23","command":"..."}</code></span>
     </div>
     <div class="cors-warn" id="corsWarn">
       ⚠ CORS issue detected. AnyLog must respond with
@@ -543,7 +543,7 @@ async function queryNode(nodeUrl, command) {
   const resp = await fetch(nodeUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ "User-Agent": USER_AGENT_HEADER, "command": command }),
+    body: JSON.stringify({ "AnyLog-Agent": USER_AGENT_HEADER, "command": command }),
     signal: AbortSignal.timeout(15000)
   });
   const raw = await resp.text();

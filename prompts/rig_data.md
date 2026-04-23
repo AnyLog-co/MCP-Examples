@@ -153,7 +153,7 @@ fetch(nodeUrl, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    'User-Agent':  'AnyLog/1.23',
+    'AnyLog-Agent':  'AnyLog/1.23',
     'command':     `sql ${dbms} format=json:list and stat=false  ${sql}`,
     'destination': 'network'
   })

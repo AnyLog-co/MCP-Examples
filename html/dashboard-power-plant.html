@@ -603,7 +603,7 @@ const maxConcurrent = 5;
 
 // ── CORE POST ─────────────────────────────────────────────────────────────────
 async function _post(command, withDestination) {
-  const body = { 'User-Agent': CONN.userAgent, 'command': command };
+  const body = { 'AnyLog-Agent': CONN.userAgent, 'command': command };
   if (withDestination) body['destination'] = CONN.destination;
   const resp = await fetch(CONN.node, {
     method: 'POST',
