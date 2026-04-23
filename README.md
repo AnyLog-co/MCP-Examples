@@ -72,6 +72,29 @@ explicitly allows it via **Cross-Origin Resource Sharing (CORS)** headers. AnyLo
 nodes do not expose CORS headers by default, so direct browser-to-node calls are
 blocked.
 
+#### Why `AnyLog-Agent` instead of `User-Agent`
+
+AnyLog identifies requests using a custom `AnyLog-Agent` request header rather than
+the standard `User-Agent` header. This is intentional and directly related to CORS:
+
+- **`User-Agent` is browser-controlled.** Browsers treat it as a forbidden header —
+  any attempt to set it manually via `fetch()` is silently ignored, and its presence
+  in a request can trigger a CORS preflight (`OPTIONS`) that AnyLog nodes are not
+  configured to answer.
+- **`AnyLog-Agent` is a custom header you own.** Because it is not on the browser's
+  reserved list, you can set it freely. The AnyLog node can then explicitly whitelist
+  it:
+  ```
+  Access-Control-Allow-Headers: AnyLog-Agent, Content-Type
+  ```
+- **Switching to POST + `AnyLog-Agent` makes the CORS contract explicit and
+  controllable** on both ends, rather than fighting browser restrictions on reserved
+  headers.
+
+When running behind a proxy (nginx or Flask), CORS is handled at the proxy layer and
+`AnyLog-Agent` is forwarded to the node transparently — the browser never sees the
+cross-origin hop at all.
+
 The solution is to route requests through a backend service (nginx or the Flask proxy)
 that runs outside the browser's security model.
 
@@ -263,16 +286,29 @@ to generate dashboards tailored to your data.
 
 ## AnyLog REST API Reference
 
-All calls use `POST` with a JSON body. Two body shapes:
+All calls use `POST` with a JSON body and two required headers.
 
-### SQL queries — requires `destination: "network"`
+### Headers
+
+| Header | Value | Purpose |
+|---|---|---|
+| `Content-Type` | `application/json` | Required for all POST requests |
+| `AnyLog-Agent` | `AnyLog/1.23` | Identifies the request to AnyLog; replaces `User-Agent` (see [Connection Modes](#connection-modes) for why) |
+
+> **Why not `User-Agent`?** Browsers treat `User-Agent` as a reserved header —
+> setting it via `fetch()` is silently ignored and can trigger CORS preflight.
+> `AnyLog-Agent` is a custom header that both sides control explicitly.
+
+### Two body shapes
+
+#### SQL queries — requires `destination: "network"`
 
 ```bash
 curl -X POST http://HOST:PORT \
   -H "Content-Type: application/json" \
+  -H "AnyLog-Agent: AnyLog/1.23" \
   -d '{
-    "AnyLog-Agent":  "AnyLog/1.23",
-    "command":     "sql mydb format=json:list and stat=false  SELECT * FROM mytable LIMIT 10",
+    "command":     "sql mydb format=json:list and stat=false SELECT * FROM mytable LIMIT 10",
     "destination": "network"
   }'
 ```
@@ -281,14 +317,14 @@ curl -X POST http://HOST:PORT \
 `format=json:list and stat=false` returns a plain JSON array without a trailing
 row-count object.
 
-### Blockchain / node commands — no `destination`
+#### Blockchain / node commands — no `destination`
 
 ```bash
 curl -X POST http://HOST:PORT \
   -H "Content-Type: application/json" \
+  -H "AnyLog-Agent: AnyLog/1.23" \
   -d '{
-    "AnyLog-Agent": "AnyLog/1.23",
-    "command":    "get status where format=json"
+    "command": "get status where format=json"
   }'
 ```
 
@@ -296,6 +332,9 @@ Examples: `get status where format=json` · `test node` · `test network` ·
 `blockchain get uns where namespace = Smart_City`
 
 ### Via the Flask proxy (simple format)
+
+The proxy handles headers and `destination` automatically — no `AnyLog-Agent` needed
+from the browser:
 
 ```bash
 curl -X POST http://localhost:8080/api/query \

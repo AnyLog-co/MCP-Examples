@@ -8,6 +8,11 @@ Common errors and fixes for AnyLog dashboards, proxies, and MCP connections.
 
 ### `Failed to fetch` or CORS error (Direct mode)
 
+The browser is blocking the request before it reaches the AnyLog node. This happens
+for one of two reasons:
+
+**a) The node is not returning CORS headers**
+
 The AnyLog node is not responding with `Access-Control-Allow-Origin: *`.
 
 **Fix:** Switch Mode → `nginx` or `proxy` in the dashboard config bar, or launch
@@ -23,6 +28,31 @@ google-chrome --disable-web-security --user-data-dir=/tmp/dev
 # Windows
 chrome.exe --disable-web-security --user-data-dir=C:\tmp\dev
 ```
+
+**b) The browser is sending a CORS preflight (`OPTIONS`) the node doesn't answer**
+
+Browsers send a preflight before any request that uses a non-simple header or
+method. If you see a message like:
+
+```
+Response to preflight request doesn't pass access control check:
+No 'Access-Control-Allow-Origin' header is present on the requested resource.
+```
+
+This is why AnyLog uses `AnyLog-Agent` instead of `User-Agent`:
+
+- `User-Agent` is a **browser-reserved header** — `fetch()` cannot set it, and
+  its presence in a request triggers a preflight that AnyLog nodes are not
+  configured to answer.
+- `AnyLog-Agent` is a **custom header** that both sides control. The node can
+  whitelist it explicitly:
+  ```
+  Access-Control-Allow-Headers: AnyLog-Agent, Content-Type
+  ```
+
+If you are calling the AnyLog REST API directly from a browser (Direct mode), ensure
+the node is configured to respond with the required CORS headers, or route through
+the nginx or Flask proxy instead.
 
 ### CORS banner persists after switching to nginx / proxy mode
 
@@ -44,11 +74,14 @@ on the query node, which holds no operator data.
 
 ```json
 // ❌ Wrong — query node only
-{"AnyLog-Agent": "AnyLog/1.23", "command": "sql mydb format=json:list and stat=false SELECT ..."}
+{"command": "sql mydb format=json:list and stat=false SELECT ..."}
 
 // ✅ Correct — distributed to operator nodes
-{"AnyLog-Agent": "AnyLog/1.23", "command": "sql mydb format=json:list and stat=false SELECT ...", "destination": "network"}
+{"command": "sql mydb format=json:list and stat=false SELECT ...", "destination": "network"}
 ```
+
+> **Note:** `AnyLog-Agent` belongs in the HTTP **header**, not the JSON body.
+> See the [REST API Reference](./README.md#anylog-rest-api-reference) for correct curl usage.
 
 The Flask proxy in REST mode adds `destination: network` automatically.
 
@@ -87,7 +120,8 @@ The AnyLog node is not listening on the configured port. Verify with:
 ```bash
 curl -X POST http://HOST:PORT \
   -H "Content-Type: application/json" \
-  -d '{"AnyLog-Agent": "AnyLog/1.23", "command": "get status where format=json"}'
+  -H "AnyLog-Agent: AnyLog/1.23" \
+  -d '{"command": "get status where format=json"}'
 ```
 
 ---
@@ -168,10 +202,9 @@ The AnyLog query node is unreachable. Test directly:
 ```bash
 curl -X POST http://HOST:PORT \
   -H "Content-Type: application/json" \
-  -d '{"AnyLog-Agent": "AnyLog/1.23", "command": "get status where format=json"}'
+  -H "AnyLog-Agent: AnyLog/1.23" \
+  -d '{"command": "get status where format=json"}'
 ```
-
-Check IP, port, and any firewall rules between your machine and the node.
 
 ### `timeout` errors on large MCP queries
 
